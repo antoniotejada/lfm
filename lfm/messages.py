@@ -21,7 +21,39 @@ HISTORIC_MAXLEN = 100
 
 
 ######################################################################
-class CommonWindow:
+class BaseWindow(object):
+    """Base class for CommonWindow and FixSizeWindow classes"""
+
+    def init_ui(self, h, w, title, text, br_bg, br_att, bd_att, bd_bg):
+        try:
+            win = curses.newwin(h, w,
+                                int((app.maxh-h)/2), int((app.maxw-w)/2))
+            self.pwin = curses.panel.new_panel(win)
+            self.pwin.top()
+        except curses.error:
+            print 'Can\'t create window'
+            sys.exit(-1)
+        win.bkgd(br_bg, br_att)
+        win.erase()
+        win.box(0, 0)
+        if len(title) > app.maxw - 14:
+            title = title[:app.maxw-10] + '...' + '\''
+        win.addstr(0, int((w-len(title)-2)/2), ' %s ' % title, curses.A_BOLD)
+        win.addstr(2, 2, text, bd_att)
+        if self.waitkey:
+            win.addstr(h-1, int((w-27)/2), ' Press any key to continue ', br_att)
+        win.refresh()
+        win.keypad(1)
+        self.win = win
+
+    def run(self):
+        if self.waitkey:
+            while not self.pwin.window().getch():
+                pass
+        self.pwin.hide()
+
+        
+class CommonWindow(BaseWindow):
     """A superclass for 'error' and 'win' windows"""
 
     def __init__(self, title, text, br_att, br_bg, bd_att, bd_bg, waitkey = 1):
@@ -43,41 +75,14 @@ class CommonWindow:
         if h > app.maxh - 4:
             h = app.maxh - 4
             text = ''.join([l+'\n' for l in lines[-5:]])
-        try:
-            win = curses.newwin(h, w,
-                                int((app.maxh-h)/2), int((app.maxw-w)/2))
-            self.pwin = curses.panel.new_panel(win)
-            self.pwin.top()
-        except curses.error:
-            print 'Can\'t create window'
-            sys.exit(-1)
-        win.bkgd(br_bg, br_att)
-        win.erase()
-        win.box(0, 0)
-        if len(title) > app.maxw-14:
-            title = title[:app.maxw-10] + '...' + '\''
-        win.addstr(0, int((w-len(title)-2)/2), ' %s ' % title, curses.A_BOLD)
-        if h == 5:
-            win.addstr(2, 2, text, bd_att)
-        else:
-            win.addstr(2, 1, text, bd_att)
-        if self.waitkey:
-            win.addstr(h-1, int((w-27)/2), ' Press any key to continue ', br_att)
-        win.refresh()
-        win.keypad(1)
-
-    def run(self):
-        if self.waitkey:
-            while not self.pwin.window().getch():
-                pass
-        self.pwin.hide()
+        self.init_ui(h, w, title, text, br_bg, br_att, bd_att, bd_bg)
 
 
-class FixSizeCommonWindow:
+class FixSizeCommonWindow(BaseWindow):
     """A superclass for messages, with fixed size"""
 
-    def __init__(self, title, text, downtext,
-                 br_att, br_bg, bd_att, bd_bg, waitkey = 1):
+    def __init__(self, title, text, downtext, br_att, br_bg, bd_att, bd_bg,
+                 waitkey = 1):
         self.waitkey = waitkey
         text = text.replace('\t', ' ' * 4)
         w = app.maxw - 20
@@ -87,42 +92,14 @@ class FixSizeCommonWindow:
             text = text[:w-5]
         if len(downtext) > w - 4:
             downtext = downtext[:w-4]
-        h = 5
-        try:
-            win = curses.newwin(h, w,
-                                int((app.maxh-h)/2), int((app.maxw-w)/2))
-            self.pwin = curses.panel.new_panel(win)
-            self.pwin.top()
-        except curses.error:
-            print 'Can\'t create window'
-            sys.exit(-1)
-        win.bkgd(br_bg, br_att)
-        win.erase()
-        win.box(0, 0)
-        if len(title) > app.maxw - 14:
-            title = title[:app.maxw-10] + '...' + '\''
-        win.addstr(0, int((w-len(title)-2)/2), ' %s ' % title, curses.A_BOLD)
-        if h == 5:
-            win.addstr(2, 2, text, bd_att)
-        else:
-            win.addstr(2, 1, text, bd_att)
-        if self.waitkey:
-            win.addstr(h-1, int((w-27)/2),
-                       ' Press any key to continue ', br_att)
-        elif downtext:
-            win.addstr(h-1, int((w-len(downtext)-2)/2),
-                       ' %s ' % downtext, br_att)
-        win.refresh()
-        win.keypad(1)
-
-    def run(self):
-        if self.waitkey:
-            while not self.pwin.window().getch():
-                pass
-        self.pwin.hide()
+        self.init_ui(5, w, title, text, br_bg, br_att, bd_att, bd_bg)
+        if downtext and not self.waitkey:
+            self.win.addstr(4, int((w-len(downtext)-2)/2),
+                            ' %s ' % downtext, br_att)
+            self.win.refresh()
 
 
-class FixSizeProgressBarWindow:
+class FixSizeProgressBarWindow(object):
     """Like FixSizeCommonWindow but with a ProgressBar"""
 
     def __init__(self, title, text, downtext, percent,
@@ -184,18 +161,17 @@ class FixSizeProgressBarWindow:
 def error(title, msg = '', file = ''):
     """show an error window"""
 
+#     buf = '%s: %s' % (file, msg) if file else msg
     if file == '':
         buf = msg
     else:
         buf = '%s: %s' % (file, msg)
     CommonWindow(title, buf,
-                 curses.color_pair(8),
-                 curses.color_pair(8),
+                 curses.color_pair(8), curses.color_pair(8),
                  curses.color_pair(7) | curses.A_BOLD,
                  curses.color_pair(7)).run()
 
 
-######################################################################
 def win(title, text):
     """show a message window and wait for a key"""
 
@@ -213,12 +189,11 @@ def win_nokey(title, text, downtext = ''):
                         waitkey = 0).run()
 
 
-######################################################################
 def notyet(title):
     """show a not-yet-implemented message"""
 
     CommonWindow(title,
-                 'Sorry, but this function\n is not implemented yet!',
+                 'Sorry, but this function\nis not implemented yet!',
                  curses.color_pair(1) | curses.A_BOLD, curses.color_pair(1),
                  curses.color_pair(4), curses.color_pair(4)).run()
 
@@ -265,8 +240,10 @@ def get_a_key(title, question):
 def confirm(title, question, default = 0):
     """show a yes/no window, returning 1/0"""
 
-    h = 5
-    w = min(max(34, len(question)+5), app.maxw-2)
+    BTN_SELECTED = curses.color_pair(9) | curses.A_BOLD
+    BTN_NO_SELECTED = curses.color_pair(1) | curses.A_BOLD
+
+    h, w = 5, min(max(34, len(question)+5), app.maxw-2)
     try:
         win = curses.newwin(h, w, int((app.maxh-h)/2), int((app.maxw-w)/2))
         pwin = curses.panel.new_panel(win)
@@ -291,11 +268,9 @@ def confirm(title, question, default = 0):
     answer = default
     while True:
         if answer == 1:
-            attr_yes = curses.color_pair(9) | curses.A_BOLD
-            attr_no = curses.color_pair(1) | curses.A_BOLD
+            attr_yes, attr_no = BTN_SELECTED, BTN_NO_SELECTED
         else:
-            attr_yes = curses.color_pair(1) | curses.A_BOLD
-            attr_no = curses.color_pair(9) | curses.A_BOLD
+            attr_yes, attr_no = BTN_NO_SELECTED, BTN_SELECTED
         btn = curses.newpad(1, 8)
         btn.addstr(0, 0, '[ Yes ]', attr_yes)
         btn.refresh(0, 0, row, col1, row + 1, col1 + 6)
@@ -325,12 +300,13 @@ def confirm(title, question, default = 0):
     return answer
 
 
-######################################################################
 def confirm_all(title, question, default = 0):
     """show a yes/all/no/stop window, returning 1/2/0/-1"""
 
-    h = 5
-    w = min(max(45, len(question)+5), app.maxw-2)
+    BTN_SELECTED = curses.color_pair(9) | curses.A_BOLD
+    BTN_NO_SELECTED = curses.color_pair(1) | curses.A_BOLD
+    
+    h, w = 5, min(max(45, len(question)+5), app.maxw-2)
     try:
         win = curses.newwin(h, w, int((app.maxh-h)/2), int((app.maxw-w)/2))
         pwin = curses.panel.new_panel(win)
@@ -357,27 +333,17 @@ def confirm_all(title, question, default = 0):
 
     win.keypad(1)
     answer = default
+    order = [1, 2, 0, -1]
     while True:
+        attr_yes = attr_all = attr_no = attr_skipall = BTN_NO_SELECTED
         if answer == 1:
-            attr_yes = curses.color_pair(9) | curses.A_BOLD
-            attr_all = curses.color_pair(1) | curses.A_BOLD
-            attr_no = curses.color_pair(1) | curses.A_BOLD
-            attr_skipall = curses.color_pair(1) | curses.A_BOLD
+            attr_yes = BTN_SELECTED
         elif answer == 2:
-            attr_yes = curses.color_pair(1) | curses.A_BOLD
-            attr_all = curses.color_pair(9) | curses.A_BOLD
-            attr_no = curses.color_pair(1) | curses.A_BOLD
-            attr_skipall = curses.color_pair(1) | curses.A_BOLD
+            attr_all = BTN_SELECTED
         elif answer == 0:
-            attr_yes = curses.color_pair(1) | curses.A_BOLD
-            attr_all = curses.color_pair(1) | curses.A_BOLD
-            attr_no = curses.color_pair(9) | curses.A_BOLD
-            attr_skipall = curses.color_pair(1) | curses.A_BOLD
+            attr_no = BTN_SELECTED
         elif answer == -1:
-            attr_yes = curses.color_pair(1) | curses.A_BOLD
-            attr_all = curses.color_pair(1) | curses.A_BOLD
-            attr_no = curses.color_pair(1) | curses.A_BOLD
-            attr_skipall = curses.color_pair(9) | curses.A_BOLD
+            attr_skipall = BTN_SELECTED
         else:
             raise ValueError
         btn = curses.newpad(1, 8)
@@ -394,18 +360,16 @@ def confirm_all(title, question, default = 0):
         btn.refresh(0, 0, row, col4, row + 1, col4 + 7)
 
         ch = win.getch()
-        if ch in (curses.KEY_UP, curses.KEY_DOWN, curses.KEY_LEFT,
-                  curses.KEY_RIGHT, 9):
-            if answer == 1:
-                answer = 2
-            elif answer == 2:
-                answer = 0
-            elif answer == 0:
-                answer = -1
-            elif answer == -1:
-                answer = 1
-            else:
-                raise ValueError
+        if ch in (curses.KEY_UP, curses.KEY_LEFT):
+            try:
+                answer = order[order.index(answer) - 1]
+            except IndexError:
+                answer = order[len(order)]
+        if ch in (curses.KEY_DOWN, curses.KEY_RIGHT, 9):
+            try:
+                answer = order[order.index(answer) + 1]
+            except IndexError:
+                answer = order[0]
         elif ch in (ord('Y'), ord('y')):
             answer = 1
             break
@@ -427,12 +391,13 @@ def confirm_all(title, question, default = 0):
     return answer
 
 
-######################################################################
 def confirm_all_none(title, question, default = 0):
     """show a yes/all/no/none/stop window, returning 1/2/0/-2/-1"""
 
-    h = 5
-    w = min(max(50, len(question)+5), app.maxw-2)
+    BTN_SELECTED = curses.color_pair(9) | curses.A_BOLD
+    BTN_NO_SELECTED = curses.color_pair(1) | curses.A_BOLD
+
+    h, w = 5, min(max(50, len(question)+5), app.maxw-2)
     try:
         win = curses.newwin(h, w, int((app.maxh-h)/2), int((app.maxw-w)/2))
         pwin = curses.panel.new_panel(win)
@@ -460,39 +425,22 @@ def confirm_all_none(title, question, default = 0):
 
     win.keypad(1)
     answer = default
+    order = [1, 2, 0, -2, -1]
     while True:
+        attr_yes, attr_all, attr_no, attr_none, attr_skipall = [BTN_NO_SELECTED] * 5
         if answer == 1:
-            attr_yes = curses.color_pair(9) | curses.A_BOLD
-            attr_all = curses.color_pair(1) | curses.A_BOLD
-            attr_no = curses.color_pair(1) | curses.A_BOLD
-            attr_none = curses.color_pair(1) | curses.A_BOLD
-            attr_skipall = curses.color_pair(1) | curses.A_BOLD
+            attr_yes = BTN_SELECTED
         elif answer == 2:
-            attr_yes = curses.color_pair(1) | curses.A_BOLD
-            attr_all = curses.color_pair(9) | curses.A_BOLD
-            attr_no = curses.color_pair(1) | curses.A_BOLD
-            attr_none = curses.color_pair(1) | curses.A_BOLD
-            attr_skipall = curses.color_pair(1) | curses.A_BOLD
+            attr_all = BTN_SELECTED
         elif answer == 0:
-            attr_yes = curses.color_pair(1) | curses.A_BOLD
-            attr_all = curses.color_pair(1) | curses.A_BOLD
-            attr_no = curses.color_pair(9) | curses.A_BOLD
-            attr_none = curses.color_pair(1) | curses.A_BOLD
-            attr_skipall = curses.color_pair(1) | curses.A_BOLD
+            attr_no = BTN_SELECTED
         elif answer == -2:
-            attr_yes = curses.color_pair(1) | curses.A_BOLD
-            attr_all = curses.color_pair(1) | curses.A_BOLD
-            attr_no = curses.color_pair(1) | curses.A_BOLD
-            attr_none = curses.color_pair(9) | curses.A_BOLD
-            attr_skipall = curses.color_pair(1) | curses.A_BOLD
+            attr_none = BTN_SELECTED
         elif answer == -1:
-            attr_yes = curses.color_pair(1) | curses.A_BOLD
-            attr_all = curses.color_pair(1) | curses.A_BOLD
-            attr_no = curses.color_pair(1) | curses.A_BOLD
-            attr_none = curses.color_pair(1) | curses.A_BOLD
-            attr_skipall = curses.color_pair(9) | curses.A_BOLD
+            attr_skipall = BTN_SELECTED
         else:
             raise ValueError
+      
         btn = curses.newpad(1, 8)
         btn.addstr(0, 0, '[ Yes ]', attr_yes)
         btn.refresh(0, 0, row, col1, row + 1, col1 + 6)
@@ -510,20 +458,16 @@ def confirm_all_none(title, question, default = 0):
         btn.refresh(0, 0, row, col5, row + 1, col5 + 7)
 
         ch = win.getch()
-        if ch in (curses.KEY_UP, curses.KEY_DOWN, curses.KEY_LEFT,
-                  curses.KEY_RIGHT, 9):
-            if answer == 1:
-                answer = 2
-            elif answer == 2:
-                answer = 0
-            elif answer == 0:
-                answer = -2
-            elif answer == -2:
-                answer = -1
-            elif answer == -1:
-                answer = 1
-            else:
-                raise ValueError
+        if ch in (curses.KEY_UP, curses.KEY_LEFT):
+            try:
+                answer = order[order.index(answer) - 1]
+            except IndexError:
+                answer = order[len(order)]
+        if ch in (curses.KEY_DOWN, curses.KEY_RIGHT, 9):
+            try:
+                answer = order[order.index(answer) + 1]
+            except IndexError:
+                answer = order[0]
         elif ch in (ord('Y'), ord('y')):
             answer = 1
             break
@@ -549,7 +493,7 @@ def confirm_all_none(title, question, default = 0):
 
 
 ######################################################################
-class Yes_No_Buttons:
+class Yes_No_Buttons(object):
     """Yes/No buttons"""
 
     def __init__(self, w, h, d):
@@ -561,15 +505,14 @@ class Yes_No_Buttons:
 
 
     def show(self):
+        BTN_SELECTED = curses.color_pair(9) | curses.A_BOLD
+	BTN_NO_SELECTED = curses.color_pair(1) | curses.A_BOLD
         if self.active == 0:
-            attr1 = curses.color_pair(1) | curses.A_BOLD
-            attr2 = curses.color_pair(1) | curses.A_BOLD
+            attr1, attr2 = BTN_NO_SELECTED, BTN_NO_SELECTED
         elif self.active == 1:
-            attr1 = curses.color_pair(9) | curses.A_BOLD
-            attr2 = curses.color_pair(1) | curses.A_BOLD
+            attr1, attr2 = BTN_SELECTED, BTN_NO_SELECTED
         else:
-            attr1 = curses.color_pair(1) | curses.A_BOLD
-            attr2 = curses.color_pair(9) | curses.A_BOLD
+            attr1, attr2 = BTN_NO_SELECTED, BTN_SELECTED
         btn = curses.newpad(1, 8)
         btn.addstr(0, 0, '[<Yes>]', attr1)
         btn.refresh(0, 0, self.row, self.col1, self.row + 1, self.col1 + 6)
@@ -596,7 +539,7 @@ class Yes_No_Buttons:
 
 
 ######################################################################
-class EntryLine:
+class EntryLine(object):
     """An entry line to enter a dir. or file, a pattern, etc"""
 
     def __init__(self, w, h, x, y, path, with_historic, with_complete,
@@ -610,6 +553,7 @@ class EntryLine:
         self.entry.keypad(1)
 
         self.entry_width = w - 4
+        self.origtext = path
         self.text = path
         self.panelpath = panelpath
         self.pos = len(self.text)
@@ -623,9 +567,7 @@ class EntryLine:
 
 
     def show(self):
-        text = self.text
-        pos = self.pos
-        ew = self.entry_width
+        text, pos, ew = self.text, self.pos, self.entry_width
         ltext = len(text)
         if pos < ew:
             relpos = pos
@@ -635,7 +577,7 @@ class EntryLine:
                 textstr = text[:ew]
         else:
             if pos > ltext - (ew-1):
-                relpos = ew - 1 - (ltext - pos)
+                relpos = ew-1 - (ltext-pos)
                 textstr = text[ltext-ew+1:] + ' '
             else:
                 relpos = pos - int(pos/ew)*ew
@@ -651,8 +593,8 @@ class EntryLine:
         while True:
             self.show()
             ch = self.entry.getch()
-#              print 'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
-#                    (curses.keyname(ch), ch & 255, ch, ch)
+#             print 'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
+#                  (curses.keyname(ch), ch & 255, ch, ch)
             if ch in (0x03, 0x1B):        # Ctrl-C, ESC
                 return -1
             elif ch == curses.KEY_UP:
@@ -689,7 +631,7 @@ class EntryLine:
                         selected = entries.pop()
                     else:
                         y, x = self.entry.getbegyx()
-                        selected = SelectItem(entries, y + 1, x - 2).run()
+                        selected = SelectItem(entries, y+1, x-2).run()
                         app.display()
                         cursor_show2()
                     if selected != -1:
@@ -700,41 +642,75 @@ class EntryLine:
                     continue
             # chars and edit keys
             elif ch == 0x17:          # Ctrl-W
-                if self.text == None or self.text == '':
+                if not self.text:
+                    continue
+                self.text = ''
+                self.pos = 0
+            elif ch == 0x0B:          # Ctrl-K
+                if not self.text:
+                    continue
+                self.text = self.text[:self.pos]
+            elif ch == 0x04:          # Ctrl-D
+                if not self.text:
                     continue
                 text = self.text
                 if text == os.sep:
-                    text = ''
+                    self.text = ''
+                    self.pos = 0
+                if self.pos < len(text):
+                    if text[self.pos] == os.sep:
+                        i = text[self.pos+1:].find(os.sep)
+                        if i == -1:
+                            i = 0
+                        self.text = text[:self.pos] + text[self.pos+i+1:]
+                    else:
+                        i = text[self.pos:].find(os.sep)
+                        if i == -1:
+                            i = len(text) - self.pos
+                        text = text[:self.pos] + text[self.pos+i:]
+                        self.text = text.replace(os.sep+os.sep, os.sep)
                 else:
-                    if text[len(text)-1] == os.sep:
-                        text = os.path.dirname(text)
-                    text = os.path.dirname(text)
-                    if text != '' and text != os.sep:
-                        text += os.sep
-                self.text = text
+                    if text[self.pos-1] == os.sep:
+                        i = text[:self.pos-1].rfind(os.sep)
+                    else:
+                        i = text[:self.pos].rfind(os.sep)
+                    if i == -1:
+                        continue
+                    self.text = text[:i+1]
+                    self.pos = len(self.text)
+            elif ch == 0x01A:         # Ctrl-Z
+                self.text = self.origtext
                 self.pos = len(self.text)
-            elif ch == 0x04:          # Ctrl-D
-                if self.text == None or self.text == '':
-                    continue
-                text = ''
-                self.text = text
-                self.pos = len(self.text)
-            elif ch == curses.KEY_IC: # insert
-                self.ins = not self.ins
-            elif ch in (curses.KEY_HOME, 0x01):  # home
-                self.pos = 0
-            elif ch in (curses.KEY_END, 0x05):   # end
-                self.pos = len(self.text)
-            elif ch == curses.KEY_LEFT and self.pos > 0:
-                self.pos -= 1
-            elif ch == curses.KEY_RIGHT and self.pos < len(self.text):
-                self.pos += 1
             elif ch in (8, 127, curses.KEY_BACKSPACE) and len(self.text) > 0 and \
-                 self.pos > 0:    # backspace
+                 self.pos > 0:        # backspace, Ctrl-H
                 self.text = self.text[:self.pos-1] + self.text[self.pos:]
                 self.pos -= 1
             elif ch == curses.KEY_DC and self.pos < len(self.text):  # del
                 self.text = self.text[:self.pos] + self.text[self.pos+1:]
+            elif ch == curses.KEY_IC: # insert
+                self.ins = not self.ins
+            elif ch in (curses.KEY_HOME, 0x01):  # home, Ctrl-A
+                self.pos = 0
+            elif ch in (curses.KEY_END, 0x05):   # end, Ctrl-E
+                self.pos = len(self.text)
+            elif ch in (curses.KEY_LEFT, 0x02) and self.pos > 0: # Ctrl-B
+                self.pos -= 1
+            elif ch in (curses.KEY_RIGHT, 0x06) and self.pos < len(self.text): # Ctr-F
+                self.pos += 1
+            elif ch in (0x10, 0x21C):         # Ctrl-P, Ctrl-Cursor_left
+                if self.pos == 1 and self.text[0] == os.sep:
+                    self.pos = 0
+                    continue
+                if self.pos > 0 and self.text[self.pos-1] == os.sep:
+                    i = self.text[:self.pos-1].rfind(os.sep)
+                else:
+                    i = self.text[:self.pos].rfind(os.sep)
+                if i != -1:
+                    self.pos = i + 1
+            elif ch in (0x0E, 0x22B):         # Ctrl-N, Ctrl-Cursor_right
+                i = self.text[self.pos:].find(os.sep)
+                if i != -1:
+                    self.pos = self.pos + i + 1
             elif len(self.text) < 255 and 32 <= ch <= 255:
                 if self.ins:
                     self.text = self.text[:self.pos] + chr(ch) + self.text[self.pos:]
@@ -747,11 +723,11 @@ class EntryLine:
 
 
 ######################################################################
-class Entry:
+class Entry(object):
     """An entry window to enter a dir. or file, a pattern, ..."""
 
-    def __init__(self, title, help, path = '', with_historic = 1,
-                 with_complete = 1, panelpath = ''):
+    def __init__(self, title, help, path = '',
+                 with_historic = True, with_complete = True, panelpath = ''):
         h = 6
         w = min(max(34, len(help)+5), app.maxw-2)
         try:
@@ -817,25 +793,21 @@ class Entry:
             # save new historic entries
             if self.with_historic:
                 if self.entry.text and self.entry.text != '*':
-                    if len(historic) < HISTORIC_MAXLEN:
-                        historic.append(self.entry.text)
-                    else:
-                        historic.reverse()
-                        historic.pop()
-                        historic.reverse()
-                        historic.append(self.entry.text)
+                    if len(historic) >= HISTORIC_MAXLEN:
+                        historic.remove(historic[0])
+                    historic.append(self.entry.text)
         self.pwin.hide()
         return answer
 
 
 ######################################################################
-class DoubleEntry:
+class DoubleEntry(object):
     """An entry window to enter 2 dirs. or files, patterns, ..."""
 
     def __init__(self, title, help1 = '', path1 = '',
-                 with_historic1 = 1, with_complete1 = 1, panelpath1 = '',
+                 with_historic1 = True, with_complete1 = True, panelpath1 = '',
                  help2 = '', path2 = '',
-                 with_historic2 = 1, with_complete2 = 1, panelpath2 = '',
+                 with_historic2 = True, with_complete2 = True, panelpath2 = '',
                  active_entry = 0):
         h = 9
         w = min(max(34, max(len(help1), len(help2))+5), app.maxw-2)
@@ -926,14 +898,10 @@ class DoubleEntry:
             # save new historic entries
             if self.with_historic:
                 for text in self.entry1.text, self.entry2.text:
-                    if text != None and text != '' and text != '*':
-                        if len(historic) < 100:
-                            historic.append(text)
-                        else:
-                            historic.reverse()
-                            historic.pop()
-                            historic.reverse()
-                            historic.append(text)
+                    if text and text != '*':
+                        if len(historic) >= HISTORIC_MAXLEN:
+                            historic.remove(historic[0])
+                        historic.append(text)
             ans1, ans2 = self.entry1.text, self.entry2.text
         else:
             ans1, ans2 = None, None
@@ -942,7 +910,7 @@ class DoubleEntry:
 
 
 ######################################################################
-class SelectItem:
+class SelectItem(object):
     """A window to select an item"""
 
     def __init__(self, entries, y0, x0, entry_i = ''):
@@ -973,7 +941,7 @@ class SelectItem:
         win.box(0, 0)
         y, x = win.getbegyx()
         h, w = win.getmaxyx()
-        h0 = h - 2
+        h0, w0 = h - 2, w - 3
         nels = len(self.entries)
         entry_a = int(self.entry_i/h0) * h0
         for i in xrange(h0):
@@ -981,12 +949,12 @@ class SelectItem:
                 line = self.entries[entry_a + i]
             except IndexError:
                 line = ''
-            if len(line) > w - 3:
-                if (w - 3) % 2 == 0:     # even
-                    line = line[:int((w-3)/2)] + '~' + line[-int((w-3)/2)+2:]
+            if len(line) > w0:
+                if w0 % 2 == 0:     # even
+                    line = line[:int(w0/2)] + '~' + line[-int(w0/2)+2:]
                 else:                    # odd
-                    line = line[:int((w-3)/2)+1] + '~' + line[-int((w-3)/2)+2:]
-            if line != '':
+                    line = line[:int(w0/2)+1] + '~' + line[-int(w0/2)+2:]
+            if line:
                 win.addstr(i+1, 2, line, curses.color_pair(4))
         win.refresh()
         # cursor
@@ -994,7 +962,7 @@ class SelectItem:
         cursor.bkgd(curses.color_pair(1))
         cursor.erase()
         line = self.entries[self.entry_i]
-        if len(line) > w - 2:
+        if len(line) >= w0:
             if (w - 2) % 2 == 0:         # even
                 line = line[:int((w-2)/2)] + '~' + line[-int((w-2)/2)+2:]
             else:                        # odd
@@ -1002,7 +970,7 @@ class SelectItem:
         cursor.addstr(0, 1, line, curses.color_pair(1) | curses.A_BOLD)
         y += 1; x += 1
         cur_row = y + self.entry_i % h0
-        cursor.refresh(0, 0, cur_row, x, cur_row, x + w - 3)
+        cursor.refresh(0, 0, cur_row, x, cur_row, x + w0)
         # scrollbar
         if nels > h0:
             n = max(int(h0*h0/nels), 1)
@@ -1032,7 +1000,7 @@ class SelectItem:
                 if self.entry_i != 0:
                     self.entry_i -= 1
             elif ch in (curses.KEY_DOWN, ord('j'), ord('J')):
-                if self.entry_i != nels - 1:
+                if self.entry_i < nels - 1:
                     self.entry_i += 1
             elif ch in (curses.KEY_PPAGE, curses.KEY_BACKSPACE, 0x08, 0x02):
                 if self.entry_i < h - 3:
@@ -1071,7 +1039,7 @@ class SelectItem:
 
 
 ######################################################################
-class FindfilesWin:
+class FindfilesWin(object):
     """A window to select a file"""
 
     def __init__(self, entries, entry_i = ''):
@@ -1105,7 +1073,7 @@ class FindfilesWin:
         win.box(0, 0)
         y, x = win.getbegyx()
         h, w = win.getmaxyx()
-        h0 = h - 4
+        h0, w0 = h - 4, w - 3
         nels = len(self.entries)
         entry_a = int(self.entry_i/h0) * h0
         for i in xrange(h0):
@@ -1113,12 +1081,12 @@ class FindfilesWin:
                 line = self.entries[entry_a+i]
             except IndexError:
                 line = ''
-            if len(line) >= w - 3:
-                if (w - 3) % 2 == 0:     # even
-                    line = line[:int((w-3)/2)] + '~' + line[-int((w-3)/2)+3:]
+            if len(line) >= w0:
+                if w0 % 2 == 0:     # even
+                    line = line[:int(w0/2)] + '~' + line[-int(w0/2)+3:]
                 else:                    # odd
-                    line = line[:int((w-3)/2)+1] + '~' + line[-int((w-3)/2)+3:]
-            if line != '':
+                    line = line[:int(w0/2)+1] + '~' + line[-int(w0/2)+3:]
+            if line:
                 win.addstr(i+1, 2, line, curses.color_pair(4))
         win.refresh()
         # cursor
@@ -1127,7 +1095,7 @@ class FindfilesWin:
         cursor.bkgdset(curses.color_pair(1))
         cursor.erase()
         line = self.entries[self.entry_i]
-        if len(line) >= w - 3:
+        if len(line) >= w0:
             if (w - 2) % 2 == 0:         # even
                 line = line[:int((w-2)/2)] + '~' + line[-int((w-2)/2)+3:]
             else:                        # odd
@@ -1135,7 +1103,7 @@ class FindfilesWin:
         cursor.addstr(0, 1, line, curses.color_pair(1) | curses.A_BOLD)
         y += 1; x += 1
         cursor.refresh(0, 0, y + self.entry_i % h0,
-                       x, y + self.entry_i % h0, x+w-3)
+                       x, y + self.entry_i % h0, x + w0)
         # scrollbar
         if nels > h0:
             n = max(int(h0*h0/nels), 1)
@@ -1158,24 +1126,19 @@ class FindfilesWin:
         win.addstr(h-2, 3,
                    '[ Go ]  [ Panelize ]  [ View ]  [ Edit ]  [ Do ]  [ Quit ]',
                    curses.color_pair(4))
+        attr0 = attr1 = attr2 = attr3 = attr4 = attr5 = curses.color_pair(4)
         if self.btn_active == 0:
             attr0 = curses.color_pair(1) | curses.A_BOLD
-            attr1 = attr2 = attr3 = attr4 = attr5 = curses.color_pair(4)
         elif self.btn_active == 1:
             attr1 = curses.color_pair(1) | curses.A_BOLD
-            attr0 = attr2 = attr3 = attr4 = attr5 = curses.color_pair(4)
         elif self.btn_active == 2:
             attr2 = curses.color_pair(1) | curses.A_BOLD
-            attr0 = attr1 = attr3 = attr4 = attr5 = curses.color_pair(4)
         elif self.btn_active == 3:
             attr3 = curses.color_pair(1) | curses.A_BOLD
-            attr0 = attr1 = attr2 = attr4 = attr5 = curses.color_pair(4)
         elif self.btn_active == 4:
             attr4 = curses.color_pair(1) | curses.A_BOLD
-            attr0 = attr1 = attr2 = attr3 = attr5 = curses.color_pair(4)
         else:
             attr5 = curses.color_pair(1) | curses.A_BOLD
-            attr0 = attr1 = attr2 = attr3 = attr4 = curses.color_pair(4)
         win.addstr(h-2, 3, '[ Go ]', attr0)
         win.addstr(h-2, 11, '[ PAnelize ]', attr1)
         win.addstr(h-2, 25, '[ View ]', attr2)
@@ -1259,12 +1222,12 @@ class FindfilesWin:
 
 
 ######################################################################
-class MenuWin:
+class MenuWin(object):
     """A window to select a menu option"""
 
     def __init__(self, title, entries):
         h = len(entries) + 4
-        w = max(map(len, entries)) + 4
+        w = max(len(title)+2, max(map(len, entries))) + 4
         y0 = int((app.maxh-h) / 2)
         x0 = int((app.maxw-w) / 2)
         try:
@@ -1296,7 +1259,7 @@ class MenuWin:
                 line = self.entries[i]
             except IndexError:
                 line = ''
-            if line != '':
+            if line:
                 win.addstr(i+2, 2, line, curses.color_pair(3))
         win.refresh()
         # cursor
@@ -1307,7 +1270,7 @@ class MenuWin:
         cursor.addstr(0, 1, line, curses.color_pair(1) | curses.A_BOLD)
         y += 1; x += 1
         cursor.refresh(0, 0, y + self.entry_i % (h-4) + 1,
-                       x, y + self.entry_i % (h-4) + 1, x+w-3)
+                       x, y + self.entry_i % (h-4) + 1, x + w-3)
 
 
     def manage_keys(self):
@@ -1351,7 +1314,7 @@ class MenuWin:
 
 
 ######################################################################
-class ChangePerms:
+class ChangePerms(object):
     """A window to change permissions, owner or group"""
 
     def __init__(self, file, fileinfo, i = 0, n = 0):
@@ -1377,10 +1340,7 @@ class ChangePerms:
         self.group = fileinfo[files.FT_GROUP]
         self.owner_old = self.owner[:]
         self.group_old = self.group[:]
-        self.i = i
-        self.n = n
-        self.entry_i = 0
-        self.w = w
+        self.i, self.n, self.entry_i, self.w = i, n, 0, w
 
 
     def show_btns(self):
@@ -1470,45 +1430,31 @@ class ChangePerms:
 
     def manage_keys(self):
         y, x = self.pwin.window().getbegyx()
+#         order = [0, 1, 2, 3, 4, 7, 8, 5, 6] if self.i else [0, 1, 2, 3, 4, 5, 6]
+        if self.i:
+            order = [0, 1, 2, 3, 4, 7, 8, 5, 6]
+        else:
+            order = [0, 1, 2, 3, 4, 5, 6]
         while True:
             self.show()
             ch = self.pwin.window().getch()
             if ch in (0x03, 0x1B, ord('c'), ord('C'), ord('q'), ord('Q')):
                 return -1
             elif ch in (ord('\t'), 0x09, curses.KEY_DOWN, curses.KEY_RIGHT):
-                if self.i:
-                    if self.entry_i == 4:
-                        self.entry_i = 7
-                    elif self.entry_i == 8:
-                        self.entry_i = 5
-                    elif self.entry_i == 6:
-                        self.entry_i = 0
-                    else:
-                        self.entry_i += 1
-                else:
-                    if self.entry_i == 6:
-                        self.entry_i = 0
-                    else:
-                        self.entry_i += 1
+                try:
+                    self.entry_i = order[order.index(self.entry_i)+1]
+                except IndexError:
+                    self.entry_i = order[0]
             elif ch in (curses.KEY_UP, curses.KEY_LEFT):
-                if self.i:
-                    if self.entry_i == 0:
-                        self.entry_i = 6
-                    elif self.entry_i == 5:
-                        self.entry_i = 8
-                    elif self.entry_i == 7:
-                        self.entry_i = 4
-                    else:
-                        self.entry_i -= 1
-                else:
-                    if self.entry_i == 0:
-                        self.entry_i = 6
-                    else:
-                        self.entry_i -= 1
+                try:
+                    self.entry_i = order[order.index(self.entry_i)-1]
+                except IndexError:
+                    self.entry_i = order[0]
             elif ch in (ord('r'), ord('R')):
                 if not 0 <= self.entry_i <= 2:
                     continue
                 d = self.entry_i * 3
+#                 self.perms[d] = 'r' if self.perms[d] == '-' else '-'
                 if self.perms[d] == 'r':
                     self.perms[d] = '-'
                 else:
@@ -1517,6 +1463,7 @@ class ChangePerms:
                 if not 0 <= self.entry_i <= 2:
                     continue
                 d = 1 + self.entry_i * 3
+#                 self.perms[d] = 'w' if self.perms[d] == '-' else '-'
                 if self.perms[d] == 'w':
                     self.perms[d] = '-'
                 else:
@@ -1525,6 +1472,7 @@ class ChangePerms:
                 if not 0 <= self.entry_i <= 2:
                     continue
                 d = 2 + self.entry_i * 3
+#                 self.perms[d] = 'x' if self.perms[d] == '-' else '-'
                 if self.perms[d] == 'x':
                     self.perms[d] = '-'
                 else:
@@ -1532,6 +1480,7 @@ class ChangePerms:
             elif ch in (ord('t'), ord('T')):
                 if not self.entry_i == 2:
                     continue
+#                 self.perms[d] = self.perms_old[8] if self.perms[d] == 't' else 't'
                 if self.perms[8] == 't':
                     self.perms[8] = self.perms_old[8]
                 else:
@@ -1540,6 +1489,7 @@ class ChangePerms:
                 if not 0 <= self.entry_i <= 1:
                     continue
                 d = 2 + self.entry_i * 3
+#                 self.perms[d] = self.perms_old[d] if self.perms[d] == 's' else 's'
                 if self.perms[d] == 's':
                     self.perms[d] = self.perms_old[d]
                 else:

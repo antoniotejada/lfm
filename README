@@ -2,13 +2,13 @@
 lfm - Last File Manager
 =======================
 
-:Author: Iñigo Serna, inigoserna AT telefonica DOT net
+:Author: Iñigo Serna, inigoserna AT gmail DOT com
 
-:Version: 2.0, September 3rd. 2007
+:Version: 2.1, December 21th. 2008
 
 :Home page: http://www.terra.es/personal7/inigoserna/lfm/
 
-:License: \(C\) 2001-7, Iñigo Serna
+:License: \(C\) 2001-8, Iñigo Serna
 
           This software has been realised under the `GPL License`__ version 3
           or later, read the COPYING_ file that comes with this package for
@@ -16,7 +16,7 @@ lfm - Last File Manager
 
           There is NO WARRANTY.
 
-:Last update: Mon Sep  3 22:50:48 2007
+:Last update: Sat Dec 20 23:35:39 2008
 
 
 .. contents:: Table of Contents
@@ -25,19 +25,19 @@ lfm - Last File Manager
 Introduction
 ============
 **Last File Manager** is a simple but powerful file manager for the
-UNIX console. It has been developed with the ol' good `Midnight
-Commander`__ as model.
+UNIX console. Based on curses, it's written in Python.
 
 Some of the features you can find in *lfm*:
 
 - console-based file manager for UNIX platforms
 - 1-pane or 2-pane view
 - bookmarks
+- history
 - vfs for compressed files
 - dialogs with entry completion
 - fast access to a shell
 - direct integration of find/grep, df and other tools
-- tabs per pane
+- tabs
 - color files by extension [Andrey Skvortsov]
 - fast file viewer with text and binary modes
 - ...and many others
@@ -75,8 +75,7 @@ Requirements
 *Lfm* and *Pyview* are written in Python_ and require curses module.
 It needs Python v2.3 or higher, it won't work with older versions.
 
-Since version 0.90, *lfm* needs ncurses >= v5.x for the handling 
-of terminal resizing.
+Since version 0.90, *lfm* needs ncurses >= v5.x to handle terminal resizing.
 
 All modern UNIX flavours (Linux, \*BSD, Solaris, etc) should run it without 
 problems. If they appear please notify me.
@@ -101,6 +100,8 @@ Download & Installation
    +---------+------------------+------------+
    | Version |       File       |    Date    |
    +=========+==================+============+
+   |   2.1   | lfm-2.1.tar.gz_  | 2008/12/21 |
+   +---------+------------------+------------+
    |   2.0   | lfm-2.0.tar.gz_  | 2007/09/03 |
    +---------+------------------+------------+
    |   1.0   |  Never released  |   ~2006    |
@@ -168,24 +169,46 @@ Keys
 These are the complete list of key bindings:
 
 + **Movement**
-    - cursor_up, k, K
-    - cursor_down, j, J
-    - previous page, backspace, Ctrl-B
-    - next page, space, Ctrl-F
+    - cursor_up, k
+    - cursor_down, j
+    - previous_page, backspace, Ctrl-B
+    - next_page, space, Ctrl-F
     - home, Ctrl-A: first file
     - end, Ctrl-E: last file
     - cursor_left: upper dir
     - cursor_right: enter dir / vfs
-    - g, G: go to directory
     - Ctrl-S: go to file in current panel
+
++ **Movement in non active pane** [#]_
+    - Alt/Shift-cursor_up, K
+    - Alt/Shift-cursor_down, J
+    - Alt/Shift-previous_page, B
+    - Alt/Shift-next_page, F
+    - Alt/Shift-home, A: first file
+    - Alt/Shift-end, E: last file
+    - Alt/Shift-cursor_left: upper dir
+    - Alt/Shift-cursor_right: enter dir / vfs
+   
+.. [#] Some key shorcuts combinations such as Alt or Shift + key may not work, as it
+       depends on the capabilities of the terminal program you are using.
+       F.e. it doesn't work in my computer console running Fedora 10 Linux, but it works
+       under gnome-terminal in X. Your results could be different.
+       Anyway, there are alternative shortcuts (K J B F A E), but not for everything.
+       Consult your terminal emulation program documentation to check it.
+       Also note that you can allow/disallow this navigation with Ctrl-W, it's disabled
+       by default.
+
++ **Changing directory**
+    - g, G: go to directory
     - 0..9: go to bookmark #
     - Ctrl-D, Ctrl-\\: select bookmark # from menu
-    - b, B: set bookmark #
+    - b: set bookmark #
+    - Ctrl-Y: display directories history
 
 + **Panes**
     - tab: other pane
-    - .: toggle 1/2 panes
-    - ,: Ctrl-U: change panes position (left->right, right->left)
+    - .: toggle display 1 or 2 panes
+    - , Ctrl-U: change panes position (left->right, right->left)
     - =: show same directory in both panes
 
 + **Tabs**:
@@ -204,11 +227,11 @@ These are the complete list of key bindings:
     - t, T: touch file
     - l, L: create link
     - Ctrl-L: edit link
+    - F2: rename file/dir/selection
     - F3: view file
     - F4: edit file
     - F5: copy file/dir/selection
     - F6: move file/dir/selection
-    - F12: easy way to rename file/dir/selection
     - F7: make directory
     - F8, del: delete file/dir/selection
     - enter: execute file, enter dir / vfs or view 'specially' depending on the extension of the regular file. It is executed in a thread that can be stopped and captures output
@@ -219,20 +242,23 @@ These are the complete list of key bindings:
     - s, S: sort files
     - /: find/grep files
     - @: do something on file. Output is not captured
+    - Ctrl-H: toggle show/hide dot files
+    - Ctrl-W: toggle allow navigate in non-active pane
     - Ctrl-O: open shell. Type 'exit' to return to lfm
     - Ctrl-T: tree
-    - F2: file menu
+    - F12: file menu
         - @: do something on file(s)
         - i: file(s) info
         - p: change file permissions, owner, group
         - g: gzip/gunzip file(s)
         - b: bzip2/bunzip2 file(s)
-        - x: uncompress .tar.gz, .tar.bz2, .zip, .rar
+        - x: uncompress .tar.gz, .tar.bz2, .zip, .rar, .7z
         - u: uncompress .tar.gz, etc in other panel
         - c: compress directory to .tar.gz
         - d: compress directory to .tar.bz2
         - z: compress directory to .zip
         - r: compress directory to .rar 
+        - 7: compress directory to .7z 
     - F9: general menu 
         - /: find/grep file
         - #: show directories size
@@ -253,9 +279,17 @@ These are the complete list of key bindings:
     - enter: return path
     - tab: change to next entry or button
     - Ctrl-T: complete
-    - Ctrl-W: delete leftwards until / or beginning
-    - Ctrl-D: delete all
-    - left, right, home, end, backspace, del, insert, ...
+    - Ctrl-W: delete whole line
+    - Ctrl-K: delete from position to end of line
+    - Ctrl-D: delete until next /
+    - Ctrl-Z: recover original content (undo)
+    - home, Ctrl-A: move start of line
+    - end, Ctrl-E: move end of line
+    - left, Ctrl-B: move cursor left
+    - right, Ctrl-F: move cursor right
+    - Ctrl-P, Ctrl-left: move cursor previous /
+    - Ctrl-N, Ctrl-right: move cursor next /
+    - backspace, del, insert, ...
     - Ctrl-C, ESC: quit
 
 + Keys in *SelectItem* window:
@@ -330,22 +364,24 @@ It's a great pleasure to code in a language like this.
 
 Alexei Gilchrist, for his cfm program from which I took some ideas.
 
-Midnight Commander developers, whose program was the guide.
+`Midnight Commander`__ developers, whose program was the guide.
 
 And also to all the people who have contributed with ideas, reporting
-bugs and code over these years: Antoni Aloy, Sebastien Bacher, Witold
-Bołt, Fabian Braennstroem, Ondrej Certik, Kevin Coyner, Tim Daneliuk,
-Mike Dean, Christian Eichert, Steve Emms, Stephen R. Figgins, Ana
-Beatriz Guerrero Lopez, Tjabo Kloppenburg, Zoran Kolic, Max Kutny,
-Bartosz Oler, Piotr Ozarowski, Jerome Prudent, Mikhail Ramendik, Rod,
-Daniel T. Schmitt, Robin Siebler, Andrey Skvortsov, Espartaco Smith,
-Jörg Sonnenberger, Tim Terlegård, Edd Thompson, Walter van den Broek,
-Alejandro Weil and many others...
+bugs and code over these years: Antoni Aloy, Sebastien Bacher, Grigory
+Bakunov, Witold Bołt, Fabian Braennstroem, Jason Buberel, Ondrej Certik,
+Kevin Coyner, Tim Daneliuk, Mike Dean, Arnå DG, Christian Eichert, Steve Emms,
+Murat Erten, Stephen R. Figgins, f1ufx, Francisco Gama, Vlad Glagolev,
+Ana Beatriz Guerrero Lopez, Tjabo Kloppenburg, Zoran Kolic, Max Kutny,
+Martin Lüethi, James Mills, Bartosz Oler, Piotr Ozarowski, Mikhail A. Pokidko,
+Jerome Prudent, Mikhail Ramendik, Rod, Daniel T. Schmitt, Robin Siebler,
+Andrey Skvortsov, Espartaco Smith, Jörg Sonnenberger, Tim Terlegård,
+Edd Thompson, Walter van den Broek, Alejandro Weil, Hai Zaar and many
+others...
+
 You have made posible to run *lfm* in all those platforms!
 
 
-
-.. _sources: lfm-2.0.tar.gz
+.. _sources: lfm-2.1.tar.gz
 .. _README.pyview: README.pyview.html
 .. _TODO: TODO
 .. _NEWS: NEWS
@@ -356,6 +392,7 @@ You have made posible to run *lfm* in all those platforms!
 .. _python: http://www.python.org
 __ GPL_
 __ mc_
+.. _lfm-2.1.tar.gz: lfm-2.1.tar.gz
 .. _lfm-2.0.tar.gz: lfm-2.0.tar.gz
 .. _lfm-0.91.tar.gz: lfm-0.91.tar.gz
 .. _lfm-0.9.tar.gz: lfm-0.9.tar.gz

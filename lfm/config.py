@@ -19,33 +19,20 @@ from utils import get_shell_output
 CONFIG_FILE = '.lfmrc'
 defaultprogs = { 'shell': 'bash',
                  'pager': 'pyview',
-                 'editor': 'mcedit',
-                 'web': 'galeon',
-                 'ogg': 'ogg123',
-                 'mp3': 'mpg321',
-                 'audio': 'esdplay',
+                 'editor': 'vi',
+                 'web': 'firefox',
+                 'audio': 'mplayer',
                  'video': 'mplayer',
                  'graphics': 'gthumb',
                  'pdf': 'evince',
                  'ps': 'evince' }
 filetypes = { 'web': ('html', 'htm'),
-              'ogg': ('ogg', ),
-              'mp3': ('mp3', ),
-              'audio': ('wav', 'au', 'midi'),
+              'audio': ('ogg', 'flac', 'mp3', 'wav', 'au', 'midi'),
               'video': ('mpeg', 'mpg', 'avi', 'asf'),
               'graphics': ('png', 'jpeg', 'jpg', 'gif', 'tiff', 'tif', 'xpm', 'svg'),
               'pdf': ('pdf', ),
               'ps': ('ps', ) }
-bookmarks = [ '/',
-              '/home/inigo',
-              '/home/inigo/personal',
-              '/home/inigo/devel/mine/lfm',
-              '/zzz/compiling/gnome',
-              '/zzz/compiling/python',
-              '/zzz/compiling/linux',
-              '/etc',
-              '/root',
-              '/dfsdf' ]
+bookmarks = ['/'] * 10
 colors = { 'title': ('yellow', 'blue'),
            'files': ('white', 'black'),
            'current_file': ('blue', 'cyan'),
@@ -64,7 +51,9 @@ colors = { 'title': ('yellow', 'blue'),
            'archive_files': ('yellow', 'black'),
            'source_files': ('cyan', 'black'),
            'graphics_files': ('magenta', 'black'),
-           'data_files': ('magenta', 'black') }
+           'data_files': ('magenta', 'black'),
+           'current_file_otherpane': ('black', 'white'),
+           'current_selected_file_otherpane': ('yellow', 'white') }
 options = { 'save_conf_at_exit': 1,
             'show_output_after_exec': 1,
             'rebuild_vfs': 0,
@@ -74,7 +63,8 @@ options = { 'save_conf_at_exit': 1,
             'sort': SORTTYPE_byName,
             'sort_mix_dirs': 0,
             'sort_mix_cases': 1,
-            'color_files': 1 }
+            'color_files': 1,
+            'manage_otherpane': 0 }
 confirmations = { 'delete': 1,
                   'overwrite': 1,
                   'quit': 0,
@@ -90,16 +80,16 @@ files_ext  = { 'temp_files': ('.tmp', '.$$$', '~', '.bak'),
                                   '.mail', '.msg', '.letter', '.ics', '.vcs', '.vcard',
                                   '.lsm', '.po', '.man', '.1', '.info',
                                   '.doc', '.xls', '.ppt', '.pps'),
-               'media_files': ('.mp2', '.mp3', '.mpg', '.ogg', '.mpeg', '.wav',
+               'media_files': ('.mp2', '.mp3', '.mpg', '.ogg', '.flac', '.mpeg', '.wav',
                                '.avi', '.asf', '.mov', '.mol', '.mpl', '.xm', '.med',
                                '.mid', '.midi', '.umx', '.wma', '.acc', '.wmv',
                                '.swf'),
                'archive_files': ('.gz', '.bz2', '.tar', '.tgz', '.Z', '.zip',
-                                 '.rar', '.arj', '.cab', '.lzh', '.lha',
+                                 '.rar', '.7z', '.arj', '.cab', '.lzh', '.lha',
                                  '.zoo', '.arc', '.ark',
                                   '.rpm', '.deb'),
                'source_files': ('.c', '.h', '.cc', '.hh', '.cpp', '.hpp',
-                                '.py', '.pl', '.pm', '.inc',
+                                '.py', '.pl', '.pm', '.inc', '.rb.',
                                 '.asm', '.pas', '.f', '.f90', '.pov', '.m', '.pas',
                                 '.cgi', '.php', '.phps', '.tcl', '.tk',
                                 '.js', '.java', '.jav', '.jasm',
@@ -113,17 +103,16 @@ files_ext  = { 'temp_files': ('.tmp', '.$$$', '~', '.bak'),
                                   '.xcf', '.dwb', '.dwg', '.dxf', '.svg', '.dia'),
                'data_files': ('.dta', '.nc', '.dbf', '.mdn', '.db', '.mdb', '.dat',
                               '.fox', '.dbx', '.mdx', '.sql', '.mssql', '.msql',
-                              '.ssql', '.pgsql', '.cdx', '.dbi') }
+                              '.ssql', '.pgsql', '.cdx', '.dbi', '.sqlite') }
 
 
 ######################################################################
 ##### Configuration
-class Config:
+class Config(object):
     """Config class"""
 
     def __init__(self):
-        self.file = os.path.abspath(os.path.expanduser(os.path.join('~',
-                                                                    CONFIG_FILE)))
+        self.file = os.path.abspath(os.path.expanduser(os.path.join('~', CONFIG_FILE)))
         self.file_start = '#' * 10 + ' ' + LFM_NAME + ' ' + \
                           'Configuration File' + ' ' + '#' * 10
         self.progs = {} # make a copy
@@ -140,6 +129,7 @@ class Config:
     def check_progs(self):
         for k, v in defaultprogs.items():
             r = get_shell_output('%s \"%s\"' % (sysprogs['which'], v))
+#             self.progs[k] = v if r else ''
             if r:
                 self.progs[k] = v
             else:
@@ -155,7 +145,7 @@ class Config:
         f.close()
         if title and title != self.file_start:
             return -2
-        # all ok, proceed
+        # everything ok, proceed
         cfg = SafeConfigParser()
         cfg.read(self.file)
         # programs
@@ -236,7 +226,7 @@ class Config:
         buf += '\n[Bookmarks]\n'
         for i, b in enumerate(self.bookmarks):
             buf += '%d: %s\n' % (i, b)
-        # colorus
+        # colours
         buf += '\n[Colors]\n'
         for k, v in self.colors.items():
             buf += '%s: %s %s\n' % (k, v[0], v[1])

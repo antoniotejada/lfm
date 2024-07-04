@@ -29,7 +29,7 @@ def check_compressed_file_type(filename):
         return None
 
 
-class PackagerBase:
+class PackagerBase(object):
     def __init__(self, filename):
         while filename[-1] == os.sep:
             filename = filename[:-1]
@@ -153,16 +153,30 @@ class PackagerRAR(PackagerBase):
     compressXXX_cmd = compress_prog + ' a \"%s\" %s'
 
 
+class Packager7Z(PackagerBase):
+    type = '7z'
+    exts = ('.7z', )
+    need_tar = False
+    uncompress_prog = sysprogs['7z']
+    uncompress_cmd = uncompress_prog + ' x \"%s\"'
+    compress_prog = sysprogs['7z']
+    compress_cmd = compress_prog + ' a \"%s\" \"%s\"'
+    compressXXX_cmd = compress_prog + ' a \"%s\" %s'
+
+
+
 packagers = ( PackagerTBZ2, PackagerBZ2,
               PackagerTGZ, PackagerGZ,
-              PackagerZIP, PackagerRAR )
+              PackagerZIP, PackagerRAR,
+              Packager7Z )
 
 packagers_by_type = { 'tbz2': PackagerTBZ2,
                       'bz2': PackagerBZ2,
                       'tgz': PackagerTGZ,
                       'gz': PackagerGZ,
                       'zip': PackagerZIP,
-                      'rar': PackagerRAR }
+                      'rar': PackagerRAR,
+                      '7z': Packager7Z }
 
 
 ######################################################################

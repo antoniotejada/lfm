@@ -13,6 +13,7 @@ import stat
 import time
 import pwd
 import grp
+import shutil
 import tempfile
 
 from utils import get_shell_output2
@@ -69,6 +70,7 @@ def __get_size(f):
     """return the size of the directory or file via 'du -sk' command"""
 
     buf = get_shell_output2('du -sk \"%s\"' % f)
+#     return int(buf.split()[0])*1024 if buf else 0
     if buf:
         return int(buf.split()[0]) * 1024
     else:
@@ -256,17 +258,17 @@ def set_perms(f, perms):
     ps, i = 0, 8
     for p in perms:
         if p == 'x':
-            ps += 1 * 8 ** int(i / 3)
+            ps += 1 * 8 ** int(i/3)
         elif p == 'w':
-            ps += 2 * 8 ** int(i / 3)
+            ps += 2 * 8 ** int(i/3)
         elif p == 'r':
-            ps += 4 * 8 ** int(i / 3)
+            ps += 4 * 8 ** int(i/3)
         elif p == 't' and i == 0:
             ps += 1 * 8 ** 3
-        elif p == 's' and (i == 6 or i == 3):
+        elif p == 's':
             if i == 6:
                 ps += 4 * 8 ** 3
-            else:
+            elif i == 3:
                 ps += 2 * 8 ** 3
         i -= 1
     try:
@@ -299,47 +301,46 @@ def get_fs_info():
         buf = os.popen('df -k').readlines()
     except (IOError, os.error), (errno, strerror):
         return (strerror, errno)
-    else:
-        fs = []
-        for l in buf:
-            if l[0] == os.sep:
-                e = l.split()
-                if len(e) > 1:
-                    e[1] = str(int(e[1]) / 1024)
-                    e[2] = str(int(e[2]) / 1024)
-                    e[3] = str(int(e[3]) / 1024)
-                    e[4] = e[4]
-                    e[5] = e[5]
-                else:
-                    continue
-            elif l[0] == ' ':
-                t = l.split()
-                e.append(str(int(t[0]) / 1024))
-                e.append(str(int(t[1]) / 1024))
-                e.append(str(int(t[2]) / 1024))
-                e.append(t[3])
-                e.append(t[4])
+    fs = []
+    for l in buf:
+        if l[0] == os.sep:
+            e = l.split()
+            if len(e) > 1:
+                e[1] = str(int(e[1]) / 1024)
+                e[2] = str(int(e[2]) / 1024)
+                e[3] = str(int(e[3]) / 1024)
+                e[4] = e[4]
+                e[5] = e[5]
             else:
                 continue
-            fs.append(e)
-
-        # get filesystems type
-        if sys.platform[:5] == 'linux':
-            es = open('/etc/fstab').readlines()
-            fstype_pos = 2
-        elif sys.platform[:5] == 'sunos':
-            es = open('/etc/vfstab').readlines()
-            fstype_pos = 3
+        elif l[0] == ' ':
+            t = l.split()
+            e.append(str(int(t[0]) / 1024))
+            e.append(str(int(t[1]) / 1024))
+            e.append(str(int(t[2]) / 1024))
+            e.append(t[3])
+            e.append(t[4])
         else:
-            es = []
-        for f in fs:
-            for e in es:
-                if e.find(f[5]) != -1:
-                    f.append(e.split()[fstype_pos])
-                    break
-            else:
-                f.append('unknown')
-        return fs
+            continue
+        fs.append(e)
+
+    # get filesystems type
+    if sys.platform[:5] == 'linux':
+        es = open('/etc/fstab').readlines()
+        fstype_pos = 2
+    elif sys.platform[:5] == 'sunos':
+        es = open('/etc/vfstab').readlines()
+        fstype_pos = 3
+    else:
+        es = []
+    for f in fs:
+        for e in es:
+            if e.find(f[5]) != -1:
+                f.append(e.split()[fstype_pos])
+                break
+        else:
+            f.append('unknown')
+    return fs
 
 
 ########################################################################
@@ -361,8 +362,7 @@ def __do_sort(f_dict, sortmode, sort_mix_cases):
         return names
 
     if sortmode == SORTTYPE_None:
-        names = f_dict.keys()
-        return __move_pardir_to_top(f_dict)
+        return __move_pardir_to_top(f_dict.keys())
 
     if sortmode in (SORTTYPE_byName, SORTTYPE_byName_rev):
         if sort_mix_cases:
@@ -478,8 +478,6 @@ def create_link(pointto, linkname):
 
 # copy
 def do_copy(source, dest):
-    import shutil
-
     if os.path.islink(source):
         dest = os.path.join(os.path.dirname(dest), os.path.basename(source))
         try:
@@ -506,7 +504,7 @@ def do_copy(source, dest):
         shutil.copy2(source, dest)
 
 
-def copy(f, path, destdir, check_fileexists = 1):
+def copy(f, path, destdir, check_fileexists = True):
     """ copy file / dir to destdir"""
 
     fullpath = os.path.join(path, f)
@@ -523,7 +521,7 @@ def copy(f, path, destdir, check_fileexists = 1):
 
 
 # move
-def move(f, path, destdir, check_fileexists = 1):
+def move(f, path, destdir, check_fileexists = True):
     """delete file / dir"""
 
     fullpath = os.path.join(path, f)
@@ -546,8 +544,7 @@ def move(f, path, destdir, check_fileexists = 1):
             do_delete(destdir)
         except (IOError, os.error), (errno, strerror):
             return (strerror, errno)
-        else:
-            return (strerror, errno)
+        return (strerror, errno)
     else:
         try:
             do_delete(fullpath)

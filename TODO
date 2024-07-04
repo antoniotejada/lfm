@@ -1,36 +1,26 @@
 ============================================================================
-Last update:	Time-stamp: <2007-09-03 23:28:45 inigo>
+Last update:	Time-stamp: <2008-12-20 23:52:48 inigo>
 ============================================================================
 
 General:
 ========
 Medium Priority:
-  + general
-    - use CONSTANTS instead of curses.color_pair(x)
   + ui
-    - redesign dialogs to fill window dimensions
-    - don't redraw screen after each keystroke
     - copy/move dialog: use file block-by-block progress bar
     - tab views:
       . 2 columns mode
       . customized: permissions instead of date
-    - rewrite messages.py
-    - investigate if curses.Textbox could be interesting
+      . quick view
+      . info view
   + improvements over present features
     - symlinks navigation. symlink has to return to a parent dir.
     - non copied moved / renamed / deleted files should remain selected
     - recursive chmod chown chgrp. Checkbuttons: recursive, ignore dirs
-    - exclude files (f.e. *.o) to grep
-      . ".#filename" are temporary emacs files/links
   + new features:
-    - hot-key to toggle hidden files showing: C-h
-    - "save delete" option => move to ~/.Trash
-    - historic navigation: mc: Alt-Y / Alt-U
     - command line
       . make command-line run ipython interpreter
-    - global copy/cut/paste between tabs or panes
-    - crypt / hash files
-    - plugins system
+    - crypt files
+    - background processes: copy/move
 
 Low Priority (maybe some day):
   + keybindings customization
@@ -38,15 +28,23 @@ Low Priority (maybe some day):
   + remote vfs: ssh, ftp, smb, webdav
   + i18n
   + sessions
+  + use mimetypes module
   + pyview: tab 4/8 chars
+  + plugin system
+  + global copy/cut/paste between tabs or panes
   + complex commands, make it configurable:
     - show directory under cursor in the other panel: mc: Alt+O
     - exec some command over (selected files) with pattern substitution
       eg. convert $file $file.jpeg
+  + support setuptools
+  + exclude files (f.e. *.o) in grep 
+    - ".#filename" are temporary emacs files/links
+    - grep --exclude=XXX
 
 Very Low Priority (never):
   + mouse support
   + a gui to configure preferences
+  + "save delete" option => move to ~/.Trash
 
 
 Known Bugs:

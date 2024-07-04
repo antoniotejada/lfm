@@ -8,7 +8,6 @@ This module contains the actions to execute when keys are pressed.
 
 import os, os.path
 import sys
-import time
 from glob import glob
 import curses
 
@@ -31,14 +30,11 @@ app = None
 keytable = {
     # movement
     ord('k'): 'cursor_up',
-    ord('K'): 'cursor_up',
     curses.KEY_UP: 'cursor_up',
     ord('j'): 'cursor_down',
-    ord('J'): 'cursor_down',
     curses.KEY_DOWN: 'cursor_down',
     curses.KEY_PPAGE: 'page_previous',
     curses.KEY_BACKSPACE: 'page_previous',
-    0x08: 'page_previous',     # BackSpace
     0x02: 'page_previous',     # Ctrl-B
     curses.KEY_NPAGE: 'page_next',
     ord(' '): 'page_next',
@@ -48,6 +44,24 @@ keytable = {
     curses.KEY_END: 'end',
     0x05: 'end',               # Ctrl-E
 
+    # movement other pane
+    curses.KEY_SR: 'cursor_up_otherpane',        # Shift-up
+    0x22f: 'cursor_up_otherpane',                # Alt-up, kUP3
+    ord('K'): 'cursor_up_otherpane',             # K
+    curses.KEY_SF: 'cursor_down_otherpane',      # Shift-down
+    0x206: 'cursor_down_otherpane',              # Alt-down, kDN3
+    ord('J'): 'cursor_down_otherpane',           # J
+    0x224: 'page_previous_otherpane',            # Alt-pageup, kPRV3
+    ord('B'): 'page_previous_otherpane',         # B
+    0x21f: 'page_next_otherpane',                # Alt-pagedown, kNXT3
+    ord('F'): 'page_next_otherpane',             # F
+    ord('A'): 'home_otherpane',                  # A
+    ord('E'): 'end_otherpane',                   # E
+    curses.KEY_SLEFT: 'cursor_left_otherpane',   # Shift-left
+    0x21a: 'cursor_left_otherpane',              # Alt-left, kLFT3
+    curses.KEY_SRIGHT: 'cursor_right_otherpane', # Shift-right
+    0x229: 'cursor_right_otherpane',             # Alt-right, kRIT3
+    
     # change dir
     curses.KEY_LEFT: 'cursor_left',
     curses.KEY_RIGHT: 'cursor_right',
@@ -70,8 +84,8 @@ keytable = {
     0x04: 'select_bookmark',   # Ctrl-D
     0x1C: 'select_bookmark',   # Ctrl-\
     ord('b'): 'set_bookmark',
-    ord('B'): 'set_bookmark',
-
+    0x19: 'select_historic',   # Ctrl-Y
+    
     # panels
     ord('\t'): 'toggle_active_pane',  # tab
     ord('.'): 'toggle_panes',
@@ -90,6 +104,8 @@ keytable = {
     ord('*'): 'invert_select',
 
     # misc
+    0x08: 'toggle_dotfiles',    # Ctrl-H
+    0x17: 'toggle_manage_otherpane',    # Ctrl-W
     ord('#'): 'show_size',
     ord('s'): 'sort',
     ord('S'): 'sort',
@@ -106,11 +122,11 @@ keytable = {
     0x0F: 'open_shell',         # Ctrl-O
 
     # main functions
+    curses.KEY_F2: 'rename',
     curses.KEY_F3: 'view_file',
     curses.KEY_F4: 'edit_file',
     curses.KEY_F5: 'copy',
     curses.KEY_F6: 'move',
-    curses.KEY_F12: 'rename',
     curses.KEY_F7: 'make_dir',
     curses.KEY_DC: 'delete',
     curses.KEY_F8: 'delete',
@@ -119,8 +135,8 @@ keytable = {
     ord('h'): 'show_help',
     ord('H'): 'show_help',
     curses.KEY_F1: 'show_help',
-    curses.KEY_F2: 'file_menu',
     curses.KEY_F9: 'general_menu',
+    curses.KEY_F12: 'file_menu',
 
     # terminal resize:
     curses.KEY_RESIZE: 'resize_window',
@@ -151,40 +167,125 @@ def do(tab, ch):
 def cursor_up(tab):
     tab.file_i -= 1
     tab.fix_limits()
+    return RET_HALF_UPDATE
 
 def cursor_down(tab):
     tab.file_i += 1
     tab.fix_limits()
+    return RET_HALF_UPDATE
 
 def page_previous(tab):
     tab.file_i -= tab.pane.dims[0]
     if tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
         tab.file_i += 3
     tab.fix_limits()
+    return RET_HALF_UPDATE
 
 def page_next(tab):
     tab.file_i += tab.pane.dims[0]
     if tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
         tab.file_i -= 3
     tab.fix_limits()
+    return RET_HALF_UPDATE
 
 def home(tab):
     tab.file_i = 0
     tab.fix_limits()
+    return RET_HALF_UPDATE
 
 def end(tab):
     tab.file_i = tab.nfiles - 1
     tab.fix_limits()
+    return RET_HALF_UPDATE
 
 
+# movement other pane
+def cursor_up_otherpane(tab):
+    if app.prefs.options['manage_otherpane'] and \
+            tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
+        othertab = app.noact_pane.act_tab
+        othertab.file_i -= 1
+        othertab.fix_limits()
+        return RET_HALF_UPDATE_OTHER
+    else:
+        return RET_NO_UPDATE
+
+def cursor_down_otherpane(tab):
+    if app.prefs.options['manage_otherpane'] and \
+            tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
+        othertab = app.noact_pane.act_tab
+        othertab.file_i += 1
+        othertab.fix_limits()
+        return RET_HALF_UPDATE_OTHER
+    else:
+        return RET_NO_UPDATE
+
+def page_previous_otherpane(tab):
+    if app.prefs.options['manage_otherpane'] and \
+            tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
+        othertab = app.noact_pane.act_tab
+        othertab.file_i -= othertab.pane.dims[0] - 3
+        othertab.fix_limits()
+        return RET_HALF_UPDATE_OTHER
+    else:
+        return RET_NO_UPDATE
+
+def page_next_otherpane(tab):
+    if app.prefs.options['manage_otherpane'] and \
+            tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
+        othertab = app.noact_pane.act_tab
+        othertab.file_i += othertab.pane.dims[0] - 3
+        othertab.fix_limits()
+        return RET_HALF_UPDATE_OTHER
+    else:
+        return RET_NO_UPDATE
+
+def home_otherpane(tab):
+    if app.prefs.options['manage_otherpane'] and \
+            tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
+        othertab = app.noact_pane.act_tab
+        othertab.file_i = 0
+        othertab.fix_limits()
+        return RET_HALF_UPDATE_OTHER
+    else:
+        return RET_NO_UPDATE
+
+def end_otherpane(tab):
+    if app.prefs.options['manage_otherpane'] and \
+            tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
+        othertab = app.noact_pane.act_tab
+        othertab.file_i = othertab.nfiles - 1
+        othertab.fix_limits()
+        return RET_HALF_UPDATE_OTHER
+    else:
+        return RET_NO_UPDATE
+
+def cursor_left_otherpane(tab): 
+    if app.prefs.options['manage_otherpane'] and \
+            tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
+        othertab = app.noact_pane.act_tab
+        othertab.exit_dir()
+        return RET_HALF_UPDATE_OTHER
+    else:
+        return RET_NO_UPDATE
+
+def cursor_right_otherpane(tab): 
+    if app.prefs.options['manage_otherpane'] and \
+            tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
+        othertab = app.noact_pane.act_tab
+        enter(othertab, allowexec=False)
+        return RET_HALF_UPDATE_OTHER
+
+    
 # change dir
 def cursor_left(tab):
     tab.exit_dir()
+    return RET_HALF_UPDATE
 
 def cursor_right(tab):
     enter(tab)
 
-def enter(tab):
+def enter(tab, allowexec=True):
     filename = tab.get_file()
     vfstype = compress.check_compressed_file_type(filename)
     typ = tab.files[filename][files.FT_TYPE]
@@ -196,36 +297,33 @@ def enter(tab):
         tab.init(files.get_linkpath(tab.path, filename))
     elif typ in (files.FTYPE_REG, files.FTYPE_LNK) and vfstype != None:
         vfs.init(tab, filename, vfstype)
-    elif typ == files.FTYPE_EXE:
+    elif typ == files.FTYPE_EXE and allowexec:
         do_execute_file(tab)
-    elif typ == files.FTYPE_REG:
+    elif typ == files.FTYPE_REG and allowexec:
         do_special_view_file(tab)
     else:
         return
 
 def goto_dir(tab):
     todir = doEntry(tab.path, 'Go to directory', 'Type directory name')
-    app.display()
-    if todir == None or todir == "":
-        return
-    todir = os.path.join(tab.path, todir)
-    if tab.vfs:
-        vfs.exit(tab)
-    tab.init(todir)
+    if todir:
+        app.display()
+        todir = os.path.join(tab.path, todir)
+        if tab.vfs:
+            vfs.exit(tab)
+        tab.init(todir)
 
 def goto_file(tab):
     tofile = doEntry(tab.path, 'Go to file', 'Type how file name begins')
-    app.display()
-    if tofile == None or tofile == "":
-        return
-    thefiles = tab.sorted[tab.file_i:]
-    for f in thefiles:
-        if f.find(tofile) == 0:
-            break
-    else:
-        return
-    tab.file_i = tab.sorted.index(f)
-    tab.fix_limits()
+    if tofile:
+        thefiles = tab.sorted[tab.file_i:]
+        for f in thefiles:
+            if f.find(tofile) == 0:
+                break
+        else:
+            return
+        tab.file_i = tab.sorted.index(f)
+        tab.fix_limits()
 
 def tree(tab):
     if tab.vfs:
@@ -271,11 +369,10 @@ def bookmark_9(tab):
 
 def select_bookmark(tab):
     ret = messages.MenuWin('Select Bookmark', app.prefs.bookmarks).run()
-    if ret == -1:
-        return
-    if tab.vfs:
-        vfs.exit(tab)
-    tab.init(ret)
+    if ret != -1:
+        if tab.vfs:
+            vfs.exit(tab)
+        tab.init(ret)
 
 def set_bookmark(tab):
     if tab.vfs:
@@ -284,18 +381,29 @@ def set_bookmark(tab):
     while True:
         ch = messages.get_a_key('Set bookmark',
                                 'Press 0-9 to save the bookmark, Ctrl-C to quit')
-        if 0x30 <= ch <= 0x39:         # 0..9
+        if ch == -1:                 # Ctrl-C
+            break
+        elif 0x30 <= ch <= 0x39:     # 0..9
             app.prefs.bookmarks[ch-0x30] = tab.path[:]
             break
-        elif ch == -1:                 # Ctrl-C
-            break
+
+
+def select_historic(tab):
+    items = tab.historic[::-1]
+    if not items:
+        messages.error('Select from history', 'No previous directories')
+        return
+    ret = messages.MenuWin('Return to', items).run()
+    if ret != -1:
+        if tab.vfs:
+            vfs.exit(tab)
+        tab.init(ret)
 
 
 # panes and tabs
 def toggle_active_pane(tab):
-    if tab.pane.mode in (PANE_MODE_FULL, PANE_MODE_HIDDEN):
-        return
-    return TOGGLE_PANE
+    if tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
+        return RET_TOGGLE_PANE
 
 def toggle_panes(tab):
     if tab.pane.mode == PANE_MODE_FULL:
@@ -310,11 +418,10 @@ def toggle_panes(tab):
         tab.fix_limits()
 
 def swap_panes(tab):
-    if tab.pane.mode == PANE_MODE_FULL:
-        return
-    app.lpane.mode, app.rpane.mode = app.rpane.mode, app.lpane.mode
-    app.lpane.init_ui()
-    app.rpane.init_ui()
+    if tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
+        app.lpane.mode, app.rpane.mode = app.rpane.mode, app.lpane.mode
+        app.lpane.init_ui()
+        app.rpane.init_ui()
 
 def same_tabs(tab):
     othertab = app.noact_pane.act_tab
@@ -334,18 +441,16 @@ def same_tabs(tab):
 def new_tab(tab):
     if len(tab.pane.tabs) >= 4:
         messages.error('New tab', 'Can\'t create more tabs')
-        return
     else:
-        return TAB_NEW
+        return RET_TAB_NEW
 
 def close_tab(tab):
     if len(tab.pane.tabs) == 1:
         messages.error('Close tab', 'Can\'t close last tab')
-        return
     else:
         if tab.vfs:
             vfs.exit(tab)
-        return TAB_CLOSE
+        return RET_TAB_CLOSE
 
 def left_tab(tab):
     tabs = tab.pane.tabs
@@ -363,36 +468,31 @@ def right_tab(tab):
 # selections
 def select_item(tab):
     filename = tab.get_file()
-    if filename == os.pardir:
-        tab.file_i += 1
-        tab.fix_limits()
-        return
-    try:
-        tab.selections.index(filename)
-    except ValueError:
-        tab.selections.append(filename)
-    else:
-        tab.selections.remove(filename)
+    if filename != os.pardir:
+        try:
+            tab.selections.index(filename)
+        except ValueError:
+            tab.selections.append(filename)
+        else:
+            tab.selections.remove(filename)
     tab.file_i += 1
     tab.fix_limits()
 
 def select_group(tab):
     pattern = doEntry(tab.path, 'Select group', 'Type pattern', '*')
-    if pattern == None or pattern == '':
-        return
-    fullpath = os.path.join(tab.path, pattern)
-    for f in [os.path.basename(f) for f in glob(fullpath)]:
-        if f not in tab.selections:
-            tab.selections.append(f)
+    if pattern:
+        fullpath = os.path.join(tab.path, pattern)
+        for f in [os.path.basename(f) for f in glob(fullpath)]:
+            if f not in tab.selections:
+                tab.selections.append(f)
 
 def deselect_group(tab):
     pattern = doEntry(tab.path, 'Deselect group', 'Type pattern', '*')
-    if pattern == None or pattern == '':
-        return
-    fullpath = os.path.join(tab.path, pattern)
-    for f in [os.path.basename(f) for f in glob(fullpath)]:
-        if f in tab.selections:
-            tab.selections.remove(f)
+    if pattern:
+        fullpath = os.path.join(tab.path, pattern)
+        for f in [os.path.basename(f) for f in glob(fullpath)]:
+            if f in tab.selections:
+                tab.selections.remove(f)
 
 def invert_select(tab):
     selections_old = tab.selections[:]
@@ -400,6 +500,22 @@ def invert_select(tab):
                           f != os.pardir]
 
 # misc
+def toggle_dotfiles(tab):
+#     app.prefs.options['show_dotfiles'] = 1 if app.prefs.options['show_dotfiles'] == 0 else 0
+    if app.prefs.options['show_dotfiles'] == 0:
+        app.prefs.options['show_dotfiles'] = 1
+    else:
+        app.prefs.options['show_dotfiles'] = 0
+    app.regenerate()
+
+def toggle_manage_otherpane(tab):
+#     app.prefs.options['manage_otherpane'] = 1 if app.prefs.options['manage_otherpane'] == 0 else 0
+    if app.prefs.options['manage_otherpane'] == 0:
+        app.prefs.options['manage_otherpane'] = 1
+    else:
+        app.prefs.options['manage_otherpane'] = 0
+    return RET_HALF_UPDATE_OTHER
+
 def show_size(tab):
     show_dirs_size(tab)
 
@@ -421,15 +537,17 @@ def find_grep(tab):
 
 def touch_file(tab):
     newfile = doEntry(tab.path, 'Touch file', 'Type file name')
-    if newfile == None or newfile == "":
+    if not newfile:
         return
     fullfilename = os.path.join(tab.path, newfile)
     i, err = os.popen4('touch \"%s\"' % get_escaped_filename(fullfilename))
     err = err.read().split(':')[-1:][0].strip()
     if err:
+        app.display()
         messages.error('Touch file', '%s: %s' % (newfile, err))
-    curses.curs_set(0)
-    app.regenerate()
+    else:
+        curses.curs_set(0)
+        app.regenerate()
 
 def create_link(tab):
     othertab = app.noact_pane.act_tab
@@ -437,22 +555,21 @@ def create_link(tab):
         otherfile = os.path.join(othertab.path, othertab.get_file())
     else:
         otherfile = othertab.get_file()
-    newlink, pointto = doDoubleEntry(tab.path, 'Create link',
-                                     'Link name', '', 1, 1,
-                                     'Pointing to', otherfile, 1, 1)
-    if newlink == None or pointto == None:
-        return
-    if newlink == '':
+    newlink, pointto = doDoubleEntry(tab.path, 'Create link', 'Link name', '',
+                                     'Pointing to', otherfile)
+    app.display()
+    if not newlink:
         messages.error('Create link', 'You must type new link name')
         return
-    if pointto == '':
+    if not pointto:
         messages.error('Create link', 'You must type pointed file')
         return
     fullfilename = os.path.join(tab.path, newlink)
     ans = files.create_link(pointto, fullfilename)
     if ans:
         messages.error('Create link', '%s (%s)' % (ans, tab.get_file()))
-    app.regenerate()
+    else:
+        app.regenerate()
 
 def edit_link(tab):
     fullfilename = tab.get_fullpathfile()
@@ -460,10 +577,11 @@ def edit_link(tab):
         return
     pointto = doEntry(tab.path, 'Edit link', 'Link \'%s\' points to' % \
                       tab.get_file(), os.readlink(fullfilename))
-    if pointto == None or pointto == "":
+    app.display()
+    if not pointto:
+        messages.error('Create link', 'You must type pointed file')
         return
-    if pointto != None and pointto != "" and \
-       pointto != os.readlink(fullfilename):
+    if pointto != os.readlink(fullfilename):
         ans = files.modify_link(pointto, fullfilename)
         if ans:
             messages.error('Edit link', '%s (%s)' % (ans, tab.getfile()))
@@ -499,10 +617,8 @@ def copy(tab):
     if destdir:
         res = ProcessCopyMoveLoop('Copying files', files.copy,
                                   fs, tab.path, destdir).run()
-    else:
-        return
-    tab.selections = []
-    app.regenerate()
+        tab.selections = []
+        app.regenerate()
 
 def move(tab):
     destdir = app.noact_pane.act_tab.path + os.sep
@@ -519,10 +635,8 @@ def move(tab):
     if destdir:
         res = ProcessCopyMoveLoop('Moving files', files.move,
                                   fs, tab.path, destdir).run()
-    else:
-        return
-    tab.selections = []
-    tab.refresh()
+        tab.selections = []
+        tab.refresh()
 
 def rename(tab):
     if tab.selections:
@@ -539,14 +653,14 @@ def rename(tab):
 
 def make_dir(tab):
     newdir = doEntry(tab.path, 'Make directory', 'Type directory name')
-    if newdir == None or newdir == '':
-        return
-    ans = files.mkdir(tab.path, newdir)
-    if ans:
-        messages.error('Make directory',
-                       '%s (%s)' % (ans, newdir))
-        return
-    app.regenerate()
+    if newdir:
+        ans = files.mkdir(tab.path, newdir)
+        if ans:
+            app.display()
+            messages.error('Make directory',
+                           '%s (%s)' % (ans, newdir))
+        else:
+            app.regenerate()
 
 def delete(tab):
     if tab.selections:
@@ -575,18 +689,8 @@ def show_help(tab):
     cmd = cmd[0]
     curses.endwin()
     docdir = os.path.join(sys.exec_prefix, 'share/doc/lfm')
-    if cmd == 'r':
-        docfile = 'README'
-    elif cmd == 'v':
-        docfile = 'README.pyview'
-    elif cmd == 'n':
-        docfile = 'NEWS'
-    elif cmd == 't':
-        docfile = 'TODO'
-    elif cmd == 'c':
-        docfile = 'ChangeLog'
-    elif cmd == 'l':
-        docfile = 'COPYING'
+    docfile = { 'r': 'README', 'v': 'README.pyview', 'n': 'NEWS', 't': 'TODO',
+                'c': 'ChangeLog', 'l': 'COPYING' }.get(cmd)
     fullfilename = os.path.join(docdir, docfile)
     os.system('%s \"%s\"' % (app.prefs.progs['pager'], fullfilename))
     curses.curs_set(0)
@@ -597,12 +701,13 @@ def file_menu(tab):
              'p    Change file permissions, owner, group',
              'g    Gzip/gunzip file(s)',
              'b    Bzip2/bunzip2 file(s)',
-             'x    Uncompress .tar.gz, .tar.bz2, .zip, .rar',
+             'x    Uncompress .tar.gz, .tar.bz2, .zip, .rar, .7z',
              'u    Uncompress .tar.gz, etc in other panel',
              'c    Compress directory to .tar.gz',
              'd    Compress directory to .tar.bz2',
              'z    Compress directory to .zip',
-             'r    Compress directory to .rar' ]
+             'r    Compress directory to .rar',
+             '7    Compress directory to .7z' ]
     cmd = messages.MenuWin('File Menu', menu).run()
     if cmd == -1:
         return
@@ -630,6 +735,8 @@ def file_menu(tab):
         compress_dir(tab, 'zip')
     elif cmd == 'r':
         compress_dir(tab, 'rar')
+    elif cmd == '7':
+        compress_dir(tab, '7z')
     app.regenerate()
 
 
@@ -687,18 +794,18 @@ def quit(tab):
         ans = messages.confirm('Last File Manager',
                                'Quit Last File Manager', 1)
         if ans == 1:
-            return -1
+            return RET_QUIT
     else:
-        return -1
+        return RET_QUIT
 
 def exit(tab):
     if app.prefs.confirmations['quit']:
         ans = messages.confirm('Last File Manager',
                                'Quit Last File Manager', 1)
         if ans == 1:
-            return -2
+            return RET_EXIT
     else:
-        return -2
+        return RET_EXIT
 
 
 ######################################################################
@@ -709,6 +816,7 @@ def goto_bookmark(tab, num):
     if tab.vfs:
         vfs.exit(tab)
     tab.init(todir)
+    return RET_HALF_UPDATE
 
 
 # show size
@@ -734,32 +842,17 @@ def show_dirs_size(tab):
 
 # sort
 def do_sort(tab):
-    options = app.prefs.options
+    sorttypes = { 'o': files.SORTTYPE_None, 'O': files.SORTTYPE_None,
+                  'n': files.SORTTYPE_byName, 'N': files.SORTTYPE_byName_rev,
+                  's': files.SORTTYPE_bySize, 'S': files.SORTTYPE_bySize_rev,
+                  'd': files.SORTTYPE_byDate, 'D': files.SORTTYPE_byDate_rev }
     while True:
         ch = messages.get_a_key('Sorting mode',
                                 'N(o), by (n)ame, by (s)ize, by (d)ate,\nuppercase if reversed order, Ctrl-C to quit')
-        if ch in (ord('o'), ord('O')):
-            options['sort'] = files.SORTTYPE_None
+        if ch == -1:                 # Ctrl-C
             break
-        elif ch == ord('n'):
-            options['sort'] =  files.SORTTYPE_byName
-            break
-        elif ch == ord('N'):
-            options['sort'] =  files.SORTTYPE_byName_rev
-            break
-        elif ch == ord('s'):
-            options['sort'] = files.SORTTYPE_bySize
-            break
-        elif ch == ord('S'):
-            options['sort'] = files.SORTTYPE_bySize_rev
-            break
-        elif ch == ord('d'):
-            options['sort'] = files.SORTTYPE_byDate
-            break
-        elif ch == ord('D'):
-            options['sort'] = files.SORTTYPE_byDate_rev
-            break
-        elif ch == -1:                 # Ctrl-C
+        elif 32 <= ch < 256 and chr(ch) in sorttypes.keys():
+            app.prefs.options['sort'] = sorttypes[chr(ch)]
             break
     old_filename = tab.get_file()
     old_selections = tab.selections[:]
@@ -971,8 +1064,8 @@ def do_show_fs_info():
 # find and grep
 def findgrep(tab):
     # ask data
-    fs, pat = doDoubleEntry(tab.path, 'Find files', 'Filename', '*', 1, 1,
-                            'Content', '', 1, 0)
+    fs, pat = doDoubleEntry(tab.path, 'Find files', 'Filename', '*', 
+                            'Content', '', with_complete2=False)
     if fs == None or fs == '':
         return
     path = os.path.dirname(fs)
@@ -1071,8 +1164,8 @@ def findgrep(tab):
 
 
 # entries
-def doEntry(tabpath, title, help, path = '', with_historic = True,
-            with_complete = True):
+def doEntry(tabpath, title, help, path = '',
+            with_historic = True, with_complete = True):
     while True:
         path = messages.Entry(title, help, path, with_historic, with_complete,
                               tabpath).run()
@@ -1082,18 +1175,16 @@ def doEntry(tabpath, title, help, path = '', with_historic = True,
             return path
 
 
-def doDoubleEntry(tabpath, title, help1, path1 = '',
+def doDoubleEntry(tabpath, title, help1, path1, help2, path2,
                   with_historic1 = True, with_complete1 = True,
-                  help2 = '', path2 = '',
                   with_historic2 = True, with_complete2 = True):
-    active_entry = 0
     tabpath1 = tabpath2 = tabpath
     while True:
-        path = messages.DoubleEntry(title, help1, path1, with_historic1,
-                                    with_complete1, tabpath1,
-                                    help2, path2, with_historic2,
-                                    with_complete2, tabpath2,
-                                    active_entry).run()
+        path = messages.DoubleEntry(title, help1, path1,
+                                    with_historic1, with_complete1, tabpath1,
+                                    help2, path2,
+                                    with_historic2, with_complete2, tabpath2,
+                                    active_entry=0).run()
         if type(path) != type([]):
             return path
         else:
@@ -1104,7 +1195,7 @@ def doDoubleEntry(tabpath, title, help1, path1 = '',
 
 ######################################################################
 ##### Tree
-class Tree:
+class Tree(object):
     """Tree class"""
 
     def __init__(self, path = os.sep, panemode = 0):
@@ -1234,7 +1325,6 @@ class Tree:
             self.dims = (app.maxh-2, int(app.maxw/2), 1, 0)
         else: # PANE_MODE_HIDDEN:
             self.dims = (app.maxh-2, 0, 0, 0)     # h, w, y, x
-            return
 
 
     def display(self):
@@ -1355,7 +1445,7 @@ class Tree:
                             newpos -= 1
                 else:
                     newpos = self.pos
-                    while 1:
+                    while True:
                         if newpos - 1 < 0 or self.tree[newpos-1][1] != depth:
                             break
                         newpos -= 1
@@ -1367,14 +1457,14 @@ class Tree:
                         newpos = self.pos + (app.maxh-4)
                     else:
                         newpos = self.pos
-                        while 1:
+                        while True:
                             if newpos + 1 == len(self.tree) or \
                                     self.tree[newpos+1][1] != depth:
                                 break
                             newpos += 1
                 else:
                     newpos = self.pos
-                    while 1:
+                    while True:
                         if newpos + 1 == len(self.tree) or \
                                 self.tree[newpos+1][1] != depth:
                             break

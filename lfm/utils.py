@@ -28,7 +28,7 @@ app = None
 
 ######################################################################
 ##### InterProcess Communication
-class IPC:
+class IPC(object):
     def __init__(self):
         pipe_r, pipe_w = os.pipe()
         self.rfd = os.fdopen(pipe_r, 'rb', 0)
@@ -62,7 +62,7 @@ class IPC:
 
 ######################################################################
 ##### Process Base Loop
-class ProcessBaseLoop:
+class ProcessBaseLoop(object):
     """Run a function in background, so it can be stopped, continued, etc.
     There is also a graphical animation to show the program still runs and
     has not crashed.
@@ -416,7 +416,7 @@ class ProcessDeleteLoop(ProcessBaseLoop):
 
 ######################################################################
 ##### Process Func
-class ProcessFunc:
+class ProcessFunc(object):
     """Run a function in background, so it can be stopped, continued, etc.
     There is also a graphical animation to show the program still runs and
     has not crashed.

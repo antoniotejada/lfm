@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright (C) 2001-7, Iñigo Serna <inigoserna@telefonica.net>.
+Copyright (C) 2001-8, Iñigo Serna <inigoserna@gmail.com>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -20,8 +20,8 @@ g_encoding = locale.getpreferredencoding()
 
 ######################################################################
 AUTHOR = 'Iñigo Serna'
-VERSION = '2.0'
-DATE = '2001-7'
+VERSION = '2.1'
+DATE = '2001-8'
 
 LFM_NAME = 'lfm - Last File Manager'
 PYVIEW_NAME = 'pyview'
@@ -35,12 +35,15 @@ sysprogs = { 'tar': 'tar',
              'zip': 'zip',
              'unzip': 'unzip',
              'rar': 'rar',
+             '7z': '7z',
              'grep': 'grep',
              'find': 'find',
              'which': 'which',
              'xargs': 'xargs' }
 
-TOGGLE_PANE, TAB_NEW, TAB_CLOSE = xrange(1, 4)
+RET_QUIT, RET_EXIT = -1, -2
+RET_TOGGLE_PANE, RET_TAB_NEW, RET_TAB_CLOSE, RET_NO_UPDATE, \
+    RET_HALF_UPDATE, RET_HALF_UPDATE_OTHER = xrange(1, 7)
 PANE_MODE_HIDDEN, PANE_MODE_LEFT, PANE_MODE_RIGHT, PANE_MODE_FULL = xrange(4)
 
 

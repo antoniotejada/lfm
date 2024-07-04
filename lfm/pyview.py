@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2001-7  Iñigo Serna
-# Time-stamp: <2007-09-03 23:18:41 inigo>
+# Copyright (C) 2001-8  Iñigo Serna
+# Time-stamp: <2008-12-20 22:48:22 inigo>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 
 
 """
-Copyright (C) 2001-7, Iñigo Serna <inigoserna@telefonica.net>.
+Copyright (C) 2001-8, Iñigo Serna <inigoserna@gmail.com>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -80,7 +80,7 @@ def create_temp_for_stdin(buf):
 ##################################################
 ##### Internal View
 ##################################################
-class InternalView:
+class InternalView(object):
     """Internal View class"""
 
     def __init__(self, title, buf, center = 1):
@@ -105,7 +105,11 @@ class InternalView:
             self.x0 = int((app.maxw-col_max)/2)
         else:
             self.x0 = 1
-            self.y0 = not self.large
+#             self.y0 = 0 if self.large else 1
+            if self.large:
+                self.y0 = 0
+            else:
+                self.large = 1
         self.buf = buf
 
 
@@ -126,6 +130,7 @@ class InternalView:
                                 curses.color_pair(1) | curses.A_BOLD)
             self.win_body.bkgd(curses.color_pair(2))
             self.win_status.bkgd(curses.color_pair(1))
+        self.win_body.leaveok(1)
         self.win_body.keypad(1)
 
         self.win_title.erase()
@@ -160,7 +165,7 @@ class InternalView:
     def run(self):
         self.show()
         if self.large:
-            quit = 0
+            quit = False
             while not quit:
                 self.show()
                 ch = self.win_body.getch()
@@ -178,7 +183,7 @@ class InternalView:
                     self. y = min(self.y+app.maxh-2, self.nlines-1)
                 elif ch in (0x1B, ord('q'), ord('Q'), ord('x'), ord('X'),
                             curses.KEY_F3, curses.KEY_F10):
-                    quit = 1
+                    quit = True
         else:
             while not self.win_body.getch():
                 pass
@@ -187,7 +192,7 @@ class InternalView:
 ##################################################
 ##### pyview
 ##################################################
-class FileView:
+class FileView(object):
     """Main application class"""
 
     def __init__(self, win, filename, line, mode, stdin_flag):
@@ -237,6 +242,8 @@ class FileView:
                 pos += len(l)
                 self.lines_pos.append(pos)
             f.close()
+        else:
+            nlines = 0
         self.nlines = nlines + 1
 
 
@@ -272,6 +279,7 @@ class FileView:
                                 curses.color_pair(1) | curses.A_BOLD)
             self.win_file.bkgdset(curses.color_pair(2))
             self.win_status.bkgdset(curses.color_pair(1))
+        self.win_file.leaveok(1)
         self.win_file.keypad(1)
 
 
@@ -336,7 +344,6 @@ class FileView:
 
     def __get_prev_lines_text(self):
         lines = []
-        i = 0
         for i in xrange(self.maxh-2):
             line_i = self.line - 1 - i
             if line_i < 0:
@@ -382,6 +389,7 @@ class FileView:
         for y, l in enumerate(lines):
             lwin = curses.newpad(1, self.maxw+1)
             lwin.erase()
+#             largeline = True if len(l)-self.col > self.maxw else False
             if len(l) - self.col > self.maxw:
                 largeline = True
             else:
@@ -529,11 +537,13 @@ class FileView:
                 path = '~' + path[-(self.maxw-38):]
             self.win_status.addstr('Path: %s' % path)
         if self.maxw > 30:
+#             mode = 'TEXT' if self.mode == MODE_TEXT else 'HEX'
             if self.mode == MODE_TEXT:
                 mode = 'TEXT'
             else:
                 mode = 'HEX'
             self.win_status.addstr(0, self.maxw-30, 'View mode: %s' % mode)
+#             wrap = 'YES' if self.wrap else 'NO'
             if self.wrap:
                 wrap = 'YES'
             else:
@@ -652,7 +662,7 @@ class FileView:
         """run application, manage keys, etc"""
 
         self.show()
-        while 1:
+        while True:
             ch = self.win_file.getch()
 
             # cursor up
@@ -688,15 +698,12 @@ class FileView:
                 self.show()
             # page previous
             elif ch in (curses.KEY_PPAGE, curses.KEY_BACKSPACE,
-                        0x08, 0x02):                         # BackSpace, Ctrl-
+                        0x08, 0x02):                         # BackSpace, Ctrl-B
                 if self.mode == MODE_TEXT:
                     if self.wrap:
                         lines = self.__get_prev_lines_text()
                         if self.col:     # if we aren't at 1st char of line
-                            line0 = self.__get_1line()[:self.col]
-                            lines.insert(0, line0)
-                        else:
-                            line0 = ''
+                            lines.insert(0, self.__get_1line()[:self.col])
                         y = self.maxh - 2
                         end = False
                         for i, l in enumerate(lines):
@@ -716,10 +723,11 @@ class FileView:
                                 break
                         else:
                             i += 1
-                        if line0:
+                        if self.col:
                             i -= 1
                         if y < 0:
                             self.__move_lines(-i)
+#                             self.col = ((dy-1) if i==0 else dy) * self.maxw
                             if i == 0:
                                 self.col = (dy-1) * self.maxw
                             else:
@@ -756,6 +764,7 @@ class FileView:
                         else:
                             i += 1
                         self.__move_lines(i)
+#                         self.col = (self.col+dy) if i==0 else dy) * self.maxw
                         if i == 0:
                             self.col += dy * self.maxw
                         else:
@@ -801,7 +810,7 @@ class FileView:
             elif ch in (ord('w'), ord('W'), curses.KEY_F2):
                 if self.mode == MODE_HEX:
                     continue
-                self. wrap = not self.wrap
+                self.wrap = not self.wrap
                 self.__move_lines(0)
                 self.col = 0
                 self.show()
@@ -826,7 +835,7 @@ class FileView:
                     title = 'Goto byte'
                     help = 'Type byte offset'
                 n = messages.Entry(title, help, '', 1, 0).run()
-                if n == None or n == '':
+                if not n:
                     self.show()
                     continue
                 if n[0] in ('+', '-'):
@@ -853,6 +862,7 @@ class FileView:
                     self.show()
                     continue
                 if self.mode == MODE_TEXT:
+#                     self.line = self.line+n if rel else n-1
                     if rel:
                         self.line += n
                     else:
@@ -860,6 +870,7 @@ class FileView:
                     self.line = min(self.line, self.nlines-1)
                     self.__move_lines(0)
                 else:
+#                     self.pos = self.pos+n if rel else n
                     if rel:
                         self.pos += n
                     else:
@@ -896,7 +907,7 @@ class FileView:
                 self.show()
             # set bookmark
             elif ch in (ord('b'), ord('B')):
-                while 1:
+                while True:
                     ch = messages.get_a_key('Set bookmark',
                                             'Press 0-9 to save bookmark, Ctrl-C to quit')
                     if 0x30 <= ch <= 0x39:
@@ -1017,6 +1028,7 @@ def PyView(sysargs):
             if arg[0] == '+':
                 line = arg[1:]
                 try:
+#                     line = int(line, 16) if line[:2] == '0x' else int(line)
                     if line[:2] == '0x':
                         line = int(line, 16)
                     else:

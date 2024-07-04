@@ -1,3 +1,21 @@
+Version 2.1 ("What do you want for Christimas?") - 2008/12/21:
+
+  + Ctrl-H now show/hide dot files
+  + Ctrl-Y display directories history 
+  + It's now posible to move the cursor in the non-active pane
+    Consult the documentation for available keys and actions
+    This behaviour is de/activated with Ctrl-W
+  + added support for .7z compressed files
+  + swapped F2 and F12 keys, now F2 rename files and F12 show file menu
+  + new key shortcuts in dialogs. Read docs
+  + speed up cursor movement
+  + lots of code cleaning and refactoring
+  + and fixed lot of bugs, some of them:
+    - setup.py: change Iñigo for Inigo to avoid problems when installing
+    - sorting by None doesn't crash anymore
+	- MenuWin dialog crashed when title length was greater than length of
+      entries to show
+
 Version 2.0 ("Nine 1/2 weeks... ok, ok, and 3 years") - 2007/09/03:
 
   + tabs implemented
@@ -18,7 +36,7 @@ Version 2.0 ("Nine 1/2 weeks... ok, ok, and 3 years") - 2007/09/03:
   + added man pages [Sebastien Bacher]
   + use reST for documentation
   + check for python version 2.3 or higher in lfm and pyview
-  + updated to GPL v3 license
+  + upgraded to GPL v3 license
   + and fixed lot of bugs, some of them:
     - general:
       . delete garbage if user stops action

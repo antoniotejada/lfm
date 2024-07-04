@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2001-7  Iñigo Serna
-# Time-stamp: <2007-09-02 21:25:16 inigo>
+# Copyright (C) 2001-8  Iñigo Serna
+# Time-stamp: <2008-12-20 22:48:01 inigo>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-u"""lfm v2.0 - (C) 2001-7, by Iñigo Serna <inigoserna@telefonica.net>
+u"""lfm v2.1 - (C) 2001-8, by Iñigo Serna <inigoserna@gmail.com>
 
 'Last File Manager' is a file manager for UNIX console which born with
 midnight commander as model. Released under GNU Public License, read
@@ -39,7 +39,7 @@ Options:
 
 
 __author__ = u'Iñigo Serna'
-__revision__ = '2.0'
+__revision__ = '2.1'
 
 
 import os, os.path
@@ -62,11 +62,12 @@ import pyview
 ######################################################################
 ##### Global variables
 LOG_FILE = os.path.join(os.getcwd(), 'lfm.log')
+MAX_HISTORIC_ENTRIES = 15
 
 
 ######################################################################
 ##### Lfm main class
-class Lfm:
+class Lfm(object):
     """Main application class"""
 
     def __init__(self, win, prefs):
@@ -96,13 +97,13 @@ class Lfm:
         self.maxh, self.maxw = self.win.getmaxyx()
         curses.cbreak()
         curses.raw()
+        self.win.leaveok(1)
         messages.cursor_hide()
 
         # colors
         if curses.has_colors():
-            prefs_colors = self.prefs.colors
             # Translation table: color name -> curses color name
-            self.coltbl = {
+            colors_table = {
                 'black': curses.COLOR_BLACK,
                 'blue': curses.COLOR_BLUE,
                 'cyan': curses.COLOR_CYAN,
@@ -111,28 +112,23 @@ class Lfm:
                 'red': curses.COLOR_RED,
                 'white': curses.COLOR_WHITE,
                 'yellow': curses.COLOR_YELLOW }
-            # Initialize every color pair with user colors or with the defaults
+            # List of items to get color
             color_items = ['title', 'files', 'current_file', 'messages', 'help',
                            'file_info', 'error_messages1', 'error_messages2',
                            'buttons', 'selected_file', 'current_selected_file',
                            'tabs', 'temp_files', 'document_files', 'media_files',
                            'archive_files', 'source_files', 'graphics_files',
-                           'data_files']
-            for i, color_name in enumerate(color_items):
-                curses.init_pair(i+1,
-                    self.__set_color(prefs_colors[color_name][0],
-                                     self.coltbl[colors[color_name][0]]),
-                    self.__set_color(prefs_colors[color_name][1],
-                                     self.coltbl[colors[color_name][1]]))
-
-
-    def __set_color(self, col, defcol):
-        """return curses color value if exists, otherwise return default"""
-
-        if self.coltbl.has_key(col):
-            return self.coltbl[col]
-        else:
-            return defcol
+                           'data_files', 'current_file_otherpane',
+                           'current_selected_file_otherpane']
+            # Initialize every color pair with user colors or with the defaults
+            prefs_colors = self.prefs.colors
+            for i, item_name in enumerate(color_items):
+                pref_color_fg, pref_color_bg = prefs_colors[item_name]
+                def_color_fg = colors_table[colors[item_name][0]]
+                def_color_bg = colors_table[colors[item_name][1]]
+                color_fg = colors_table.get(pref_color_fg, def_color_fg)
+                color_bg = colors_table.get(pref_color_bg, def_color_bg)
+                curses.init_pair(i+1, color_fg, color_bg)
 
 
     def resize(self):
@@ -151,10 +147,24 @@ class Lfm:
 
 
     def display(self):
-        """show files pane and status bar"""
+        """display/update both panes and status bar"""
 
         self.lpane.display()
         self.rpane.display()
+        self.statusbar.display()
+
+
+    def half_display(self):
+        """display/update only active pane and status bar"""
+
+        self.act_pane.display()
+        self.statusbar.display()
+
+
+    def half_display_other(self):
+        """display/update only non-active pane and status bar"""
+
+        self.noact_pane.display()
         self.statusbar.display()
 
 
@@ -187,13 +197,14 @@ class Lfm:
             ret = self.act_pane.manage_keys()
             if ret < 0:
                 return self.quit_program(ret)
-            elif ret == TOGGLE_PANE:
+            elif ret == RET_TOGGLE_PANE:
                 if self.act_pane == self.lpane:
                     self.act_pane, self.noact_pane = self.rpane, self.lpane
                 else:
                     self.act_pane, self.noact_pane = self.lpane, self.rpane
-            elif ret == TAB_NEW:
+            elif ret == RET_TAB_NEW:
                 tab = self.act_pane.act_tab
+#                 path = os.path.dirname(tab.vbase) if tab.vfs else tab.path
                 if tab.vfs:
                     path = os.path.dirname(tab.vbase)
                 else:
@@ -203,7 +214,7 @@ class Lfm:
                 newtab.init(path)
                 self.act_pane.tabs.insert(idx+1, newtab)
                 self.act_pane.act_tab = newtab
-            elif ret == TAB_CLOSE:
+            elif ret == RET_TAB_CLOSE:
                 tab = self.act_pane.act_tab
                 idx = self.act_pane.tabs.index(tab)
                 self.act_pane.act_tab = self.act_pane.tabs[idx-1]
@@ -213,7 +224,7 @@ class Lfm:
 
 ######################################################################
 ##### StatusBar class
-class StatusBar:
+class StatusBar(object):
     """Status bar"""
 
     def __init__(self, maxh, app):
@@ -273,7 +284,7 @@ class StatusBar:
 
 ######################################################################
 ##### Pane class
-class Pane:
+class Pane(object):
     """The Pane class is like a notebook containing TabVfs"""
 
     def __init__(self, mode, app):
@@ -302,6 +313,7 @@ class Pane:
         except curses.error:
             print 'Can\'t create Pane window'
             sys.exit(-1)
+        self.win.leaveok(1)
         self.win.keypad(1)
         if curses.has_colors():
             self.win.bkgd(curses.color_pair(2))
@@ -365,15 +377,14 @@ class Pane:
                 if tab.vfs:
                     path = os.path.basename(tab.vbase.split('#')[0])
                 else:
-                    path = os.path.basename(tab.path)
-                    if path == '':
-                        path = os.path.dirname(tab.path)
+                    path = os.path.basename(tab.path) or os.path.dirname(tab.path)
                 path = utils.decode(path)
                 if len(path) > w - 2:
                     path = '[%s~]' % path[:w-3]
                 else:
                     path = '[' + path + ' ' * (w-2-len(path)) + ']'
                 path = utils.encode(path)
+#             attr = curses.color_pair(10) if tab == self.act_tab else curses.color_pair(1)
             if tab == self.act_tab:
                 attr = curses.color_pair(10) #| curses.A_BOLD
             else:
@@ -426,11 +437,13 @@ class Pane:
             else:
                 self.win.attrset(curses.color_pair(2))
                 attr = curses.color_pair(2)
+#             path = utils.decode(vfs.join(tab) if tab.vfs else tab.path)
             if tab.vfs:
                 path = vfs.join(tab)
             else:
                 path = tab.path
             path = utils.decode(path)
+#             title_path = utils.encode('~' + path[-w+5:] if len(path) > w-5 else path)
             if len(path) > w - 5:
                 title_path = '~' + path[-w+5:]
             else:
@@ -456,13 +469,13 @@ class Pane:
             res = files.get_fileinfo_dict(tab.path, filename,
                                           tab.files[filename])
             # get file color
-            if not tab.selections.count(filename):
+            if tab.selections.count(filename):
+                attr = curses.color_pair(10) | curses.A_BOLD
+            else:
                 if self.app.prefs.options['color_files']:
                     attr = self.get_filetypecolorpair(filename, tab.files[filename][files.FT_TYPE])
                 else:
                     attr = curses.color_pair(2)
-            else:
-                attr = curses.color_pair(10) | curses.A_BOLD
 
             # show
             if self.mode == PANE_MODE_FULL:
@@ -504,8 +517,15 @@ class Pane:
 
 
     def display_cursorbar(self):
-        if self != self.app.act_pane:
-            return
+        if self == self.app.act_pane:
+            attr_noselected = curses.color_pair(3)
+            attr_selected = curses.color_pair(11) | curses.A_BOLD
+        else:
+            if self.app.prefs.options['manage_otherpane']:
+                attr_noselected = curses.color_pair(20)
+                attr_selected = curses.color_pair(21)
+            else:
+                return
         if self.mode == PANE_MODE_FULL:
             cursorbar = curses.newpad(1, self.maxw)
         else:
@@ -519,9 +539,9 @@ class Pane:
         try:
             tab.selections.index(filename)
         except ValueError:
-            attr = curses.color_pair(3)
+            attr = attr_noselected
         else:
-            attr = curses.color_pair(11) | curses.A_BOLD
+            attr = attr_selected
 
         res = files.get_fileinfo_dict(tab.path, filename, tab.files[filename])
         if self.mode == PANE_MODE_FULL:
@@ -533,8 +553,8 @@ class Pane:
         else:
             buf = tab.get_fileinfo_str_short(res, self.dims[1], self.pos_col1)
             cursorbar.addstr(0, 0, buf, attr)
-            cursorbar.addch(0, self.pos_col1-1, curses.ACS_VLINE)
-            cursorbar.addch(0, self.pos_col2-1, curses.ACS_VLINE)
+            cursorbar.addch(0, self.pos_col1-1, curses.ACS_VLINE, attr)
+            cursorbar.addch(0, self.pos_col2-1, curses.ACS_VLINE, attr)
             row = tab.file_i % (self.dims[0]-3) + 3
             if self.mode == PANE_MODE_LEFT:
                 cursorbar.refresh(0, 0,
@@ -557,30 +577,34 @@ class Pane:
 
     def manage_keys(self):
         self.win.nodelay(1)
-        while 1:
+        while True:
             ch = self.win.getch()
             if ch == -1:       # no key pressed
 #                 curses.napms(1)
                 time.sleep(0.05)
                 curses.doupdate()
                 continue
-#             if ch == 0x1B:     # ESC
-#                 ch = self.app.win.getch() + 0x100
 #             print 'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
 #                   (curses.keyname(ch), ch & 255, ch, ch)
 #             messages.win('Keyboard hitted:',
 #                          'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
 #                          (curses.keyname(ch), ch & 255, ch, ch))
             ret = actions.do(self.act_tab, ch)
-            if ret != None:
+            if ret == None:
+                self.app.display()
+            elif ret == RET_NO_UPDATE:
+                continue
+            elif ret == RET_HALF_UPDATE:
+                self.app.half_display()
+            elif ret == RET_HALF_UPDATE_OTHER:
+                self.app.half_display_other()
+            else:
                 return ret
-
-            self.app.display()
 
 
 ######################################################################
 ##### Vfs class
-class Vfs:
+class Vfs(object):
     """Vfs class contains files information in a directory"""
 
     def __init__(self):
@@ -594,27 +618,40 @@ class Vfs:
         self.vfs = ''          # vfs? if not -> blank string
         self.base = ''         # tempdir basename
         self.vbase = self.path # virtual directory basename
+        # historic
+        self.historic = []
 
 
     def init_dir(self, path):
+#         old_path = self.path if self.path and not self.vfs else None
+        if self.path and not self.vfs:
+            old_path = self.path
+        else:
+            old_path = None
         try:
             app = self.pane.app
             self.nfiles, self.files = files.get_dir(path, app.prefs.options['show_dotfiles'])
             sortmode = app.prefs.options['sort']
             sort_mix_dirs = app.prefs.options['sort_mix_dirs']
             sort_mix_cases = app.prefs.options['sort_mix_cases']
-
             self.sorted = files.sort_dir(self.files, sortmode,
                                          sort_mix_dirs, sort_mix_cases)
             self.sort_mode = sortmode
             self.path = os.path.abspath(path)
             self.selections = []
         except (IOError, OSError), (errno, strerror):
+            self.historic.pop()
             return (strerror, errno)
         # vfs variables
         self.vfs = ''
         self.base = ''
         self.vbase = self.path
+        # historic
+        if old_path:
+            if old_path in self.historic:
+                self.historic.remove(old_path)
+            self.historic.append(old_path)
+            self.historic = self.historic[-MAX_HISTORIC_ENTRIES:]
 
 
     def init(self, path, old_file = ''):
@@ -673,7 +710,6 @@ class Vfs:
             else:
                 self.file_i = len(self.sorted) - 1
         self.vfs, self.base, self.vbase = self.old_vfs
-
         del(self.old_file)
         del(self.old_file_i)
         del(self.old_vfs)
@@ -683,7 +719,7 @@ class Vfs:
         """Rebuild tabs' directories"""
 
         path = self.path
-        if path[-1] == os.sep:
+        if path != "/" and path[-1] == os.sep:
             path = path[:-1]
         while not os.path.exists(path):
             path = os.path.dirname(path)
@@ -853,6 +889,14 @@ def main(win, prefs, paths1, paths2):
     return ret
 
 
+def add_path(arg, paths):
+    buf = os.path.abspath(arg)
+    if not os.path.isdir(buf):
+        usage('<%s> is not a directory' % arg)
+        lfm_exit(-1)
+    paths.append(buf)
+
+
 def lfm_start(sysargs):
     # get configuration & preferences
     DEBUG = 0
@@ -864,7 +908,7 @@ def lfm_start(sysargs):
         prefs.save()
         time.sleep(1)
     elif ret == -2:
-        print 'Config file seems corrupted, we\'ll use default values'
+        print 'Config file looks corrupted, we\'ll use default values'
         prefs.save()
         time.sleep(1)
 
@@ -896,23 +940,11 @@ def lfm_start(sysargs):
         paths1.append(os.path.abspath('.'))
         paths2.append(os.path.abspath('.'))
     elif len(args) == 1:
-        buf = os.path.abspath(args[0])
-        if not os.path.isdir(buf):
-            usage('<%s> is not a directory' % args[0])
-            lfm_exit(-1)
-        paths1.append(buf)
+        add_path(args[0], paths1)
         paths2.append(os.path.abspath('.'))
     elif len(args) == 2:
-        buf = os.path.abspath(args[0])
-        if not os.path.isdir(buf):
-            usage('<%s> is not a directory' % args[0])
-            lfm_exit(-1)
-        paths1.append(buf)
-        buf = os.path.abspath(args[1])
-        if not os.path.isdir(buf):
-            usage('<%s> is not a directory' % args[1])
-            lfm_exit(-1)
-        paths2.append(buf)
+        add_path(args[0], paths1)
+        add_path(args[1], paths2)
     else:
         usage('Incorrect number of arguments')
         lfm_exit(-1)

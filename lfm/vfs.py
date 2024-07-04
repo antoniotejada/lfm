@@ -110,13 +110,11 @@ def regenerate_file(tab):
             files.do_delete(tmpfile)
         except OSError:
             pass
-        return
     elif st == -100: # stopped by user
         try:
             files.do_delete(tmpfile)
         except OSError:
             pass
-        return
     else:
         tmpfile += c.exts[0] # zip & rar always adds extension
         # copy file

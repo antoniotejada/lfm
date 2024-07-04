@@ -43,12 +43,12 @@ if sys.version_info < (2, 3):
 
 
 setup(name = 'lfm',
-      version = '2.0',
+      version = '2.1',
       license = 'GPL',
       description = doclines[0],
       long_description = '\n'.join(doclines[2:]),
-      author = 'Iñigo Serna',
-      author_email = 'inigoserna@telefonica.net',
+      author = u'Inigo Serna',
+      author_email = 'inigoserna@gmail.com',
       url = 'http://www.terra.es/personal7/inigoserna/lfm',
       platforms = 'POSIX',
       classifiers = filter(None, classifiers.split("\n")),
