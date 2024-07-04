@@ -43,7 +43,7 @@ if sys.version_info < (2, 3):
 
 
 setup(name = 'lfm',
-      version = '2.1',
+      version = '2.2',
       license = 'GPL',
       description = doclines[0],
       long_description = '\n'.join(doclines[2:]),

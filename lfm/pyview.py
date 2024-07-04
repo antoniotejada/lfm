@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2001-8  Iñigo Serna
-# Time-stamp: <2008-12-20 22:48:22 inigo>
+# Copyright (C) 2001-10  Iñigo Serna
+# Time-stamp: <2010-01-23 21:12:54 inigo>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,10 +19,10 @@
 
 
 """
-Copyright (C) 2001-8, Iñigo Serna <inigoserna@gmail.com>.
+Copyright (C) 2001-10, Iñigo Serna <inigoserna@gmail.com>.
 All rights reserved.
 
-This software has been realised under the GPL License, see the COPYING
+This software has been released under the GPL License, see the COPYING
 file that comes with this package. There is NO WARRANTY.
 
 'pyview' is a simple pager (viewer) to be used with Last File Manager.
@@ -31,31 +31,180 @@ file that comes with this package. There is NO WARRANTY.
 
 import os, os.path
 import sys
-import time
-import thread
 import getopt
 import logging
+from time import time
 import curses, curses.ascii
 
 from __init__ import *
 import messages
+from utils import run_shell, encode, decode
 
 
 ########################################################################
-##### module variables
+##### module definitions and variables
+PYVIEW_NAME = 'pyview'
+PYVIEW_README = """
+    %s is a pager (viewer) written in Python.
+Though  initially it was written to be used with 'lfm',
+it can be used standalone too.
+Since version 0.9 it can read from standard input too
+(eg. $ ps efax | pyview  -s)
+
+This software has been realised under the GPL License,
+see the COPYING file that comes with this package.
+There is NO WARRANTY.
+
+Keys:
+=====
++ Movement
+    - cursor_up, p, P
+    - cursor_down, n, N
+    - previous page, backspace, Ctrl-P
+    - next page, space, Ctrl-N
+    - home: first line
+    - end: last line
+    - cursor_left
+    - cursor_right
+
++ Actions
+    - h, H, F1: help
+    - w, W, F2: toggle un / wrap (only in text mode)
+    - m, M, F4: toggle text / hex mode
+    - g, G, F5: goto line / byte offset
+    - /: find (new search)
+    - F6: find previous or find
+    - F7: find next or find
+    - 0..9: go to bookmark #
+    - b, B: set bookmark #
+    - Ctrl-O: open shell 'sh'. Type 'exit' to return to pyview
+    - q, Q, x, X, F3, F10: exit
+
+Goto Line / Byte Offset
+=======================
+    Enter the line number / byte offset you want to show.
+If number / byte is preceded by '0x' it is interpreted as hexadecimal.
+You can scroll relative lines from the current position using '+' or '-'
+character.
+
+Find
+====
+    Type the string to search. It ignores case.
+""" % PYVIEW_NAME
+MODE_TEXT, MODE_HEX = 0, 1
+
+
 app = None
 LOG_FILE = os.path.join(os.getcwd(), 'pyview.log')
 
+
+######################################################################
+##### Internal View
+class InternalView(object):
+    """Internal View class"""
 
-########################################################################
-# read from stdin
+    def __init__(self, title, buf, center=True):
+        self.title = title
+        self.__validate_buf(buf, center)
+        self.init_curses()
+
+    def __validate_buf(self, buf, center):
+        buf = [(l[0][:app.maxw-2], l[1] ) for l in buf]
+        buf2 = [l[0] for l in buf]
+        self.nlines = len(buf2)
+        if self.nlines > app.maxh - 2:
+            self.large = True
+            self.y0 = self.y = 0
+        else:
+            self.large = False
+            self.y0 = int(((app.maxh-2) - self.nlines)/2)
+        if center:
+            col_max = max(map(len, buf2))
+            self.x0 = int((app.maxw-col_max)/2)
+        else:
+            self.x0 = 1
+            # self.y0 = 0 if self.large else 1 # python v2.5+
+            if self.large:
+                self.y0 = 0
+            else:
+                self.y0 = 1
+        self.buf = buf
+
+    def init_curses(self):
+        curses.cbreak()
+        curses.raw()
+        curses.curs_set(0)
+        try:
+            self.win_title = curses.newwin(1, 0, 0, 0)
+            self.win_body = curses.newwin(app.maxh-2, 0, 1, 0)     # h, w, y, x
+            self.win_status = curses.newwin(1, 0, app.maxh-1, 0)
+        except curses.error:
+            print 'Can\'t create windows'
+            sys.exit(-1)
+        if curses.has_colors():
+            self.win_title.bkgd(curses.color_pair(1),
+                                curses.color_pair(1) | curses.A_BOLD)
+            self.win_body.bkgd(curses.color_pair(2))
+            self.win_status.bkgd(curses.color_pair(1))
+        self.win_body.leaveok(1)
+        self.win_body.keypad(1)
+        self.win_title.erase()
+        self.win_status.erase()
+        title = self.title
+        if len(title) - 4 > app.maxw:
+            title = title[:app.maxw-12] + '~' + title[-7:]
+        self.win_title.addstr(0, int((app.maxw-len(title))/2), title)
+        if self.large:
+            status = ''
+        else:
+            status = 'Press a key to continue'
+            self.win_status.addstr(0, int((app.maxw-len(status))/2), status)
+        self.win_title.refresh()
+        self.win_status.refresh()
+
+    def show(self):
+        self.win_body.erase()
+        buf = self.large and self.buf[self.y:self.y+app.maxh-2] or self.buf
+        for i, (l, c) in enumerate(buf):
+            self.win_body.addstr(self.y0+i, self.x0, l, curses.color_pair(c))
+        self.win_body.refresh()
+
+    def run(self):
+        if self.large:
+            while True:
+                self.show()
+                ch = self.win_body.getch()
+                if ch in (ord('k'), ord('K'), curses.KEY_UP):
+                    self.y = max(self.y-1, 0)
+                if ch in (ord('j'), ord('J'), curses.KEY_DOWN):
+                    self. y = min(self.y+1, self.nlines-1)
+                elif ch in (curses.KEY_HOME, 0x01):
+                    self.y = 0
+                elif ch in (curses.KEY_END, 0x05):
+                    self.y = self.nlines - 1
+                elif ch in (curses.KEY_PPAGE, 0x08, 0x02, curses.KEY_BACKSPACE):
+                    self.y = max(self.y-app.maxh+2, 0)
+                elif ch in (curses.KEY_NPAGE, ord(' '), 0x06):
+                    self. y = min(self.y+app.maxh-2, self.nlines-1)
+                elif ch in (0x1B, ord('q'), ord('Q'), ord('x'), ord('X'),
+                            curses.KEY_F3, curses.KEY_F10):
+                    break
+        else:
+            self.show()
+            while not self.win_body.getch():
+                pass
+
+
+######################################################################
+##### Utilities
+
 def read_stdin():
-    """Read from stdin with 1 sec. timeout. Returns text"""
+    """Read from stdin with 2.0 sec timeout maximum. Returns text"""
 
     from select import select
 
     try:
-        fd = select([sys.stdin], [], [], 0.5)[0][0]
+        fd = select([sys.stdin], [], [], 2.0)[0][0]
         stdin = ''.join(fd.readlines())
         # close stdin (pipe) and open terminal for reading
         os.close(0)
@@ -77,192 +226,146 @@ def create_temp_for_stdin(buf):
     return filename
 
 
-##################################################
-##### Internal View
-##################################################
-class InternalView(object):
-    """Internal View class"""
-
-    def __init__(self, title, buf, center = 1):
-        self.title = title
-        self.__validate_buf(buf, center)
-        self.init_curses()
-
-
-    def __validate_buf(self, buf, center):
-        buf = [(l[0][:app.maxw-2], l[1] ) for l in buf]
-        buf2 = [l[0] for l in buf]
-        self.nlines = len(buf2)
-        if self.nlines > app.maxh - 2:
-            self.y0 = 0
-            self.large = 1
-            self.y = 0
+class FileCache(object):
+    def __init__(self, filename, maxsize=1000000):
+        # cache
+        self.lines = {}
+        self.lines_age = {}
+        self.size = 0
+        self.maxsize = maxsize
+        # file
+        self.filename = filename
+        self.fd = open(filename, 'r')
+        self.nbytes = os.path.getsize(filename)
+        self.lines_pos = [-1, 0L] # make index start at 1, first line pos = 0
+        if self.nbytes != 0:
+            pos = nline = 0L
+            for line in self.fd:
+                nline += 1
+                pos += len(line)
+                self.lines_pos.append(pos)
+                # prepolulate first 50 lines
+                if nline <= 50:
+                    buf = line.replace('\t', ' '*4)[:-1]
+                    self.lines[nline] = buf
+                    self.lines_age[nline] = time()
+                    self.size += len(buf)
+            self.nlines = nline
         else:
-            self.y0 = int(((app.maxh-2) - self.nlines)/2)
-            self.large = 0
-        if center:
-            col_max = max(map(len, buf2))
-            self.x0 = int((app.maxw-col_max)/2)
+            self.nlines = 0
+
+    def __del__(self):
+        self.fd.close()
+
+    def __len__(self):
+        return len(self.lines)
+    
+    def __repr__(self):
+        return u'FileCache [%s, %d of %d lines in cache]' % \
+            (self.filename, len(self), self.nlines)
+
+    def isempty(self):
+        return self.nbytes == 0
+    
+    def __getitem__(self, lineno):
+        """return line# contents"""
+        if lineno < 1 or lineno > self.nlines:
+            return None
+        if lineno in self.lines.keys():
+            self.lines_age[lineno] = time()
+            return self.lines[lineno]
         else:
-            self.x0 = 1
-#             self.y0 = 0 if self.large else 1
-            if self.large:
-                self.y0 = 0
-            else:
-                self.large = 1
-        self.buf = buf
+            self.fd.seek(self.lines_pos[lineno])
+            line = self.fd.readline()
+            self.lines[lineno] = line
+            self.lines_age[lineno] = time()
+            self.size += len(line)
+            self.__ensure_size()
+            return line
 
+    def __ensure_size(self):
+        if self.size > self.maxsize:
+            ages = [(t, len(self.lines[lno]), lno) for lno, t in self.lines_age.items()]
+            ages.sort(reverse=True)
+            while self.size > self.maxsize:
+                t, s, lno = ages.pop()
+                del self.lines[lno]
+                del self.lines_age[lno]
+                self.size -= s
 
-    def init_curses(self):
-        curses.cbreak()
-        curses.raw()
-        curses.curs_set(0)
-        try:
-            self.win_title = curses.newwin(1, 0, 0, 0)
-            self.win_body = curses.newwin(app.maxh-2, 0, 1, 0)     # h, w, y, x
-            self.win_status = curses.newwin(1, 0, app.maxh-1, 0)
-        except curses.error:
-            print 'Can\'t create windows'
-            sys.exit(-1)
+    def line_len(self, lineno):
+        """return length of line#"""
+        if lineno < 1 or lineno > self.nlines:
+            return None
+        return len(self[lineno])   
 
-        if curses.has_colors():
-            self.win_title.bkgd(curses.color_pair(1),
-                                curses.color_pair(1) | curses.A_BOLD)
-            self.win_body.bkgd(curses.color_pair(2))
-            self.win_status.bkgd(curses.color_pair(1))
-        self.win_body.leaveok(1)
-        self.win_body.keypad(1)
+    def linecol2pos(self, lineno, col):
+        """return absolute position for line# and col# in file"""
+        if lineno < 1 or lineno > self.nlines or col < 0:
+            return None
+        return self.lines_pos[lineno] + col
 
-        self.win_title.erase()
-        self.win_status.erase()
-        title = self.title
-        if len(title) - 4 > app.maxw:
-            title = title[:app.maxw-12] + '~' + title[-7:]
-        self.win_title.addstr(0, int((app.maxw-len(title))/2), title)
-        if self.large:
-            status = ''
-        else:
-            status = 'Press a key to continue'
-            self.win_status.addstr(0, int((app.maxw-len(status))/2), status)
+    def pos2linecol(self, pos):
+        """return line# and col# for absolute pos in file"""
+        if pos < 0 or pos > self.nbytes:
+            return None
+        for i, p in enumerate(self.lines_pos):
+            if pos == p:
+                return i, 0
+            elif pos < p:
+                return i-1, p-pos
+        return i, p-pos
 
-        self.win_title.refresh()
-        self.win_status.refresh()
-
-
-    def show(self):
-        """show title, file and status bar"""
-
-        self.win_body.erase()
-        if self.large:
-            buf = self.buf[self.y:self.y+app.maxh-2]
-        else:
-            buf = self.buf
-        for i, (l, c) in enumerate(buf):
-            self.win_body.addstr(self.y0+i, self.x0, l, curses.color_pair(c))
-        self.win_body.refresh()
-
-
-    def run(self):
-        self.show()
-        if self.large:
-            quit = False
-            while not quit:
-                self.show()
-                ch = self.win_body.getch()
-                if ch in (ord('k'), ord('K'), curses.KEY_UP):
-                    self.y = max(self.y-1, 0)
-                if ch in (ord('j'), ord('J'), curses.KEY_DOWN):
-                    self. y = min(self.y+1, self.nlines-1)
-                elif ch in (curses.KEY_HOME, 0x01):
-                    self.y = 0
-                elif ch in (curses.KEY_END, 0x05):
-                    self.y = self.nlines - 1
-                elif ch in (curses.KEY_PPAGE, 0x08, 0x02, curses.KEY_BACKSPACE):
-                    self.y = max(self.y-app.maxh-2, 0)
-                elif ch in (curses.KEY_NPAGE, ord(' '), 0x06):
-                    self. y = min(self.y+app.maxh-2, self.nlines-1)
-                elif ch in (0x1B, ord('q'), ord('Q'), ord('x'), ord('X'),
-                            curses.KEY_F3, curses.KEY_F10):
-                    quit = True
-        else:
-            while not self.win_body.getch():
-                pass
-
-
-##################################################
-##### pyview
-##################################################
+    def get_bytes(self, n, pos):
+        """return a string with n bytes starting at pos"""
+        self.fd.seek(pos)
+        return self.fd.read(n)       
+    
+
+######################################################################
+##### PyView
 class FileView(object):
     """Main application class"""
 
     def __init__(self, win, filename, line, mode, stdin_flag):
         global app
-        app = self
+        app, messages.app = self, self
         self.win = win        # root window, need for resizing
-        self.file = filename
         self.mode = mode
-        self.wrap = 0
+        self.wrap = False
         self.stdin_flag = stdin_flag
+        self.line, self.col, self.col_max, self.pos = 1, 0, 0, 0
+        self.pattern = ''
+        self.matches = []
+        self.bookmarks = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
         self.init_curses()
-        self.pos, self.col = 0, 0
-        messages.app = self
         try:
-            self.__get_file_info(filename)
+            self.fc = FileCache(filename)
         except (IOError, os.error), (errno, strerror):
             messages.error('%s' % PYVIEW_NAME,
                            '%s (%s)' % (strerror, errno), filename)
             sys.exit(-1)
-        if self.nbytes == 0:
+        if self.fc.isempty():
             messages.error('View \'%s\'' % filename, 'File is empty')
             sys.exit(-1)
-        self.fd = open(filename)
-        self.line = 0
-        try:
+        if line != 0:
             if mode == MODE_TEXT:
-                self.__move_lines((line or 1) - 1)
+                self.line = max(0, min(line, self.fc.nlines))
             else:
-                self.pos = min(line, self.nbytes)
-                self.__move_hex(0)
-        except IndexError:
-            pass
-        self.pattern = ''
-        self.matches = []
-        self.bookmarks = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
-
-
-    def __get_file_info(self, filename):
-        """get size and number of lines of the file"""
-
-        self.nbytes = os.path.getsize(filename)
-        self.lines_pos = [0L]
-        if self.nbytes != 0:
-            pos = 0L
-            f = open(filename)
-            for nlines, l in enumerate(f.readlines()):
-                pos += len(l)
-                self.lines_pos.append(pos)
-            f.close()
-        else:
-            nlines = 0
-        self.nlines = nlines + 1
-
+                self.pos = max(0, min(line, self.fc.nbytes)) & 0xFFFFFFF0L
 
     def init_curses(self):
-        """initialize curses stuff: windows, colors, ..."""
-
         self.maxh, self.maxw = self.win.getmaxyx()
         curses.cbreak()
         curses.raw()
         curses.curs_set(0)
         try:
             self.win_title = curses.newwin(1, 0, 0, 0)
-            self.win_file = curses.newwin(self.maxh-2, 0, 1, 0)     # h, w, y, x
+            self.win_file = curses.newwin(self.maxh-2, 0, 1, 0)
             self.win_status = curses.newwin(1, 0, self.maxh-1, 0)
         except curses.error:
             print 'Can\'t create windows'
             sys.exit(-1)
-
-        # colors
         if curses.has_colors():
             curses.init_pair(1, curses.COLOR_YELLOW, curses.COLOR_BLUE)    # title
             curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)    # files
@@ -282,7 +385,6 @@ class FileView(object):
         self.win_file.leaveok(1)
         self.win_file.keypad(1)
 
-
     def resize_window(self):
         h, w = self.win.getmaxyx()
         self.maxh, self.maxw = h, w
@@ -296,275 +398,143 @@ class FileView(object):
         self.show()
 
 
-    def __move_lines(self, lines):
-        if lines >= 0:
-            self.line = min(self.line+lines, self.nlines-1)
-#             # Code that don't show blank lines when in last lines of file
-#             if self.wrap:
-#                 if self.line + lines > self.nlines - 1 - (curses.LINES-2):
-#                     # get last (curses.LINES -2 ) lines
-#                     pos = self.lines_pos[self.nlines - 1 - (curses.LINES-2)]
-#                     self.fd.seek(pos)
-#                     lines = []
-#                     for i in xrange(curses.LINES-2):
-#                         l = self.fd.readline().rstrip().replace('\t', ' ' * 4)
-#                         lines.append(l)
-#                     lines.reverse()
-#                     # calculate lines that fit in screen
-#                     lno = 0
-#                     i= 0
-#                     while lno < curses.LINES-2:
-#                         lno += int(len(lines[i])/curses.COLS) + 1
-#                         i += 1
-#                     # calculate horizontal scrolling if needed
-#                     self.col = curses.COLS * (lno - (curses.LINES-2))
-#                     self.line = self.nlines - 1 - i
-#                 else:
-#                     self.line += lines
-#             else:
-#                 if self.line + lines > self.nlines - 1 - (curses.LINES-2):
-#                     self.line = self.nlines - 1 - (curses.LINES-2)
-#                 else:
-#                     self.line += lines
+    def __sanitize_char(self, c):
+        if curses.ascii.iscntrl(c) or ord(c) in range(0x7F, 0xA0):
+            return '.'
+        elif curses.ascii.isascii(c) or curses.ascii.ismeta(c):
+            return c # curses.ascii.ascii(c) = c
         else:
-            self.line = max(0, self.line+lines)
-        self.pos = self.lines_pos[self.line]
-        self.fd.seek(self.lines_pos[self.line], 0)
-
-
-    def __get_lines_text(self):
-        lines = []
-        for i in xrange(self.maxh-2):
-            l = self.fd.readline().rstrip().replace('\t', ' ' * 4)
-            lines.append(l)
-        self.fd.seek(self.pos)
-        self.col_max = max(map(len, lines))
-        return lines
-
-
-    def __get_prev_lines_text(self):
-        lines = []
-        for i in xrange(self.maxh-2):
-            line_i = self.line - 1 - i
-            if line_i < 0:
-                break
-            self.fd.seek(self.lines_pos[line_i])
-            lines.append(self.fd.readline().rstrip().replace('\t', ' ' * 4))
-        self.fd.seek(self.pos)
-        return lines
-
-
-    def __get_line_length(self):
-        return len(self.__get_1line())
-
-
-    def __get_1line(self):
-        line = self.fd.readline().rstrip().replace('\t', ' ' * 4)
-        self.fd.seek(self.pos)
-        return line
-
-
-    def show_chr(self, w, c):
-        if curses.ascii.iscntrl(c) or ord(c) in xrange(0x7F, 0xA0):
-            w.addch(ord('.'))
-        elif curses.ascii.isascii(c):
-            w.addch(curses.ascii.ascii(c))
-        elif curses.ascii.ismeta(c):
-            w.addstr(c)
-        else:
-            w.addch(ord('.'))
-
-
+            return '.'
+        
     def show_str(self, w, line):
-        for i in xrange(len(line)):
-            c = line[i]
-            if ord(c) == ord('\r'):
-                pass
-            self.show_chr(w, c)
+        buf = ''.join(map(self.__sanitize_char, line))
+        w.addstr(buf)
 
+    def show_str_yx(self, y, x, w, line):
+        buf = ''.join(map(self.__sanitize_char, line))
+        w.addstr(y, x, buf)
+
+    def __calc_hex_charsperline(self):
+        tbl = ((152, 32), (134, 28), (116, 24), (98, 20), (80, 16), (62, 12), (44, 8), (26,4))
+        for width, chars_per_line in tbl:
+            if self.maxw >= width:
+                return chars_per_line
+        else:
+            return -1
+    
+    def __move_hex(self, n):
+        self.pos += self.__calc_hex_charsperline() * n
+        self.pos = min(self.fc.nbytes & 0xFFFFFFF0L, max(0, self.pos))
 
     def show_text_nowrap(self):
-        lines = self.__get_lines_text()
         self.win_file.refresh()
-        for y, l in enumerate(lines):
-            lwin = curses.newpad(1, self.maxw+1)
-            lwin.erase()
-#             largeline = True if len(l)-self.col > self.maxw else False
-            if len(l) - self.col > self.maxw:
-                largeline = True
-            else:
-                largeline = False
+        self.col_max = self.maxw
+        lwin = curses.newpad(self.maxh-2, self.maxw+1)
+        lwin.erase()
+        for y in xrange(self.maxh-2):
+            l = self.fc[self.line+y]
+            if l is None:
+                break
+            l = l.replace('\n', '').replace('\r', '').replace('\t', ' '*4)
+            largeline = (len(l)-self.col > self.maxw) and True or False
             buf = l[self.col:self.col+self.maxw]
-            self.show_str(lwin, buf)
-            lwin.refresh(0, 0, y+1, 0, y+1, self.maxw-1)
+            self.show_str_yx(y, 0, lwin, buf)
             if largeline:
-                lwin2 = curses.newpad(1, 2)
-                lwin2.erase()
-                lwin2.addch('>', curses.color_pair(2) | curses.A_BOLD)
-                lwin2.refresh(0, 0, y+1, self.maxw-1, y+1, self.maxw-1)
-                del(lwin2)
-            del(lwin)
-        self.win_file.refresh()
-
+                self.col_max = max(self.col_max, len(l))
+                lwin.addch(y, self.maxw-1, '>', curses.color_pair(2) | curses.A_BOLD)
+        lwin.refresh(0, 0, 1, 0, self.maxh-2, self.maxw-1)
 
     def show_text_wrap(self):
-        lines = self.__get_lines_text()
-        lines[0] = lines[0][self.col:]   # show remaining chars of 1st line
         self.win_file.refresh()
-        y = 0
-        for l in lines:
-            if y > self.maxh - 2:
+        lwin = curses.newpad(self.maxh-2, self.maxw+1)
+        lwin.erase()
+        i = y = 0
+        dx = self.col
+        while y < self.maxh - 2:
+            l = self.fc[self.line+i]
+            if l is None:
                 break
-            if len(l) <= self.maxw:
-                lwin = curses.newpad(1, self.maxw+1)
-                lwin.erase()
-                self.show_str(lwin, l)
-                lwin.refresh(0, 0, y+1, 0, y+1, self.maxw-1)
-                del(lwin)
-                y += 1
+            l = l.replace('\n', '').replace('\r', '').replace('\t', ' '*4)
+            l = l[dx:] # remaining chars of line
+            self.show_str_yx(y, 0, lwin, l[:self.maxw])
+            y += 1
+            if len(l) > self.maxw:
+                dx += self.maxw
             else:
-                while len(l) > 0:
-                    lwin = curses.newpad(1, self.maxw+1)
-                    lwin.erase()
-                    self.show_str(lwin, l[:self.maxw])
-                    lwin.refresh(0, 0, y+1, 0, y+1, self.maxw-1)
-                    del(lwin)
-                    y += 1
-                    if y > self.maxh - 2:
-                        break
-                    l = l[self.maxw:]
-        self.win_file.refresh()
-
-
-    def __move_hex(self, lines):
-        self.pos = self.pos & 0xFFFFFFF0L
-        if lines > 0:
-            self.pos = min(self.pos+lines*16, self.nbytes-1)
-        else:
-            self.pos = max(0, self.pos+lines*16)
-        self.fd.seek(self.pos, 0)
-        for i in xrange(len(self.lines_pos)):
-            ls = self.lines_pos[i]
-            if self.pos <= ls:
-                self.line = max(0, i-1)
-                break
-        else:
-            self.line = i
-
-
-    def __get_lines_hex(self, chars_per_line=16):
-        self.__move_hex(0)
-        lines = self.fd.read(chars_per_line * (self.maxh-2))
-        le = len(lines)
-        if le != chars_per_line * (self.maxh-2):
-            for i in xrange(chars_per_line * (self.maxh-2) - le):
-                lines += chr(0)
-        self.fd.seek(self.pos)
-        return lines
-
+                i += 1; dx = 0
+        lwin.refresh(0, 0, 1, 0, self.maxh-2, self.maxw-1)
 
     def show_hex(self):
-        if self.maxw >= 152:
-            chars_per_line = 32
-        elif self.maxw >= 134:
-            chars_per_line = 28
-        elif self.maxw >= 116:
-            chars_per_line = 24
-        elif self.maxw >= 98:
-            chars_per_line = 20
-        elif self.maxw >= 80:
-            chars_per_line = 16
-        elif self.maxw >= 62:
-            chars_per_line = 12
-        elif self.maxw >= 44:
-            chars_per_line = 8
-        elif self.maxw >= 26:
-            chars_per_line = 4
-        else:
-            return
-        lines = self.__get_lines_hex(chars_per_line)
         self.win_file.erase()
-        self.win_file.refresh()
+        chars_per_line = self.__calc_hex_charsperline()
+        if chars_per_line == -1:
+            return
+        n = chars_per_line * (self.maxh-2)
+        bytes = self.fc.get_bytes(n, self.pos)
+        if len(bytes) < n:
+            bytes += '\0' * (n-len(bytes))
         for y in xrange(self.maxh-2):
-            lwin = curses.newpad(1, self.maxw+1)
-            lwin.erase()
-            attr = curses.color_pair(2) | curses.A_BOLD
-            lwin.addstr(0, 0, '%8.8X ' % (self.pos+chars_per_line*y), attr)
-            for i in xrange(chars_per_line/4):
-                buf = ''.join(['%2.2X ' % (ord(lines[y*chars_per_line+4*i+j]) & 0xFF) \
-                                   for j in xrange(4)])
-                lwin.addstr(buf)
-                if i != chars_per_line/4 - 1:
-                    lwin.addch(curses.ACS_VLINE)
-                    lwin.addch(' ')
-            for i in xrange(chars_per_line):
-                c = lines[y*chars_per_line+i]
-                self.show_chr(lwin, c)
-            lwin.refresh(0, 0, y+1, 0, y+1, self.maxw-1)
+            pos = chars_per_line*y
+            self.win_file.addstr(y, 0, '%8.8X ' % (self.pos+pos),
+                                 curses.color_pair(2) | curses.A_BOLD)
+            buf = '   '.join([' '.join(['%2.2X' % (ord(bytes[pos+4*i+j]) & 0xFF) \
+                                     for j in xrange(4)]) \
+                                  for i in xrange(chars_per_line/4)])
+            buf += ' ' + bytes[y*chars_per_line:(y+1)*chars_per_line]
+            self.show_str(self.win_file, buf)
+        for i in xrange(chars_per_line/4-1):
+            self.win_file.vline(0, 21+14*i, curses.ACS_VLINE, self.maxh-2)
         self.win_file.refresh()
-
 
     def show_title(self):
+        self.win_title.erase()
+        if self.mode == MODE_TEXT:
+            pos = self.fc.linecol2pos(self.line, self.wrap and self.col or 0)
+            lineno, col = self.line, self.col
+        else:
+            pos = self.pos
+            lineno, col = self.fc.pos2linecol(self.pos)
         if self.maxw > 20:
-            if self.stdin_flag:
-                title = 'STDIN'
-            else:
-                title = os.path.basename(self.file)
+            title = self.stdin_flag and 'STDIN' or os.path.basename(self.fc.filename)
             if len(title) > self.maxw-52:
                 title = title[:self.maxw-58] + '~' + title[-5:]
-            self.win_title.addstr('File: %s' % title)
+            self.win_title.addstr('File: %s' % encode(title))
         if self.maxw >= 67:
-            if self.col != 0 or self.wrap:
-                self.win_title.addstr(0, int(self.maxw/2)-14, 'Col: %d' % self.col)
-            buf = 'Bytes: %d/%d' % (self.pos, self.nbytes)
+            if (self.mode == MODE_TEXT) and (col != 0 or self.wrap):
+                self.win_title.addstr(0, int(self.maxw/2)-14, 'Col: %d' % col)
+            buf = 'Bytes: %d/%d' % (pos, self.fc.nbytes)
             self.win_title.addstr(0, int(self.maxw/2)-5, buf)
-            buf = 'Lines: %d/%d' % (self.line+1, self.nlines)
+            buf = 'Lines: %d/%d' % (lineno, self.fc.nlines)
             self.win_title.addstr(0, int(self.maxw*3/4)-4, buf)
         if self.maxw > 5:
-            self.win_title.addstr(0, self.maxw-5,
-                                  '%3d%%' % (int(self.pos*100/self.nbytes)))
-
+            percent = int(pos*100/self.fc.nbytes)
+            self.win_title.addstr(0, self.maxw-5, '%3d%%' % percent)
+        self.win_title.refresh()
 
     def show_status(self):
+        self.win_status.erase()
         if self.maxw > 40:
             if self.stdin_flag:
                 path = 'STDIN'
             else:
-                path = os.path.dirname(self.file)
+                path = os.path.dirname(self.fc.filename)
                 if not path or path[0] != os.sep:
                     path = os.path.join(os.getcwd(), path)
             if len(path) > self.maxw - 37:
                 path = '~' + path[-(self.maxw-38):]
-            self.win_status.addstr('Path: %s' % path)
+            self.win_status.addstr('Path: %s' % encode(path))
         if self.maxw > 30:
-#             mode = 'TEXT' if self.mode == MODE_TEXT else 'HEX'
-            if self.mode == MODE_TEXT:
-                mode = 'TEXT'
-            else:
-                mode = 'HEX'
+            mode = (self.mode==MODE_TEXT) and 'TEXT' or 'HEX'
             self.win_status.addstr(0, self.maxw-30, 'View mode: %s' % mode)
-#             wrap = 'YES' if self.wrap else 'NO'
-            if self.wrap:
-                wrap = 'YES'
-            else:
-                wrap = 'NO'
+            wrap = self.wrap and 'YES' or 'NO'
             if self.mode == MODE_TEXT:
                 self.win_status.addstr(0, self.maxw-10, 'Wrap: %s' % wrap)
-
+        self.win_status.refresh()
 
     def show(self):
-        """show title, file and status bar"""
-
-        self.win_title.erase()
-        self.win_file.erase()
-        self.win_status.erase()
-
         if self.maxh < 3:
             return
-
-        # title
         self.show_title()
-        # file
         if self.mode == MODE_TEXT:
             if self.wrap:
                 self.show_text_wrap()
@@ -572,37 +542,26 @@ class FileView(object):
                 self.show_text_nowrap()
         else:
             self.show_hex()
-        # status
         self.show_status()
-
-        self.win_title.refresh()
-        self.win_file.refresh()
-        self.win_status.refresh()
 
 
     def __find(self, title):
-        self.pattern = messages.Entry(title, 'Type search string', '', 1, 0).run()
-        if self.pattern == None or self.pattern == '':
-            self.show()
+        self.pattern = messages.Entry(title, 'Type search string', '', True, False).run()
+        if self.pattern is None or self.pattern == '':
             return -1
-        filename = os.path.abspath(self.file)
-        mode = (self.mode == MODE_TEXT) and 'n' or 'b'
+        filename = os.path.abspath(self.fc.filename)
+        mode = (self.mode==MODE_TEXT) and 'n' or 'b'
         try:
-            i, o, e = os.popen3('%s -i%c \"%s\" \"%s\"' % \
-                                (sysprogs['grep'], mode, self.pattern,
-                                 filename), 'r')
-            i.close()
-            buf = o.read()
-            err = e.read().strip()
-            o.close(), e.close()
-        except:
+            cmd = '%s -i%c \"%s\" \"%s\"' % (sysprogs['grep'], mode,
+                                             self.pattern, filename)
+            st, buf = run_shell(encode(cmd), path=u'.', return_output=True)
+        except OSError:
             self.show()
-            messages.error('Find Error', 'Can\'t popen file')
+            messages.error('Find Error', 'Can\'t open file')
             return -1
-        if err != '':
+        if st == -1:
             self.show()
-            messages.error('Find Error', err)
-            self.show()
+            messages.error('Find Error', buf)
             self.matches = []
             return -1
         else:
@@ -612,349 +571,310 @@ class FileView(object):
                 self.matches = []
             return 0
 
-
     def __find_next(self):
-        pos = (self.mode == MODE_TEXT) and self.line or self.pos+16
+        pos = (self.mode==MODE_TEXT) and self.line+1 or \
+            self.pos+self.__calc_hex_charsperline() # start in next line
         for next in self.matches:
-            if next <= pos + 1:
-                continue
-            else:
+            if next >= pos:
                 break
         else:
             self.show()
             messages.error('Find', 'No more matches <%s>' % self.pattern)
-            self.show()
             return
         if self.mode == MODE_TEXT:
-            self.line = next - 1
-            self.__move_lines(0)
+            self.line, self.col = next, 0
         else:
             self.pos = next
-            self.__move_hex(0)
-        self.show()
 
-
-    def __find_previous(self):
-        pos = (self.mode == MODE_TEXT) and self.line or self.pos
-        rev_matches = [l for l in self.matches]
+    def __find_prev(self):
+        pos = (self.mode==MODE_TEXT) and self.line-1 or \
+            self.pos - self.__calc_hex_charsperline() # start in prev line
+        # for prev in sorted(self.matches, reverse=True): # python v2.4+
+        rev_matches = self.matches[:]
         rev_matches.reverse()
         for prev in rev_matches:
-            if prev >= pos + 1:
-                continue
-            else:
+            if prev <= pos:
                 break
         else:
             self.show()
-            messages.error('Find',
-                           'No more matches <%s>' % self.pattern)
-            self.show()
+            messages.error('Find', 'No more matches <%s>' % self.pattern)
             return
         if self.mode == MODE_TEXT:
-            self.line = prev - 1
-            self.__move_lines(0)
+            self.line, self.col = prev, 0
         else:
             self.pos = prev
-            self.__move_hex(0)
-        self.show()
 
 
-    def run(self):
-        """run application, manage keys, etc"""
-
-        self.show()
-        while True:
-            ch = self.win_file.getch()
-
-            # cursor up
-            if ch in (ord('k'), ord('K'), curses.KEY_UP):
-                if self.mode == MODE_TEXT:
-                    if self.wrap:
-                        if self.col == 0 and self.line > 0:
-                            self.__move_lines(-1)
-                            self.col = int(self.__get_line_length()/self.maxw)*self.maxw
-                        else:
-                            self.col -= self.maxw
-                    else:
-                        self.__move_lines(-1)
+    # movement
+    def move_up(self):
+        if self.mode == MODE_TEXT:
+            if self.wrap:
+                if self.col > 0:
+                    self.col -= self.maxw
                 else:
-                    self.__move_hex(-1)
-                self.show()
-            # cursor down
-            elif ch in (ord('j'), ord('J'), curses.KEY_DOWN):
-                if self.mode == MODE_TEXT:
-                    if self.wrap:
-                        if self.line >= self.nlines - 1 and \
-                               self.__get_line_length() < self.maxw*(self.maxh-2):
-                            pass
-                        else:
-                            self.col += self.maxw
-                            if self.col >= self.__get_line_length():
-                                self.col = 0
-                                self.__move_lines(1)
-                    else:
-                        self.__move_lines(1)
-                else:
-                    self.__move_hex(1)
-                self.show()
-            # page previous
-            elif ch in (curses.KEY_PPAGE, curses.KEY_BACKSPACE,
-                        0x08, 0x02):                         # BackSpace, Ctrl-B
-                if self.mode == MODE_TEXT:
-                    if self.wrap:
-                        lines = self.__get_prev_lines_text()
-                        if self.col:     # if we aren't at 1st char of line
-                            lines.insert(0, self.__get_1line()[:self.col])
-                        y = self.maxh - 2
-                        end = False
-                        for i, l in enumerate(lines):
-                            y -= 1; dy = 0
-                            if y < 0:
-                                break
-                            len2 = lenz = len(l)
-                            while len2 > self.maxw:
-                                dy += 1; y -= 1
-                                if y < 0:
-                                    i += 1
-                                    dy = int(lenz/self.maxw) + 1 - dy
-                                    end = True
-                                    break
-                                len2 -= self.maxw
-                            if end:
-                                break
-                        else:
-                            i += 1
-                        if self.col:
-                            i -= 1
-                        if y < 0:
-                            self.__move_lines(-i)
-#                             self.col = ((dy-1) if i==0 else dy) * self.maxw
-                            if i == 0:
-                                self.col = (dy-1) * self.maxw
-                            else:
-                                self.col = dy * self.maxw
-                        else:
-                            self.__move_lines(-(self.maxh-2))
-                            self.col = 0
-                    else:
-                        self.__move_lines(-(self.maxh-2))
-                else:
-                    self.__move_hex(-(self.maxh-2))
-                self.show()
-            # page next
-            elif ch in (curses.KEY_NPAGE, ord(' '), 0x06):   # Ctrl-F
-                if self.mode == MODE_TEXT:
-                    if self.wrap:
-                        lines = self.__get_lines_text()
-                        lines[0] = lines[0][self.col:]
-                        y = 0
-                        end = False
-                        for i, l in enumerate(lines):
-                            y += 1; dy = 0
-                            if y > self.maxh - 2:
-                                break
-                            len2 = len(l)
-                            while len2 > self.maxw:
-                                dy += 1; y += 1
-                                if y > self.maxh - 2:
-                                    end = True
-                                    break
-                                len2 -= self.maxw
-                            if end:
-                                break
-                        else:
-                            i += 1
-                        self.__move_lines(i)
-#                         self.col = (self.col+dy) if i==0 else dy) * self.maxw
-                        if i == 0:
-                            self.col += dy * self.maxw
-                        else:
-                            self.col = dy * self.maxw
-                    else:
-                        self.__move_lines(self.maxh-2)
-                else:
-                    self.__move_hex(self.maxh-2)
-                self.show()
-            # home
-            elif ch in (curses.KEY_HOME, 0x01):  # home
-                if self.mode == MODE_TEXT:
-                    self.__move_lines(-self.nlines)
-                else:
-                    self.__move_hex(-self.nbytes)
-                self.col = 0
-                self.show()
-            # end
-            elif ch in (curses.KEY_END, 0x05):   # end
-                if self.mode == MODE_TEXT:
-                    self.__move_lines(self.nlines)
-                else:
-                    self.__move_hex(self.nbytes)
-                self.col = 0
-                self.show()
+                    self.line = max(1, self.line-1)
+                    f, r = divmod(self.fc.line_len(self.line), self.maxw)
+                    # self.col = ((r==0) and (f-1) or f) * self.maxw # Fails!
+                    if r == 0 and f > 0:
+                        f -= 1
+                    self.col = f * self.maxw
+            else:
+                self.line = max(1, self.line-1)
+        else:
+            self.__move_hex(-1)
 
-            # cursor left
-            elif ch == curses.KEY_LEFT:
-                if self.mode == MODE_HEX or self.wrap:
-                    continue
-                if self.col > 9:
-                    self.col -= 10
-                    self.show()
-            # cursor right
-            elif ch == curses.KEY_RIGHT:
-                if self.mode == MODE_HEX or self.wrap:
-                    continue
-                if self.col+self.maxw < self.col_max + 2:
-                    self.col += 10
-                    self.show()
-
-            # un/wrap
-            elif ch in (ord('w'), ord('W'), curses.KEY_F2):
-                if self.mode == MODE_HEX:
-                    continue
-                self.wrap = not self.wrap
-                self.__move_lines(0)
-                self.col = 0
-                self.show()
-
-            # text / hexadecimal mode
-            elif ch in (ord('m'), ord('M'), curses.KEY_F4):
-                if self.mode == MODE_TEXT:
-                    self.mode = MODE_HEX
+    def move_down(self):
+        if self.mode == MODE_TEXT:
+            if self.wrap:
+                if self.col + self.maxw >= self.fc.line_len(self.line):
+                    self.line = min(self.fc.nlines, self.line+1)
                     self.col = 0
                 else:
-                    self.mode = MODE_TEXT
-                    self.__move_lines(0)
-                self.show()
+                    self.col += self.maxw
+            else:
+                self.line = min(self.fc.nlines, self.line+1)
+        else:
+            self.__move_hex(1)
 
-            #  goto line/byte
+    def move_pageprev(self):
+        if self.mode == MODE_TEXT:
+            if self.wrap:
+                i, y = 0, self.maxh-2
+                if len(self.fc[self.line]) > self.maxw:
+                    y +=  int((len(self.fc[self.line])-self.col)/self.maxw)
+                while y >= 0:
+                    l = self.fc[self.line+i]
+                    if l is None:
+                        break
+                    f, r = divmod(len(l), self.maxw)
+                    if r == 0 and f > 0:
+                        f -= 1
+                    y -= f+1; i -= 1
+                if f != 0:
+                    self.col = -(y+1) * self.maxw
+                else:
+                    self.col = 0
+                self.line = max(1, self.line+i+1)
+            else:
+                self.line = max(1, self.line-self.maxh+2)
+        else:
+            self.__move_hex(-(self.maxh-2))
+
+    def move_pagenext(self):
+        if self.mode == MODE_TEXT:
+            if self.wrap:
+                i = y = 0
+                dx = self.col
+                while y < self.maxh - 2:
+                    l = self.fc[self.line+i]
+                    if l is None:
+                        break
+                    f, r = divmod(len(l[dx:]), self.maxw)
+                    if r == 0 and f > 0:
+                        f -= 1
+                    y += f+1; i += 1; dx = 0
+                if f != 0:
+                    i -= 1
+                    self.col = dx + ((f+1)-(y-self.maxh+2)) * self.maxw
+                    if self.col >= len(l[dx:]):
+                        self.col = 0
+                        i += 1
+                else:
+                    self.col = dx
+                self.line = min(self.fc.nlines, self.line+i)
+            else:
+                self.line = min(self.fc.nlines, self.line+self.maxh-2)
+        else:
+            self.__move_hex(self.maxh-2)
+        
+    def move_home(self):
+        if self.mode == MODE_TEXT:
+            self.line, self.col = 1, 0
+        else:
+            self.pos = 0
+
+    def move_end(self):
+        if self.mode == MODE_TEXT:
+            self.line, self.col = self.fc.nlines, 0
+        else:
+            self.pos = self.fc.nbytes & 0xFFFFFFF0L
+    
+    def move_left(self):
+        if self.mode == MODE_TEXT and not self.wrap:
+            if self.col > 9:
+                self.col -= 10
+
+    def move_right(self):
+        if self.mode == MODE_TEXT and not self.wrap:
+            if self.col_max > self.col+self.maxw:
+                self.col += 10
+
+    # goto, bookmarks
+    def goto(self):
+        rel = 0
+        title = (self.mode==MODE_TEXT) and 'Goto line' or 'Type line number'
+        help = (self.mode==MODE_TEXT) and 'Goto byte' or 'Type byte offset'
+        n = messages.Entry(title, help, '', True, False).run()
+        if not n:
+            return
+        if n[0] in ('+', '-'):
+            rel = 1
+        try:
+            if n[rel:rel+2] == '0x':
+                if rel != 0:
+                    n = long(n[0] + str(int(n[1:], 16)))
+                else:
+                    n = long(n, 16)
+            else:
+                n = long(n)
+        except ValueError:
+            self.show()
+            messages.error('Goto %s' % (self.mode==MODE_TEXT) and 'line' or 'byte',
+                           'Invalid number <%s>' % n)
+            return
+        if n == 0:
+            return
+        if self.mode == MODE_TEXT:
+            line = (rel!=0) and (self.line+n) or n
+            self.line = max(1, min(line, self.fc.nlines))
+        else:
+            pos = (rel!=0) and (self.pos+n) or n
+            self.pos = max(0, min(pos, self.fc.nbytes)) & 0xFFFFFFF0L
+
+    def goto_bookmark(self, no):
+        pos = self.bookmarks[no]
+        if pos != -1:
+            if self.mode == MODE_TEXT:
+                self.line, self.col = self.fc.pos2linecol(pos), 0
+            else:
+                self.pos = pos
+
+    def set_bookmark(self):
+        while True:
+            ch = messages.get_a_key('Set bookmark',
+                                    'Press 0-9 to save bookmark, Ctrl-C to quit')
+            if 0x30 <= ch <= 0x39:
+                if self.mode == MODE_TEXT:
+                    pos = self.fc.linecol2pos(self.line, self.col)
+                else:
+                    pos = self.pos
+                self.bookmarks[ch-0x30] = pos
+                break
+            elif ch == -1:
+                break
+
+    def find(self):
+        if self.__find('Find') != -1:
+            self.__find_next()
+
+    def find_prev(self):
+        if not self.matches:
+            if self.__find('Find Previous') == -1:
+                return
+        self.__find_prev()
+
+    def find_next(self):
+        if not self.matches:
+            if self.__find('Find Next') == -1:
+                return
+        self.__find_next()
+
+    # modes
+    def toggle_wrap(self):
+        if self.mode == MODE_TEXT:
+            self.wrap = not self.wrap
+            self.col = 0
+
+    def toggle_mode(self):
+        if self.mode == MODE_TEXT:
+            self.mode = MODE_HEX
+            self.pos = self.fc.linecol2pos(self.line, self.col) & 0xFFFFFFF0L
+        else:
+            self.mode = MODE_TEXT
+            self.line, self.col = self.fc.pos2linecol(self.pos)[0], 0
+            self.pos = 0
+        
+    # other
+    def open_shell(self):
+        curses.endwin()
+        if self.stdin_flag:
+            os.system('sh')
+        else:
+            os.system('cd \"%s\"; sh' % encode(os.path.dirname(self.fc.filename)))
+        curses.curs_set(0)
+
+    def show_help(self):
+        buf = [('', 2)]
+        buf.append(('%s v%s (C) %s, by %s' % \
+                    (PYVIEW_NAME, VERSION, DATE, AUTHOR), 5))
+        text = PYVIEW_README.split('\n')
+        for l in text:
+            buf.append((l, 6))
+        InternalView('Help for %s' % PYVIEW_NAME, buf).run()
+   
+
+    def run(self):
+        while True:
+            self.show()
+            ch = self.win_file.getch()
+
+            # movement
+            if ch in (ord('k'), ord('K'), curses.KEY_UP):
+                self.move_up()
+            elif ch in (ord('j'), ord('J'), curses.KEY_DOWN):
+                self.move_down()
+            elif ch in (curses.KEY_PPAGE, curses.KEY_BACKSPACE, 0x08, 0x02):
+                self.move_pageprev()
+            elif ch in (curses.KEY_NPAGE, ord(' '), 0x06):
+                self.move_pagenext()
+            elif ch in (curses.KEY_HOME, 0x01):
+                self.move_home()
+            elif ch in (curses.KEY_END, 0x05):
+                self.move_end()
+            elif ch == curses.KEY_LEFT:
+                self.move_left()
+            elif ch == curses.KEY_RIGHT:
+                self.move_right()
+
+            # goto, bookmarks, find
             elif ch in (ord('g'), ord('G'), curses.KEY_F5):
-                rel = 0
-                if self.mode == MODE_TEXT:
-                    title = 'Goto line'
-                    help = 'Type line number'
-                else:
-                    title = 'Goto byte'
-                    help = 'Type byte offset'
-                n = messages.Entry(title, help, '', 1, 0).run()
-                if not n:
-                    self.show()
-                    continue
-                if n[0] in ('+', '-'):
-                    rel = 1
-                try:
-                    if n[rel:rel+2] == '0x':
-                        if rel:
-                            n = long(n[0] + str(int(n[1:], 16)))
-                        else:
-                            n = long(n, 16)
-                    else:
-                        n = long(n)
-                except ValueError:
-                    self.show()
-                    if self.mode == MODE_TEXT:
-                        mode = 'line'
-                    else:
-                        mode = 'byte'
-                    messages.error('Goto %s' % mode,
-                                   'Invalid byte number <%s>' % n)
-                    self.show()
-                    continue
-                if n == 0:
-                    self.show()
-                    continue
-                if self.mode == MODE_TEXT:
-#                     self.line = self.line+n if rel else n-1
-                    if rel:
-                        self.line += n
-                    else:
-                        self.line = n - 1
-                    self.line = min(self.line, self.nlines-1)
-                    self.__move_lines(0)
-                else:
-#                     self.pos = self.pos+n if rel else n
-                    if rel:
-                        self.pos += n
-                    else:
-                        self.pos = n
-                    self.pos = min(self.pos, self.nbytes)
-                    self.__move_hex(0)
-                self.show()
-
-            #  find
-            elif ch == ord('/'):
-                if self.__find('Find') == -1:
-                    continue
-                self.__find_next()
-            # find previous
-            elif ch == curses.KEY_F6:
-                if not self.matches:
-                    if self.__find('Find Previous') == -1:
-                        continue
-                self.__find_previous()
-            # find next
-            elif ch == curses.KEY_F7:
-                if not self.matches:
-                    if self.__find('Find Next') == -1:
-                        continue
-                self.__find_next()
-
-            # go to bookmark
+                self.goto()
             elif 0x30 <= ch <= 0x39:
-                bk = self.bookmarks[ch-0x30]
-                if bk == -1:
-                    continue
-                self.line = bk
-                self.__move_lines(0)
-                self.show()
-            # set bookmark
+                self.goto_bookmark(ch-0x30)
             elif ch in (ord('b'), ord('B')):
-                while True:
-                    ch = messages.get_a_key('Set bookmark',
-                                            'Press 0-9 to save bookmark, Ctrl-C to quit')
-                    if 0x30 <= ch <= 0x39:
-                        self.bookmarks[ch-0x30] = self.line
-                        break
-                    elif ch == -1:
-                        break
-                self.show()
+                self.set_bookmark()
+            elif ch == ord('/'):
+                self.find()
+            elif ch == curses.KEY_F6:
+                self.find_prev()
+            elif ch == curses.KEY_F7:
+                self.find_next()
 
-            # shell
+            # modes
+            elif ch in (ord('w'), ord('W'), curses.KEY_F2):
+                self.toggle_wrap()
+            elif ch in (ord('m'), ord('M'), curses.KEY_F4):
+                self.toggle_mode()
+
+            # other
             elif ch == 0x0F:          # Ctrl-O
-                curses.endwin()
-                if self.stdin_flag:
-                    os.system('sh')
-                else:
-                    os.system('cd \"%s\"; sh' % os.path.dirname(self.file))
-                curses.curs_set(0)
-                self.show()
-
-            #  help
+                self.open_shell()
             elif ch in (ord('h'), ord('H'), curses.KEY_F1):
-                buf = [('', 2)]
-                buf.append(('%s v%s (C) %s, by %s' % \
-                            (PYVIEW_NAME, VERSION, DATE, AUTHOR), 5))
-                text = PYVIEW_README.split('\n')
-                for l in text:
-                    buf.append((l, 6))
-                InternalView('Help for %s' % PYVIEW_NAME, buf).run()
-                self.show()
-
-            # resize window
+                self.show_help()
             elif ch == curses.KEY_RESIZE:
                 self.resize_window()
-
-            # quit
             elif ch in (0x11, ord('q'), ord('Q'), ord('x'), ord('X'), # Ctrl-Q
                         curses.KEY_F3, curses.KEY_F10):
-                self.fd.close()
+                del self.fc
                 return
 
-
-##################################################
+
+######################################################################
 ##### Main
-##################################################
-def usage(prog, msg = ""):
+
+def usage(prog, msg=''):
     prog = os.path.basename(prog)
-    if msg != "":
+    if msg != '':
         print '%s:\t%s\n' % (prog, msg)
     print """\
 %s v%s - (C) %s, by %s
@@ -963,11 +883,13 @@ A simple pager (viewer) to be used with Last File Manager.
 Released under GNU Public License, read COPYING for more details.
 
 Usage:\t%s\t[-h | --help]
-\t\t[-d | --debug]
+\t\t[-s | --stdin]
 \t\t[-m text|hex | --mode=text|hex]
+\t\t[-d | --debug]
 \t\t[+n]
 \t\tpathtofile
 Options:
+    -s, --stdin\t\tread from stdin
     -m, --mode\t\tstart in text or hexadecimal mode
     -d, --debug\t\tcreate debug file
     -h, --help\t\tshow help
@@ -978,7 +900,7 @@ Options:
 
 
 def main(win, filename, line, mode, stdin_flag):
-    app = FileView(win, filename, line, mode, stdin_flag)
+    app = FileView(win, decode(filename), line, mode, stdin_flag)
     if app == OSError:
         sys.exit(-1)
     return app.run()
@@ -986,21 +908,24 @@ def main(win, filename, line, mode, stdin_flag):
 
 def PyView(sysargs):
     # defaults
-    DEBUG = 0
+    DEBUG = False
     filename = ''
     line = 0
+    stdin_flag = False
     mode = MODE_TEXT
-
+    
     # args
     try:
-        opts, args = getopt.getopt(sysargs[1:], 'dhm:',
-                                   ['debug', 'help', 'mode='])
+        opts, args = getopt.getopt(sysargs[1:], 'dhsm:',
+                                   ['debug', 'help', 'stdin', 'mode='])
     except getopt.GetoptError:
         usage(sysargs[0], 'Bad argument(s)')
         sys.exit(-1)
     for o, a in opts:
-        if o in ('-d', '--debug'):
-            DEBUG = 1
+        if o in ('-s', '--stdin'):
+            stdin_flag = True
+        elif o in ('-d', '--debug'):
+            DEBUG = True
         elif o in ('-h', '--help'):
             usage(sysargs[0])
             sys.exit(2)
@@ -1013,11 +938,10 @@ def PyView(sysargs):
                 usage(sysargs[0], '<%s> is not a valid mode' % a)
                 sys.exit(-1)
 
-    stdin = read_stdin()
-    if stdin == '':
-        stdin_flag = 0
-    else:
-        stdin_flag = 1
+    if stdin_flag:
+        stdin = read_stdin()
+        if stdin == '':
+            stdin_flag = False
 
     if len(args) > 2:
         usage(sysargs[0], 'Incorrect number of arguments')
@@ -1028,11 +952,7 @@ def PyView(sysargs):
             if arg[0] == '+':
                 line = arg[1:]
                 try:
-#                     line = int(line, 16) if line[:2] == '0x' else int(line)
-                    if line[:2] == '0x':
-                        line = int(line, 16)
-                    else:
-                        line = int(line)
+                    line = (line[:2]=='0x') and int(line, 16) or int(line)
                 except ValueError:
                     usage(sysargs[0], '<%s> is not a valid line number' % line)
                     sys.exit(-1)
@@ -1047,12 +967,12 @@ def PyView(sysargs):
         filename = create_temp_for_stdin(stdin)
     else:
         if not os.path.isfile(filename):
-            usage(sysargs[0], '<%s> is not a valid file' % file)
+            usage(sysargs[0], '<%s> is not a valid file' % filename)
             sys.exit(-1)
 
     # logging
     if DEBUG:
-        log_file = os.path.join(os.path.abspath('.'), LOG_FILE)
+        log_file = os.path.join(os.path.abspath(u'.'), LOG_FILE)
         logging.basicConfig(level=logging.DEBUG,
                             format='%(asctime)s %(levelname)s\t%(message)s',
                             datefmt='%Y-%m-%d %H:%M:%S   ',

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright (C) 2001-8, Iñigo Serna <inigoserna@gmail.com>.
+Copyright (C) 2001-10, Iñigo Serna <inigoserna@gmail.com>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -14,17 +14,29 @@ application for UNIX console.
 
 ######################################################################
 import locale
-locale.setlocale(locale.LC_ALL, '')
-g_encoding = locale.getpreferredencoding()
+from sys import exit
 
+try:
+    locale.setlocale(locale.LC_ALL, '')
+except locale.Error:
+    print 'lfm can\'t use the encoding defined in your system: "%s"' % \
+        '.'.join(locale.getdefaultlocale())
+    print 'Please configure before running lfm. Eg. $ export LANG=en_GB.UTF-8'
+    exit(-1)
+
+g_encoding = locale.getpreferredencoding()
+if g_encoding is None or g_encoding == '':
+    print 'lfm can\'t find a valid encoding for your terminal.'
+    print 'Please configure before running lfm. Eg. $ export LANG=en_GB.UTF-8'
+    exit(-1)
+    
 
 ######################################################################
 AUTHOR = 'Iñigo Serna'
-VERSION = '2.1'
-DATE = '2001-8'
+VERSION = '2.2'
+DATE = '2001-10'
 
 LFM_NAME = 'lfm - Last File Manager'
-PYVIEW_NAME = 'pyview'
 
 
 ######################################################################
@@ -36,6 +48,7 @@ sysprogs = { 'tar': 'tar',
              'unzip': 'unzip',
              'rar': 'rar',
              '7z': '7z',
+             'xz': 'xz',
              'grep': 'grep',
              'find': 'find',
              'which': 'which',
@@ -45,58 +58,6 @@ RET_QUIT, RET_EXIT = -1, -2
 RET_TOGGLE_PANE, RET_TAB_NEW, RET_TAB_CLOSE, RET_NO_UPDATE, \
     RET_HALF_UPDATE, RET_HALF_UPDATE_OTHER = xrange(1, 7)
 PANE_MODE_HIDDEN, PANE_MODE_LEFT, PANE_MODE_RIGHT, PANE_MODE_FULL = xrange(4)
-
-
-######################################################################
-##### pyview
-MODE_TEXT, MODE_HEX = 0, 1
-PYVIEW_README = """
-    %s is a pager (viewer) written in Python.
-Though  initially it was written to be used with 'lfm',
-it can be used standalone too.
-Since version 0.9 it can read from standard input too
-(eg. $ ps efax | pyview)
-
-This software has been realised under the GPL License,
-see the COPYING file that comes with this package.
-There is NO WARRANTY.
-
-Keys:
-=====
-+ Movement
-    - cursor_up, p, P
-    - cursor_down, n, N
-    - previous page, backspace, Ctrl-P
-    - next page, space, Ctrl-N
-    - home: first line
-    - end: last line
-    - cursor_left
-    - cursor_right
-
-+ Actions
-    - h, H, F1: help
-    - w, W, F2: toggle un / wrap (only in text mode)
-    - m, M, F4: toggle text / hex mode
-    - g, G, F5: goto line / byte offset
-    - /: find (new search)
-    - F6: find previous or find
-    - F7: find next or find
-    - 0..9: go to bookmark #
-    - b, B: set bookmark #
-    - Ctrl-O: open shell 'sh'. Type 'exit' to return to pyview
-    - q, Q, x, X, F3, F10: exit
-
-Goto Line / Byte Offset
-=======================
-    Enter the line number / byte offset you want to show.
-If number / byte is preceded by '0x' it is interpreted as hexadecimal.
-You can scroll relative lines from the current position using '+' or '-'
-character.
-
-Find
-====
-    Type the string to search. It ignores case.
-""" % PYVIEW_NAME
 
 
 ######################################################################

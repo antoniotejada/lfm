@@ -36,7 +36,7 @@ def init(tab, filename, vfstype):
         return # temppdir deleted by previous call, so we just return
     elif st == -100: # stopped by user
         try:
-            files.do_delete(tempdir)
+            files.delete_bulk(tempdir)
         except OSError:
             pass
         return
@@ -60,7 +60,7 @@ def copy(tab_org, tab_new):
     for f in glob(os.path.join(dir_src, '*')):
         f = os.path.basename(f)
         try:
-            files.do_copy(os.path.join(dir_src, f), os.path.join(tempdir, f))
+            files.copy_bulk(os.path.join(dir_src, f), os.path.join(tempdir, f))
         except (IOError, os.error), (errno, strerror):
             app.display()
             messages.error('Error regenerating vfs file',
@@ -85,8 +85,7 @@ def exit(tab):
             return pan_regenerate(tab)
         else:
             regenerate_file(tab)
-
-    files.do_delete(tab.base)
+    files.delete_bulk(tab.base, ignore_errors=True)
     app.regenerate()
 
 
@@ -107,23 +106,26 @@ def regenerate_file(tab):
         messages.error('Creating vfs', buf)
         app.display()
         try:
-            files.do_delete(tmpfile)
+            files.delete_bulk(tmpfile)
         except OSError:
             pass
     elif st == -100: # stopped by user
         try:
-            files.do_delete(tmpfile)
+            files.delete_bulk(tmpfile)
         except OSError:
             pass
     else:
-        tmpfile += c.exts[0] # zip & rar always adds extension
-        # copy file
+        # compress process always create filename with extension,
+        # so we have 2 files now
+        tmpfile_ext = tmpfile + c.exts[0]
         try:
-            files.do_copy(tmpfile, vfs_file)
+            files.copy_bulk(tmpfile_ext, vfs_file)
         except (IOError, os.error), (errno, strerror):
-            files.do_delete(tmpfile)
+            files.delete_bulk(tmpfile_ext)
+            files.delete_bulk(tmpfile)
             return '%s (%s)' % (strerror, errno)
-        files.do_delete(tmpfile)
+        files.delete_bulk(tmpfile_ext, ignore_errors=True)
+        files.delete_bulk(tmpfile, ignore_errors=True)
 
 
 # vfs path join
@@ -151,7 +153,7 @@ def pan_init(tab, fs):
             pass
         try:
             if os.path.isfile(f_orig):
-                files.do_copy(f_orig, f_dest)
+                files.copy_bulk(f_orig, f_dest)
             elif os.path.isdir(f_orig):
                 os.mkdir(f_dest)
         except (IOError, os.error), (errno, strerror):
@@ -174,7 +176,7 @@ def pan_copy(tab_org, tab_new):
     for f in glob(os.path.join(dir_src, '*')):
         f = os.path.basename(f)
         try:
-            files.do_copy(os.path.join(dir_src, f), os.path.join(tempdir, f))
+            files.copy_bulk(os.path.join(dir_src, f), os.path.join(tempdir, f))
         except (IOError, os.error), (errno, strerror):
             app.display()
             messages.error('Error regenerating vfs file',
@@ -192,16 +194,14 @@ def pan_regenerate(tab):
     dir_src = tab.path
     dir_dest = tab.vbase.replace('#vfs', '')
     # check if can copy files
-    i, oe = os.popen4('touch ' + dir_dest, 'r')
-    out = oe.read()
-    i.close(), oe.close()
+    out = utils.get_shell_output('touch ' + utils.encode(dir_dest))
     if out:
         return ''.join(out.split(':')[1:])[1:]
     # copy files
     for f in glob(os.path.join(dir_src, '*')):
         f = os.path.basename(f)
         try:
-            files.do_copy(os.path.join(dir_src, f), os.path.join(dir_dest, f))
+            files.copy_bulk(os.path.join(dir_src, f), os.path.join(dir_dest, f))
         except (IOError, os.error), (errno, strerror):
             app.display()
             messages.error('Error regenerating vfs file',
@@ -209,3 +209,4 @@ def pan_regenerate(tab):
 
 
 ######################################################################
+

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2001-8  Iñigo Serna
-# Time-stamp: <2008-12-20 22:48:01 inigo>
+# Copyright (C) 2001-10  Iñigo Serna
+# Time-stamp: <2010-01-23 21:12:20 inigo>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-u"""lfm v2.1 - (C) 2001-8, by Iñigo Serna <inigoserna@gmail.com>
+u"""lfm v2.2 - (C) 2001-10, by Iñigo Serna <inigoserna@gmail.com>
 
 'Last File Manager' is a file manager for UNIX console which born with
 midnight commander as model. Released under GNU Public License, read
@@ -39,7 +39,7 @@ Options:
 
 
 __author__ = u'Iñigo Serna'
-__revision__ = '2.1'
+__revision__ = '2.2'
 
 
 import os, os.path
@@ -119,7 +119,8 @@ class Lfm(object):
                            'tabs', 'temp_files', 'document_files', 'media_files',
                            'archive_files', 'source_files', 'graphics_files',
                            'data_files', 'current_file_otherpane',
-                           'current_selected_file_otherpane']
+                           'current_selected_file_otherpane',
+                           'directories', 'exe_files']
             # Initialize every color pair with user colors or with the defaults
             prefs_colors = self.prefs.colors
             for i, item_name in enumerate(color_items):
@@ -249,7 +250,7 @@ class StatusBar(object):
         self.win.erase()
         adir = self.app.act_pane.act_tab
         maxw = self.app.maxw
-        if len(adir.selections):
+        if len(adir.selections) > 0:
             if maxw >= 45:
                 size = 0
                 for f in adir.selections:
@@ -267,13 +268,9 @@ class StatusBar(object):
                 else:
                     realpath = files.get_realpath(adir.path, filename,
                                                   adir.files[filename][files.FT_TYPE])
-                realpath = utils.decode(realpath)
-                if len(realpath) > maxw - 35:
-                    path = '~' + realpath[-(maxw-37):]
-                else:
-                    path = realpath
-                path = utils.encode(path)
-                self.win.addstr(0, 20, 'Path: ' + path)
+                path = (len(realpath)>maxw-35) and \
+                    '~' + realpath[-(maxw-37):] or realpath
+                self.win.addstr(0, 20, 'Path: ' + utils.encode(path))
         if maxw > 10:
             try:
                 self.win.addstr(0, maxw-8, 'F1=Help')
@@ -299,9 +296,9 @@ class Pane(object):
     def load_tabs_with_paths(self, paths):
         for path in paths:
             tab = TabVfs(self)
-            err = tab.init(path)
+            err = tab.init(utils.decode(path))
             if err:
-                tab.init(os.path.abspath('.'))
+                tab.init(os.path.abspath(u'.'))
             self.tabs.append(tab)
         self.act_tab = self.tabs[0]
 
@@ -378,26 +375,20 @@ class Pane(object):
                     path = os.path.basename(tab.vbase.split('#')[0])
                 else:
                     path = os.path.basename(tab.path) or os.path.dirname(tab.path)
-                path = utils.decode(path)
                 if len(path) > w - 2:
                     path = '[%s~]' % path[:w-3]
                 else:
                     path = '[' + path + ' ' * (w-2-len(path)) + ']'
-                path = utils.encode(path)
-#             attr = curses.color_pair(10) if tab == self.act_tab else curses.color_pair(1)
-            if tab == self.act_tab:
-                attr = curses.color_pair(10) #| curses.A_BOLD
-            else:
-                attr = curses.color_pair(1)
-            tabs.addstr(0, i*w, path, attr)
+            attr = (tab==self.act_tab) and curses.color_pair(10) or curses.color_pair(1)
+            tabs.addstr(0, i*w, utils.encode(path), attr)
         tabs.refresh(0, 0, 0, self.dims[3],  1, self.dims[3]+self.dims[1]-1)
 
 
     def get_filetypecolorpair(self, f, typ):
         if typ == files.FTYPE_DIR:
-            return curses.color_pair(5)
+            return curses.color_pair(22)
         elif typ == files.FTYPE_EXE:
-            return curses.color_pair(6)  | curses.A_BOLD
+            return curses.color_pair(23)  | curses.A_BOLD
         ext = os.path.splitext(f)[1].lower()
         files_ext = self.app.prefs.files_ext
         if ext in files_ext['temp_files']:
@@ -437,20 +428,10 @@ class Pane(object):
             else:
                 self.win.attrset(curses.color_pair(2))
                 attr = curses.color_pair(2)
-#             path = utils.decode(vfs.join(tab) if tab.vfs else tab.path)
-            if tab.vfs:
-                path = vfs.join(tab)
-            else:
-                path = tab.path
-            path = utils.decode(path)
-#             title_path = utils.encode('~' + path[-w+5:] if len(path) > w-5 else path)
-            if len(path) > w - 5:
-                title_path = '~' + path[-w+5:]
-            else:
-                title_path = path
-            title_path = utils.encode(title_path)
+            path = tab.vfs and vfs.join(tab) or tab.path
+            path = (len(path)>w-5) and '~' + path[-w+5:] or path
             self.win.box()
-            self.win.addstr(0, 2, title_path, attr)
+            self.win.addstr(0, 2, utils.encode(path), attr)
             self.win.addstr(1, 1,
                             'Name'.center(self.pos_col1-2)[:self.pos_col1-2],
                             curses.color_pair(2) | curses.A_BOLD)
@@ -476,14 +457,13 @@ class Pane(object):
                     attr = self.get_filetypecolorpair(filename, tab.files[filename][files.FT_TYPE])
                 else:
                     attr = curses.color_pair(2)
-
             # show
             if self.mode == PANE_MODE_FULL:
                 buf = tab.get_fileinfo_str_long(res, w)
-                self.win.addstr(i, 0, buf, attr)
+                self.win.addstr(i, 0, utils.encode(buf), attr)
             else:
                 buf = tab.get_fileinfo_str_short(res, w, self.pos_col1)
-                self.win.addstr(i+2, 1, buf, attr)
+                self.win.addstr(i+2, 1, utils.encode(buf), attr)
 
         # vertical separators
         if self.mode != PANE_MODE_FULL:
@@ -535,7 +515,6 @@ class Pane(object):
 
         tab = self.act_tab
         filename = tab.sorted[tab.file_i]
-
         try:
             tab.selections.index(filename)
         except ValueError:
@@ -546,13 +525,13 @@ class Pane(object):
         res = files.get_fileinfo_dict(tab.path, filename, tab.files[filename])
         if self.mode == PANE_MODE_FULL:
             buf = tab.get_fileinfo_str_long(res, self.maxw)
-            cursorbar.addstr(0, 0, buf, attr)
+            cursorbar.addstr(0, 0, utils.encode(buf), attr)
             cursorbar.refresh(0, 0,
                               tab.file_i % self.dims[0] + 1, 0,
                               tab.file_i % self.dims[0] + 1, self.maxw-2)
         else:
             buf = tab.get_fileinfo_str_short(res, self.dims[1], self.pos_col1)
-            cursorbar.addstr(0, 0, buf, attr)
+            cursorbar.addstr(0, 0, utils.encode(buf), attr)
             cursorbar.addch(0, self.pos_col1-1, curses.ACS_VLINE, attr)
             cursorbar.addch(0, self.pos_col2-1, curses.ACS_VLINE, attr)
             row = tab.file_i % (self.dims[0]-3) + 3
@@ -580,17 +559,17 @@ class Pane(object):
         while True:
             ch = self.win.getch()
             if ch == -1:       # no key pressed
-#                 curses.napms(1)
+                # curses.napms(1)
                 time.sleep(0.05)
                 curses.doupdate()
                 continue
-#             print 'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
-#                   (curses.keyname(ch), ch & 255, ch, ch)
-#             messages.win('Keyboard hitted:',
-#                          'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
-#                          (curses.keyname(ch), ch & 255, ch, ch))
+            # print 'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
+            #       (curses.keyname(ch), ch & 255, ch, ch)
+            # messages.win('Keyboard hitted:',
+            #              'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
+            #              (curses.keyname(ch), ch & 255, ch, ch))
             ret = actions.do(self.act_tab, ch)
-            if ret == None:
+            if ret is None:
                 self.app.display()
             elif ret == RET_NO_UPDATE:
                 continue
@@ -623,11 +602,11 @@ class Vfs(object):
 
 
     def init_dir(self, path):
-#         old_path = self.path if self.path and not self.vfs else None
+#         old_path = self.path if self.path and not self.vfs else None # python v2.5+
         if self.path and not self.vfs:
             old_path = self.path
         else:
-            old_path = None
+            old_path = ''
         try:
             app = self.pane.app
             self.nfiles, self.files = files.get_dir(path, app.prefs.options['show_dotfiles'])
@@ -640,7 +619,8 @@ class Vfs(object):
             self.path = os.path.abspath(path)
             self.selections = []
         except (IOError, OSError), (errno, strerror):
-            self.historic.pop()
+            if len(self.historic) > 0:
+                self.historic.pop()
             return (strerror, errno)
         # vfs variables
         self.vfs = ''
@@ -710,16 +690,16 @@ class Vfs(object):
             else:
                 self.file_i = len(self.sorted) - 1
         self.vfs, self.base, self.vbase = self.old_vfs
-        del(self.old_file)
-        del(self.old_file_i)
-        del(self.old_vfs)
+        del self.old_file
+        del self.old_file_i
+        del self.old_vfs
 
 
     def regenerate(self):
         """Rebuild tabs' directories"""
 
         path = self.path
-        if path != "/" and path[-1] == os.sep:
+        if path != os.sep and path[-1] == os.sep:
             path = path[:-1]
         while not os.path.exists(path):
             path = os.path.dirname(path)
@@ -760,43 +740,34 @@ class Vfs(object):
 
     def get_fileinfo_str_short(self, res, maxw, pos_col1):
         filewidth = maxw - 24
-        fname = utils.decode(res['filename'])
+        fname = res['filename']
         if len(fname) > filewidth:
             half = int(filewidth/2)
             fname = fname[:half+2] + '~' + fname[-half+3:]
         fname = fname.ljust(pos_col1-2)[:pos_col1-2]
-        fname = utils.encode(fname)
+        res['fname'] = fname
         if res['dev']:
-            buf = '%c%s %3d,%3d %12s' % \
-                  (res['type_chr'], fname,
-                   res['maj_rdev'], res['min_rdev'],
-                   res['mtime2'])
+            res['devs'] = '%3d,%d' % (res['maj_rdev'], res['min_rdev'])
+            buf = '%(type_chr)c%(fname)s %(devs)7s %(mtime2)12s' % res
         else:
-            buf = '%c%s %7s %12s' % \
-                  (res['type_chr'], fname,
-                   res['size'], res['mtime2'])
+            buf = '%(type_chr)c%(fname)s %(size)7s %(mtime2)12s' % res
         return buf
 
 
     def get_fileinfo_str_long(self, res, maxw):
         filewidth = maxw - 57
-        fname = utils.decode(res['filename'])
+        fname = res['filename']
         if len(fname) > filewidth:
             half = int(filewidth/2)
             fname = fname[:half+2] + '~' + fname[-half+2:]
-        fname = utils.encode(fname)
+        res['fname'] = fname
+        res['owner'] = res['owner'][:10]
+        res['group'] = res['group'][:10]
         if res['dev']:
-            buf = '%c%9s %-8s %-8s %3d,%3d  %16s  %s' % \
-                  (res['type_chr'], res['perms'],
-                   res['owner'][:8], res['group'][:8],
-                   res['maj_rdev'], res['min_rdev'],
-                   res['mtime'], fname)
+            res['devs'] = '%3d,%d' % (res['maj_rdev'], res['min_rdev'])
+            buf = '%(type_chr)c%(perms)9s %(owner)-10s %(group)-10s %(devs)7s  %(mtime)16s  %(fname)s' % res
         else:
-            buf = '%c%9s %-8s %-8s %7s  %16s  %s' % \
-                  (res['type_chr'], res['perms'],
-                   res['owner'][:8], res['group'][:8],
-                   res['size'],
-                   res['mtime'], fname)
+            buf = '%(type_chr)c%(perms)9s %(owner)-10s %(group)-10s %(size)7s  %(mtime)16s  %(fname)s' % res
         return buf
 
 
@@ -820,7 +791,7 @@ class TabVfs(Vfs):
         self.pane = pane
 
 
-    def init(self, path, old_file = '', check_oldfile=True):
+    def init(self, path, old_file='', check_oldfile=True):
         err = self.init_dir(path)
         if err:
             messages.error('Enter In Directory', '%s (%d)' % err, path)
@@ -849,20 +820,9 @@ class TabVfs(Vfs):
 ######################################################################
 ##### Utils
 def num2str(num):
-    # Fatal in #pys60
-    # return (len(num) < 4) and num or (num2str(num[:-3]) + "." + num[-3:])
-    num_list = []
-    while num / 1000.0 >= 0.001:
-        num_list.append('%.3d' % (num % 1000))
-        num /= 1000.0
-    else:
-        num_str = '0'
-    if len(num_list) != 0:
-        num_list.reverse()
-        num_str = ','.join(num_list)
-        while num_str[0] == '0':
-            num_str = num_str[1:]
-    return num_str
+    # Thanks to "Fatal" in #pys60
+    num = str(num)
+    return (len(num) < 4) and num or (num2str(num[:-3])+","+num[-3:])
 
 
 ######################################################################
@@ -873,9 +833,9 @@ def usage(msg = ''):
     print __doc__
 
 
-def lfm_exit(ret_code, ret_path='.'):
+def lfm_exit(ret_code, ret_path=u'.'):
     f = open('/tmp/lfm-%s.path' % (os.getppid()), 'w')
-    f.write(ret_path)
+    f.write(utils.encode(ret_path))
     f.close()
     sys.exit(ret_code)
 
@@ -899,7 +859,7 @@ def add_path(arg, paths):
 
 def lfm_start(sysargs):
     # get configuration & preferences
-    DEBUG = 0
+    DEBUG = False
     paths1, paths2 = [], []
     prefs = Config()
     ret = prefs.load()
@@ -931,17 +891,17 @@ def lfm_start(sysargs):
         if o == '-2':
             prefs.options['num_panes'] = 2
         if o in ('-d', '--debug'):
-            DEBUG = 1
+            DEBUG = True
         if o in ('-h', '--help'):
             usage()
             lfm_exit(2)
 
     if len(args) == 0:
-        paths1.append(os.path.abspath('.'))
-        paths2.append(os.path.abspath('.'))
+        paths1.append(os.path.abspath(u'.'))
+        paths2.append(os.path.abspath(u'.'))
     elif len(args) == 1:
         add_path(args[0], paths1)
-        paths2.append(os.path.abspath('.'))
+        paths2.append(os.path.abspath(u'.'))
     elif len(args) == 2:
         add_path(args[0], paths1)
         add_path(args[1], paths2)
@@ -951,7 +911,7 @@ def lfm_start(sysargs):
 
     # logging
     if DEBUG:
-        log_file = os.path.join(os.path.abspath('.'), LOG_FILE)
+        log_file = os.path.join(os.path.abspath(u'.'), LOG_FILE)
         logging.basicConfig(level=logging.DEBUG,
                             format='%(asctime)s %(levelname)s\t%(message)s',
                             datefmt='%Y-%m-%d %H:%M:%S   ',
@@ -965,7 +925,7 @@ def lfm_start(sysargs):
     logging.info('End')
 
     # change to directory
-    if path != None:
+    if path is not None:
         lfm_exit(0, path)
     else:
         lfm_exit(0)

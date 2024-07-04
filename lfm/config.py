@@ -7,11 +7,12 @@ This module contains the configuration class for lfm.
 
 
 import os, os.path
+import codecs
 from ConfigParser import SafeConfigParser
 
-from __init__ import LFM_NAME, sysprogs
+from __init__ import LFM_NAME, sysprogs, g_encoding
 from files import SORTTYPE_byName
-from utils import get_shell_output
+from utils import get_shell_output, encode, decode
 
 
 ######################################################################
@@ -25,14 +26,14 @@ defaultprogs = { 'shell': 'bash',
                  'video': 'mplayer',
                  'graphics': 'gthumb',
                  'pdf': 'evince',
-                 'ps': 'evince' }
+                 'ebook': 'FBReader' }
 filetypes = { 'web': ('html', 'htm'),
               'audio': ('ogg', 'flac', 'mp3', 'wav', 'au', 'midi'),
-              'video': ('mpeg', 'mpg', 'avi', 'asf'),
+              'video': ('mpeg', 'mpg', 'avi', 'asf', 'ogv', 'flv'),
               'graphics': ('png', 'jpeg', 'jpg', 'gif', 'tiff', 'tif', 'xpm', 'svg'),
-              'pdf': ('pdf', ),
-              'ps': ('ps', ) }
-bookmarks = ['/'] * 10
+              'pdf': ('pdf', 'ps'),
+              'ebook': ('epub', 'chm', 'mobi', 'prc', 'azw', 'lit') }
+bookmarks = [u'/'] * 10
 colors = { 'title': ('yellow', 'blue'),
            'files': ('white', 'black'),
            'current_file': ('blue', 'cyan'),
@@ -53,7 +54,9 @@ colors = { 'title': ('yellow', 'blue'),
            'graphics_files': ('magenta', 'black'),
            'data_files': ('magenta', 'black'),
            'current_file_otherpane': ('black', 'white'),
-           'current_selected_file_otherpane': ('yellow', 'white') }
+           'current_selected_file_otherpane': ('yellow', 'white'),
+           'directories': ('green', 'black'),
+           'exe_files': ('red', 'black') }
 options = { 'save_conf_at_exit': 1,
             'show_output_after_exec': 1,
             'rebuild_vfs': 0,
@@ -64,17 +67,20 @@ options = { 'save_conf_at_exit': 1,
             'sort_mix_dirs': 0,
             'sort_mix_cases': 1,
             'color_files': 1,
-            'manage_otherpane': 0 }
+            'manage_otherpane': 0,
+            'automatic_file_encoding_conversion': 0 } # ask
+misc = { 'backup_extension': '.bak' }
 confirmations = { 'delete': 1,
                   'overwrite': 1,
-                  'quit': 0,
+                  'quit': 1,
                   'ask_rebuild_vfs': 1 }
 files_ext  = { 'temp_files': ('.tmp', '.$$$', '~', '.bak'),
                'document_files': ('.txt', '.text', '.rtf',
                                   '.odt', '.odc', '.odp',
                                   '.abw', '.gnumeric',
                                   '.sxw', '.sxc', '.sxp', '.sdw', '.sdc', '.sdp',
-                                  '.ps', '.pdf', '.dvi', '.bib', '.tex',
+                                  '.ps', '.pdf', '.djvu', '.dvi', '.bib', '.tex',
+                                  '.epub', '.chm', '.prc', '.mobi', '.azw', '.lit', '.imp',
                                   '.xml', '.xsd', '.xslt', '.sgml', '.dtd',
                                   '.html', '.shtml', '.htm', '.css',
                                   '.mail', '.msg', '.letter', '.ics', '.vcs', '.vcard',
@@ -83,8 +89,8 @@ files_ext  = { 'temp_files': ('.tmp', '.$$$', '~', '.bak'),
                'media_files': ('.mp2', '.mp3', '.mpg', '.ogg', '.flac', '.mpeg', '.wav',
                                '.avi', '.asf', '.mov', '.mol', '.mpl', '.xm', '.med',
                                '.mid', '.midi', '.umx', '.wma', '.acc', '.wmv',
-                               '.swf'),
-               'archive_files': ('.gz', '.bz2', '.tar', '.tgz', '.Z', '.zip',
+                               '.swf', '.flv', '.ogv'),
+               'archive_files': ('.gz', '.bz2', '.xz', '.tar', '.tgz', '.Z', '.zip',
                                  '.rar', '.7z', '.arj', '.cab', '.lzh', '.lha',
                                  '.zoo', '.arc', '.ark',
                                   '.rpm', '.deb'),
@@ -122,6 +128,7 @@ class Config(object):
         self.bookmarks = bookmarks
         self.colors = colors
         self.options = options
+        self.misc = misc
         self.confirmations = confirmations
         self.files_ext = files_ext
 
@@ -129,7 +136,7 @@ class Config(object):
     def check_progs(self):
         for k, v in defaultprogs.items():
             r = get_shell_output('%s \"%s\"' % (sysprogs['which'], v))
-#             self.progs[k] = v if r else ''
+#             self.progs[k] = v if r else '' # python v2.5+
             if r:
                 self.progs[k] = v
             else:
@@ -140,14 +147,19 @@ class Config(object):
         # check config file
         if not os.path.exists(self.file) or not os.path.isfile(self.file):
             return -1
-        f = open(self.file)
+        f = codecs.open(self.file, encoding=g_encoding)
         title = f.readline()[:-1]
         f.close()
         if title and title != self.file_start:
             return -2
-        # everything ok, proceed
+        # load config and validate sections
         cfg = SafeConfigParser()
         cfg.read(self.file)
+        for sect in ('Programs', 'File Types', 'Bookmarks', 'Colors',
+                     'Options', 'Misc', 'Confirmations', 'Files'):
+            if not cfg.has_section(sect):
+                print 'Section "%s" does not exist, creating' % sect
+                cfg.add_section(sect)
         # programs
         for typ, prog in cfg.items('Programs'):
             self.progs[typ] = prog
@@ -164,9 +176,9 @@ class Config(object):
                 continue
             if 0 <= num <= 9:
                 if os.path.isdir(os.path.expanduser(path)):
-                    self.bookmarks[num] = path
+                    self.bookmarks[num] = decode(path)
                 elif not path:
-                    self.bookmarks[num] = ''
+                    self.bookmarks[num] = u'/'
                 else:
                     print 'Incorrect directory in bookmark[%d]: %s' % \
                           (num, path)
@@ -192,6 +204,15 @@ class Config(object):
                     self.options[what] = val
         if self.options['num_panes'] != 1 or self.options['num_panes'] != 2:
             self.options['num_panes'] = 2
+        # misc
+        for what, val in cfg.items('Misc'):
+            if not isinstance(val, str):
+                print 'Bad option value: %s => %s' % (what, val)
+            else:
+                if what not in self.misc.keys():
+                    print 'Bad option: %s => %s' % (what, val)
+                else:
+                    self.misc[what] = val
         # confirmations
         for what, val in cfg.items('Confirmations'):
             try:
@@ -201,7 +222,7 @@ class Config(object):
             else:
                 if what not in self.confirmations.keys():
                     print 'Bad confirmation option: %s => %s' % (what, val)
-                elif val != 0 and val != 1:
+                elif val not in (0, 1):
                     print 'Bad confirmation value: %s => %s' % (what, val)
                 else:
                     self.confirmations[what] = val
@@ -225,16 +246,21 @@ class Config(object):
         # bookmarks
         buf += '\n[Bookmarks]\n'
         for i, b in enumerate(self.bookmarks):
-            buf += '%d: %s\n' % (i, b)
+            buf += '%d: %s\n' % (i, encode(b))
         # colours
         buf += '\n[Colors]\n'
         for k, v in self.colors.items():
             buf += '%s: %s %s\n' % (k, v[0], v[1])
         # options
         buf += '\n[Options]\n'
+        buf += '# automatic_file_encoding_conversion: never = -1, ask = 0, always = 1\n'
         buf += '# sort:\tNone = 0, byName = 1, byName_rev = 2, bySize = 3,\n'
         buf += '# \tbySize_rev = 4, byDate = 5, byDate_rev = 6\n'
         for k, v in self.options.items():
+            buf += '%s: %s\n' % (k, v)
+        # misc
+        buf += '\n[Misc]\n'
+        for k, v in self.misc.items():
             buf += '%s: %s\n' % (k, v)
         # confirmations
         buf += '\n[Confirmations]\n'
@@ -245,8 +271,8 @@ class Config(object):
         for k, vs in self.files_ext.items():
             buf += '%s: %s\n' % (k, ', '.join(vs))
         # write to file
-        f = open(self.file, 'w')
-        f.write(buf)
+        f = codecs.open(self.file, 'w', encoding=g_encoding)
+        f.write(decode(buf))
         f.close()
 
 

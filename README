@@ -4,11 +4,11 @@ lfm - Last File Manager
 
 :Author: Iñigo Serna, inigoserna AT gmail DOT com
 
-:Version: 2.1, December 21th. 2008
+:Version: 2.2, May 22th. 2010
 
 :Home page: http://www.terra.es/personal7/inigoserna/lfm/
 
-:License: \(C\) 2001-8, Iñigo Serna
+:License: \(C\) 2001-10, Iñigo Serna
 
           This software has been realised under the `GPL License`__ version 3
           or later, read the COPYING_ file that comes with this package for
@@ -16,8 +16,7 @@ lfm - Last File Manager
 
           There is NO WARRANTY.
 
-:Last update: Sat Dec 20 23:35:39 2008
-
+:Last update: Sat May 22 11:18:05 2010
 
 .. contents:: Table of Contents
 
@@ -31,14 +30,15 @@ Some of the features you can find in *lfm*:
 
 - console-based file manager for UNIX platforms
 - 1-pane or 2-pane view
+- tabs
 - bookmarks
 - history
 - vfs for compressed files
 - dialogs with entry completion
-- fast access to a shell
+- fast access to the shell
 - direct integration of find/grep, df and other tools
-- tabs
 - color files by extension [Andrey Skvortsov]
+- support for different file names encodings
 - fast file viewer with text and binary modes
 - ...and many others
 
@@ -73,12 +73,15 @@ perfect, so you should take a look to the configuration (`General Menu [F9]
 Requirements
 ============
 *Lfm* and *Pyview* are written in Python_ and require curses module.
-It needs Python v2.3 or higher, it won't work with older versions.
-
-Since version 0.90, *lfm* needs ncurses >= v5.x to handle terminal resizing.
+It should run on Python v2.4 or higher, as but I'm only have v2.6 on my
+computers I haven't tested older versions.
 
 All modern UNIX flavours (Linux, \*BSD, Solaris, etc) should run it without 
 problems. If they appear please notify me.
+
+Since version 0.90, *lfm* needs ncurses >= v5.x to handle terminal resizing.
+
+Python v2.5+ and ncurses v5.4+ to use wide characters.
 
 Note that python curses module should be linked against ncursesw library 
 (instead of ncurses) to get wide characters support. This is the usual case 
@@ -86,9 +89,12 @@ in later versions of Linux distributions, but maybe not the case in older
 Linux or other UNIX platforms. Thus, expect problems when using multibyte 
 file names (f.e. UTF-8 or latin-1 encoded) if your curses module isn't 
 compiled against ncursesw. Anyway, I hope this issue will disappear with new 
-releases of those platforms, eventually.
+releases of those platforms eventually.
 
-Also, take a look at TODO_ file to see bugs and *not-implemented-yet* (tm) 
+Consult `Files name encoding`_ section below for more information
+about support of different encodings.
+
+Finally, take a look at TODO_ file to see bugs and *not-implemented-yet* (tm) 
 features.
 
 
@@ -100,6 +106,8 @@ Download & Installation
    +---------+------------------+------------+
    | Version |       File       |    Date    |
    +=========+==================+============+
+   |   2.2   | lfm-2.2.tar.gz_  | 2010/05/22 |
+   +---------+------------------+------------+
    |   2.1   | lfm-2.1.tar.gz_  | 2008/12/21 |
    +---------+------------------+------------+
    |   2.0   | lfm-2.0.tar.gz_  | 2007/09/03 |
@@ -138,7 +146,10 @@ Download & Installation
     `# python setup.py install`
 5. Run it:
     `$ lfm`
+6. Edit settings:
+     `General Menu [F9] -> Edit Configuration [c]`
 
+    
 To let 'lfm' to change to panel's current directory after quiting with
 `q`, `Q` or `F10` keys, you must add next code to `/etc/bashrc` or to
 your `~/.bashrc`::
@@ -156,7 +167,7 @@ If you don't use bash or csh shell, above lines could differ.
 
 Upgrading
 =========
-If you upgrade from any older versions, please remove first `~/.lfmrc` to 
+If you upgrade from versions < 2.0, please remove first `~/.lfmrc` to 
 regenerate a valid configuration as file format has changed. I advise you 
 to make a backup copy before.
 
@@ -178,6 +189,9 @@ These are the complete list of key bindings:
     - cursor_left: upper dir
     - cursor_right: enter dir / vfs
     - Ctrl-S: go to file in current panel
+    - Ctrl-L: center cursor in current panel
+    - Ctrl-P, Ctrl-left: move cursor 1/4th of page upwards
+    - Ctrl-N, Ctrl-right: move cursor 1/4th of page downwards
 
 + **Movement in non active pane** [#]_
     - Alt/Shift-cursor_up, K
@@ -188,10 +202,12 @@ These are the complete list of key bindings:
     - Alt/Shift-end, E: last file
     - Alt/Shift-cursor_left: upper dir
     - Alt/Shift-cursor_right: enter dir / vfs
+    - P: move cursor 1/4th of page upwards
+    - N: move cursor 1/4th of page downwards
    
 .. [#] Some key shorcuts combinations such as Alt or Shift + key may not work, as it
        depends on the capabilities of the terminal program you are using.
-       F.e. it doesn't work in my computer console running Fedora 10 Linux, but it works
+       F.e. it doesn't work in my computer console running Fedora 11 Linux, but it works
        under gnome-terminal in X. Your results could be different.
        Anyway, there are alternative shortcuts (K J B F A E), but not for everything.
        Consult your terminal emulation program documentation to check it.
@@ -225,8 +241,8 @@ These are the complete list of key bindings:
 
 + **Files / Directories operations**
     - t, T: touch file
-    - l, L: create link
-    - Ctrl-L: edit link
+    - l: create link
+    - L: edit link
     - F2: rename file/dir/selection
     - F3: view file
     - F4: edit file
@@ -238,24 +254,27 @@ These are the complete list of key bindings:
     - i, I: show file info
 
 + **Other**
-    - #: show directories size
+    - #: show selected/all directories size
     - s, S: sort files
     - /: find/grep files
     - @: do something on file. Output is not captured
     - Ctrl-H: toggle show/hide dot files
     - Ctrl-W: toggle allow navigate in non-active pane
-    - Ctrl-O: open shell. Type 'exit' to return to lfm
+    - Ctrl-O: open shell. Type 'exit' or press Ctrl-D to return to lfm
     - Ctrl-T: tree
     - F12: file menu
         - @: do something on file(s)
         - i: file(s) info
         - p: change file permissions, owner, group
+        - a: backup file. You can specify the extension to use in settings
         - g: gzip/gunzip file(s)
         - b: bzip2/bunzip2 file(s)
-        - x: uncompress .tar.gz, .tar.bz2, .zip, .rar, .7z
+        - h: xz/unxz file(s)
+        - x: uncompress .tar.gz, .tar.bz2, .tar.xz, .zip, .rar, .7z
         - u: uncompress .tar.gz, etc in other panel
         - c: compress directory to .tar.gz
         - d: compress directory to .tar.bz2
+        - e: compress directory to .tar.xz
         - z: compress directory to .zip
         - r: compress directory to .rar 
         - 7: compress directory to .7z 
@@ -272,7 +291,6 @@ These are the complete list of key bindings:
     - h, H, F1: help
     - q, Q, F10: exit changing to current path
     - Ctrl-Q: quit
-
 
 + Keys in *EntryLine* window:
     - up, down: historic
@@ -303,6 +321,14 @@ These are the complete list of key bindings:
     - enter: return path
     - Ctrl-C, q, Q, ESC: quit
 
++ Keys in *Permissions* window:
+    - tab, cursor: move
+    - in permissions: r, w, x, s, t to toggle read, write, exec, setuid or setgid, sticky bit
+    - in user, group: space or enter to select
+    - in recursive: space or enter to toggle
+    - in buttons: space or enter to accept that action
+    - everywhere: space or enter to accept, a to accept all, i to ignore and c, q, esc, Ctrl-c to cancel
+
 + Keys in *Tree* panel:
     - down, j, K: down within current depth, without going out from directory
     - up, k, K: up within current depth, without going out from directory
@@ -313,15 +339,33 @@ These are the complete list of key bindings:
     - left: go out from directory
     - right: enter in directory
     - enter: return changing to directory
+    - Ctrl-H: toggle show/hide dot files
     - Ctrl-C, q, Q, F10, ESC: quit
 
 
-VFS
-===
-You can navigate inside some special files (known as vfs files in lfm) just 
-*entering into* them (press *enter* or *cursor_right* when the cursor bar is
-over one of these files). By now, supported types are `.tar.gz`,
-`.tar.bz2`, `.zip` and `.rar` files. 
+Files name encoding
+===================
+Since v2.0, *lfm* uses the encoding defined in the locale of your system
+if found, this will be UTF-8 likely.
+
+Since v2.2, *lfm* was rewritten to always use unicode strings internally,
+but employ terminal encoding (f.e. UTF-8) to interact with the user in
+input forms, to display contents, and to pass commands to run in shell.
+
+When *lfm* detects a file with invalid encoding name it asks the user to
+convert it (can be automatic with the proper option in the configuration).
+If not converted, *lfm* will display the file but won't operate on it.
+
+Please note there are some restrictions to support wide characters by now,
+as explained in the `Requirements`_ section.
+
+
+Virtual File Systems (VFS)
+==========================
+You can navigate inside some special files (known as vfs files in *lfm*)
+just *entering into* them (press *enter* or *cursor_right* when the
+cursor bar is over one of these files). By now, supported types are
+`.tar.gz`, `.tar.bz2`, `.zip`, `.rar`, and `.7z` files. 
 
 The virtual directory name ('path_to_vfs_file#vfs/dir') is not propagated, so 
 tmpdir (`/tmp/@6421.2/dir`) is showed in the copy/move/... dialogs or when
@@ -335,6 +379,74 @@ it or not) can be modified in the configuration file. By default the question is
 showed but it's set to *not regenerate vfs*.
 In case of `panelize` vfs type (after find/grep), deleted / moved files
 are not deleted / moved in real path.
+
+*lfm* doesn't implement remote vfs such as ssh, ftp, smb, webdav, ...
+This is a design criterion, we don't want to add external dependencies
+beyond python standard library. If you need to access remote file
+systems you could mount them using something like *fuse* and treat them
+as local directories from inside *lfm*.
+
+
+FAQ
+===
++ **How and why lfm born?**
+
+  Everything is explained in next sections. `list.com` and `midnight commander`
+  were the muses who guided.
+
++ **Isn't python slow? why develop lfm on python?**
+
+  No. It's fast enough. And programming in python is funny.
+
++ **I've reading the sources and sometimes you don't use newer python features like ternary operator, with statement, and many others**
+
+  We want to mantain compatibility with python v2.3 by now. Btw, you
+  can find some of these interesting new features in the TODO_ file.
+
++ **does it work with Python v3.x?**
+
+  No. We'll support Python v3.x when it is mainline (read, when my linux
+  distribution of choice package it as default).
+
++ **lfm does not change to current directory after quiting**
+
+  This can't be made inside the program, but you could get it using
+  the shell tip mentioned in `Download & Installation`_ section.
+
++ **Why doesn't lfm implement remote vfs such as ssh, ftp, smb, webdav, ...?**
+
+  One of the design goals for *lfm* is simplicity, we don't want to add
+  external dependencies beyond python standard library. Also you can
+  use something like *fuse* to mount those remote volumes anyway.
+
++ **Keybindings customization?**
+
+  Not for the near future. Anyway, you can modify `actions.py` in the
+  sources if it's so important for you.
+
++ **Mouse support? UI to configure settings?**
+
+  I'm afraid we speak different languages.
+
++ **When will be support for internationalization?**
+
+  If we are talking about translating *lfm*, the answer is mostly
+  never. Ncurses programming makes very difficult to control the
+  length of every text for every possible language translation.
+
+  If you mean support for file names in foreign languages and
+  encodings then it's almost here already.
+
++ **Some Chinese, Japanese or Korean files make lfm crash**
+
+  Known issue. The characters of these languages span over 2 cells, so
+  it's not possible for *lfm* to guess the real width they need.
+  We expect to solve this in a near future as we are studying
+  different methods.
+
++ **[Any other question / feature request]**
+
+  Consult if it's mentioned in the TODO_ file and/or send me an email.
 
 
 History
@@ -366,22 +478,24 @@ Alexei Gilchrist, for his cfm program from which I took some ideas.
 
 `Midnight Commander`__ developers, whose program was the guide.
 
+`Vernon D. Buerg's list.com`__, the best program ever coded (well, just after emacs ;-).
+
 And also to all the people who have contributed with ideas, reporting
 bugs and code over these years: Antoni Aloy, Sebastien Bacher, Grigory
-Bakunov, Witold Bołt, Fabian Braennstroem, Jason Buberel, Ondrej Certik,
-Kevin Coyner, Tim Daneliuk, Mike Dean, Arnå DG, Christian Eichert, Steve Emms,
-Murat Erten, Stephen R. Figgins, f1ufx, Francisco Gama, Vlad Glagolev,
-Ana Beatriz Guerrero Lopez, Tjabo Kloppenburg, Zoran Kolic, Max Kutny,
-Martin Lüethi, James Mills, Bartosz Oler, Piotr Ozarowski, Mikhail A. Pokidko,
-Jerome Prudent, Mikhail Ramendik, Rod, Daniel T. Schmitt, Robin Siebler,
-Andrey Skvortsov, Espartaco Smith, Jörg Sonnenberger, Tim Terlegård,
-Edd Thompson, Walter van den Broek, Alejandro Weil, Hai Zaar and many
-others...
+Bakunov, Luigi M. Bianchi, Hunter Blanks, Witold Bołt, Fabian Braennstroem,
+Jason Buberel, Ondrej Certik, Kevin Coyner, Tim Daneliuk, Mike Dean, Arnå DG,
+Christian Eichert, Steve Emms, Murat Erten, Luca Falavigna, Stephen R. Figgins,
+f1ufx, Francisco Gama, Vlad Glagolev, Ana Beatriz Guerrero Lopez, Kelly Hopkins,
+Tjabo Kloppenburg, Zoran Kolic, Max Kutny, Martin Lüethi, James Mills, Bartosz Oler,
+Piotr Ozarowski, Mikhail A. Pokidko, Jerome Prudent, Mikhail Ramendik, Rod,
+Daniel T. Schmitt, Chengqi Song, Robin Siebler, Andrey Skvortsov, Espartaco Smith,
+Jörg Sonnenberger, Joshua Tasker, Tim Terlegård, Edd Thompson, Walter van den Broek,
+Alejandro Weil, Hai Zaar and many others...
 
 You have made posible to run *lfm* in all those platforms!
 
 
-.. _sources: lfm-2.1.tar.gz
+.. _sources: lfm-2.2.tar.gz
 .. _README.pyview: README.pyview.html
 .. _TODO: TODO
 .. _NEWS: NEWS
@@ -389,9 +503,12 @@ You have made posible to run *lfm* in all those platforms!
 .. _COPYING: COPYING
 .. _GPL: http://www.gnu.org/licenses/licenses.html#GPL
 .. _mc: http://www.ibiblio.org/mc/
+.. _buerg: http://www.buerg.com/
 .. _python: http://www.python.org
 __ GPL_
 __ mc_
+__ buerg_
+.. _lfm-2.2.tar.gz: lfm-2.2.tar.gz
 .. _lfm-2.1.tar.gz: lfm-2.1.tar.gz
 .. _lfm-2.0.tar.gz: lfm-2.0.tar.gz
 .. _lfm-0.91.tar.gz: lfm-0.91.tar.gz

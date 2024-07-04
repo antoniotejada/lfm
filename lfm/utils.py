@@ -8,9 +8,9 @@ This module contains useful functions.
 
 import os
 import os.path
+import sys
 import time
 import signal
-import popen2
 import select
 import cPickle
 import curses
@@ -25,6 +25,20 @@ from __init__ import sysprogs, g_encoding
 ##### module variables
 app = None
 
+# first common codecs, to avoid slow down decoding
+codecs_list = [g_encoding,  'utf-8', 'latin-1', 'ascii']
+# if program is too slow due to too many encodings to try,
+# comment out next lines or put the encodings you use first
+import encodings.aliases
+# Set is deprecated on python v2.6+, but set doesn't exist < v2.6
+cds = {}
+for c in encodings.aliases.aliases.values():
+    cds[c] = 1
+# codecs_list += sorted(cds.keys()) # python v2.4+
+cds = cds.keys()
+cds.sort()
+codecs_list += cds
+
 
 ######################################################################
 ##### InterProcess Communication
@@ -36,17 +50,17 @@ class IPC(object):
 
     def send(self, buf):
         cPickle.dump(buf, self.wfd)
-        time.sleep(0.01)
+        # time.sleep(0.01)
         cPickle.dump(None, self.wfd)
 
     def receive(self):
-        ready = select.select([self.rfd], [], [], 0.01)
+        ready = select.select([self.rfd], [], [], 0.001) # 0.01
         if self.rfd in ready[0]:
             try:
                 buf = cPickle.load(self.rfd)
             except:
                 return -1, 'Error unmarshaling'
-            if buf == None:
+            if buf is None:
                 return 0, None
             try:
                 arg1, arg2 = buf
@@ -61,64 +75,51 @@ class IPC(object):
 
 
 ######################################################################
-##### Process Base Loop
-class ProcessBaseLoop(object):
+##### Process Loop Base Class
+class ProcessLoopBase(object):
     """Run a function in background, so it can be stopped, continued, etc.
     There is also a graphical animation to show the program still runs and
-    has not crashed.
-    Parameters:
-        action: action to perform, used in messages
-        func: function to run
-        lst: list of files to iterate on
-        *args: arguments to pass to the function"""
+    has not crashed."""
 
     anim_char = ('|', '/', '-', '\\')
 
-    def __init__(self, action = '', func = None, lst = [], *args):
-        self.action = action
-        self.func = func
-        self.lst = lst
-        self.args = args
-        self.subtitle = ''
-        self.ret = []
-        self.cursor_i = 0
-        self.file_i = 0
-        self.filename = ''
-        self.length = len(lst)
+    def __init__(self, action='', func=None, *args):
+        self.action = action       # action label
+        self.func = func           # function to run in child
+        self.args = args           # additional args for func
+        self.ret = []              # information to return
+        self.filename = ''         # current filename
+        self.file_i = 0            # index to current item
+        self.cursor_i = 0          # index to cursor animation step
         self.init_gui()
 
     def init_gui(self):
         self.cur_win = curses.newpad(1, 2)
         self.cur_win.bkgd(curses.color_pair(1))
-        self.dlg = messages.FixSizeProgressBarWindow('', '', '', 0,
-            curses.color_pair(1), curses.color_pair(1),
-            curses.color_pair(7) | curses.A_BOLD, curses.color_pair(4),
-            waitkey = 0)
-        self.dlg.pwin.window().nodelay(1)
+        if self.processloop_type == 1:
+            dlg = messages.ProgressBarWindow
+        elif self.processloop_type == 2:
+            dlg = messages.ProgressBarWindow2
+        self.dlg = dlg(self.action, 'Press Ctrl-C to stop',
+                       curses.color_pair(1), curses.color_pair(1),
+                       curses.color_pair(20), curses.color_pair(4),
+                       waitkey=False)
+        self.dlg.show()
 
     def end_gui(self):
-        self.dlg.pwin.window().nodelay(0)
+        self.dlg.finish()
         self.show_parent()
 
     def show_parent(self):
-        # FIXME: this doesn't seem to work...
-#         if not self.dlg.pwin.hidden():
-#             self.dlg.pwin.hide()
-#         app.lpane.win.refresh()
-#         app.rpane.win.refresh()
-#         app.statusbar.win.refresh()
+        self.dlg.ishidden = True
         app.display()
 
     def show_win(self):
-        if self.dlg.pwin.hidden():
-            self.dlg.pwin.show()
-        title = self.action + ' %d/%d' % (self.file_i+1, self.length)
-        percent = 100 * (self.file_i+1) / self.length
-        self.dlg.show(title, self.filename, 'Press Ctrl-C to stop', percent)
+        raise NotImplementedError # in ProcessLoopBase_X class
 
     def animate_cursor(self):
         self.cur_win.erase()
-        self.cur_win.addch(ProcessBaseLoop.anim_char[self.cursor_i%4],
+        self.cur_win.addch(ProcessLoopBase.anim_char[self.cursor_i%4],
                            curses.color_pair(1) | curses.A_BOLD)
         self.cur_win.refresh(0, 0, 0, app.maxw-2, 1, app.maxw-1)
         self.cursor_i += 1
@@ -126,7 +127,7 @@ class ProcessBaseLoop(object):
             self.cursor_i = 0
 
     def check_keys(self):
-        ch = self.dlg.pwin.window().getch()
+        ch = self.dlg.getch()
         if ch == 0x03:
             os.kill(self.pid_child, signal.SIGSTOP)
             self.show_parent()
@@ -156,20 +157,15 @@ class ProcessBaseLoop(object):
                 return buf
             elif code == -1:
                 return ('internal_error', buf)
-            else:
-                continue
 
     def ask_confirmation(self):
-        # Virtual method
-        raise NotImplementedError
+        raise NotImplementedError # in final class
 
     def prepare_args(self):
-        # Virtual method
-        raise NotImplementedError
+        raise NotImplementedError # in final class
 
     def process_response(self, result):
-        # Virtual method
-        raise NotImplementedError
+        raise NotImplementedError # in final class
 
     def exec_file(self, args):
         # update progress dialog
@@ -198,28 +194,21 @@ class ProcessBaseLoop(object):
     def return_data(self):
         return self.ret
 
-    def run(self):
+    def run_pre(self):
         self.p2c = IPC()
         self.c2p = IPC()
         self.pid_child = os.fork()
         if self.pid_child < 0: # error
             messages.error(self.action, 'Can\'t run function')
-            return
+            return -1
         elif self.pid_child == 0: # child
             self.child_process()
             os._exit(0)
-        # parent
-        for self.file_i, self.filename in enumerate(self.lst):
-            ret = self.ask_confirmation()
-            if ret == -1:
-                break
-            elif ret == 0:
-                continue
-            args = self.prepare_args()
-            ret = self.exec_file(args)
-            if ret == -1:
-                break
-        # finish
+
+    def run(self):
+        raise NotImplementedError # in ProcessLoopBase_X class
+
+    def run_post(self):
         self.p2c.send(('quit', None))
         self.p2c.close()
         self.c2p.close()
@@ -228,8 +217,7 @@ class ProcessBaseLoop(object):
         except OSError:
             pass
         self.end_gui()
-        return self.return_data()
-
+        
     def child_process(self):
         while True:
             # wait for command to execute
@@ -255,13 +243,49 @@ class ProcessBaseLoop(object):
                 self.c2p.send(('result', result))
                 continue
         # end
-        time.sleep(.25) # time to let parent get return value
+        # time.sleep(.25) # time to let parent get return value
         os._exit(0)
-
-
+    
+    
 ######################################################################
-class ProcessDirSizeLoop(ProcessBaseLoop):
+##### Process Loop Base Class, 1 progressbar
+class ProcessLoopBase_1(ProcessLoopBase):
+    def __init__(self, action='', func=None, lst=[], *args):
+        self.processloop_type = 1
+        super(ProcessLoopBase_1, self).__init__(action, func, *args)
+        self.lst = lst
+        self.length = len(lst)
+        
+    def show_win(self):
+        filename = self.filename
+        percent = 100 * self.file_i / self.length
+        idx_str = '%d/%d' % (self.file_i, self.length)
+        if self.dlg.ishidden:
+            self.dlg.show(filename, percent, idx_str)
+        else:
+            self.dlg.update(filename, percent, idx_str)
 
+    def run(self):
+        if ProcessLoopBase.run_pre(self) == -1:
+            return
+        for self.filename in self.lst:
+            ret = self.ask_confirmation()
+            if ret == -1:
+                break
+            elif ret == 0:
+                continue
+            self.file_i += 1
+            args = self.prepare_args()
+            ret = self.exec_file(args)
+            if ret == -1:
+                self.ret = -1   # stopped by user
+                break
+        ProcessLoopBase.run_post(self)
+        return self.return_data()
+
+
+##### Process Loop DirSize
+class ProcessLoopDirSize(ProcessLoopBase_1):
     def ask_confirmation(self):
         return 1
 
@@ -273,9 +297,8 @@ class ProcessDirSizeLoop(ProcessBaseLoop):
         return 0
 
 
-######################################################################
-class ProcessUnCompressLoop(ProcessBaseLoop):
-
+##### Process Loop Un/Compress
+class ProcessLoopUnCompress(ProcessLoopBase_1):
     def ask_confirmation(self):
         return 1
 
@@ -283,7 +306,7 @@ class ProcessUnCompressLoop(ProcessBaseLoop):
         return (self.filename, ) + self.args
 
     def process_response(self, result):
-        if type(result) == type((1, )): # error
+        if isinstance(result, tuple): # error
             st, msg = result
             if st == -1:
                 self.show_parent()
@@ -291,55 +314,8 @@ class ProcessUnCompressLoop(ProcessBaseLoop):
         return 0
 
 
-######################################################################
-class ProcessCopyMoveLoop(ProcessBaseLoop):
-
-    def __init__(self, action = '', func = None, lst = [], *args):
-        ProcessBaseLoop.__init__(self, action, func, lst, *args)
-        self.overwrite_all = not app.prefs.confirmations['overwrite']
-        self.overwrite_none = False
-
-    def ask_confirmation(self):
-        return 1
-
-    def prepare_args(self):
-        if self.overwrite_all:
-            return (self.filename, ) + self.args + (False, )
-        else:
-            return (self.filename, ) + self.args
-
-    def process_response(self, result):
-        if type(result) == type(''): # overwrite file?
-            if self.overwrite_none:
-                return 0
-            self.show_parent()
-            ans = messages.confirm_all_none(self.action,
-                                            'Overwrite \'%s\'' % result, 1)
-            if ans == -1:
-                return -1
-            elif ans == -2:
-                self.overwrite_none = True
-                return 0
-            elif ans == 0:
-                return 0
-            elif ans == 1:
-                pass
-            elif ans == 2:
-                self.overwrite_all = True
-            args = (self.filename, ) + self.args + (False, )
-            return self.exec_file(args)
-        elif type(result) == type((1,)): # error from child
-            self.show_parent()
-            messages.error('%s \'%s\'' % (self.action, self.filename),
-                           '%s (%s)' % result)
-            return 0
-        else:
-            return 0
-
-
-######################################################################
-class ProcessRenameLoop(ProcessBaseLoop):
-
+##### Process Loop Rename
+class ProcessLoopRename(ProcessLoopBase_1):
     def ask_confirmation(self):
         from actions import doEntry
         buf = 'Rename \'%s\' to' % self.filename
@@ -356,7 +332,7 @@ class ProcessRenameLoop(ProcessBaseLoop):
         return (self.filename, ) + self.args + (self.newname, )
 
     def process_response(self, result):
-        if type(result) == type(''): # overwrite file?
+        if isinstance(result, unicode) or isinstance(result, str): # overwrite?
             self.show_parent()
             ans = messages.confirm(self.action,
                                    'Overwrite \'%s\'' % result, 1)
@@ -366,9 +342,39 @@ class ProcessRenameLoop(ProcessBaseLoop):
                 return 0
             elif ans == 1:
                 args = (self.filename, ) + self.args + (self.newname, False)
-                self.dlg.pwin.show()
+                self.dlg.show()
                 return self.exec_file(args)
-        elif type(result) == type((1,)): # error from child
+        elif isinstance(result, tuple): # error from child
+            self.show_parent()
+            messages.error('%s \'%s\'' % (self.action, self.filename),
+                           '%s (%s)' % result)
+            return 0
+        else:
+            return 0
+
+
+##### Process Loop Rename
+class ProcessLoopBackup(ProcessLoopBase_1):
+    def ask_confirmation(self):
+        return 1
+
+    def prepare_args(self):
+        return (self.filename, ) + self.args
+
+    def process_response(self, result):
+        if isinstance(result, unicode) or isinstance(result, str): # overwrite?
+            self.show_parent()
+            ans = messages.confirm(self.action,
+                                   'Overwrite \'%s\'' % result, 1)
+            if ans == -1:
+                return -1
+            elif ans == 0:
+                return 0
+            elif ans == 1:
+                args = (self.filename, ) + self.args + (False, )
+                self.dlg.show()
+                return self.exec_file(args)
+        elif isinstance(result, tuple): # error from child
             self.show_parent()
             messages.error('%s \'%s\'' % (self.action, self.filename),
                            '%s (%s)' % result)
@@ -378,40 +384,128 @@ class ProcessRenameLoop(ProcessBaseLoop):
 
 
 ######################################################################
-class ProcessDeleteLoop(ProcessBaseLoop):
+##### Process Loop Base Class, 2 progressbar
+class ProcessLoopBase_2(ProcessLoopBase):
+    def __init__(self, action='', func=None, pc=None, *args):
+        self.processloop_type = 2
+        super(ProcessLoopBase_2, self).__init__(action, func, *args)
+        self.pc = pc            # PathContents
+        self.filesize_aggr = 0  # partial sum of processed files
 
-    def __init__(self, action = '', func = None, lst = [], *args):
-        ProcessBaseLoop.__init__(self, action, func, lst, *args)
-        self.delete_all = not app.prefs.confirmations['delete']
+    def show_win(self):
+        filename = self.filename.replace(self.pc.basepath+os.sep, '')
+        perc_size = 100 * self.filesize_aggr / self.pc.tsize
+        perc_count = 100 * self.file_i / self.pc.tlength
+        idx_str = '%d/%d' % (self.file_i, self.pc.tlength)
+        if self.dlg.ishidden:
+            self.dlg.show(filename, perc_size, perc_count, idx_str)
+        else:
+            self.dlg.update(filename, perc_size, perc_count, idx_str)
+
+    def run(self):
+        for filename, err in self.pc.errors:
+            self.show_parent()
+            messages.error('%s \'%s\'' % (self.action, filename),
+                           '%s (%s)' % err)
+        if ProcessLoopBase.run_pre(self) == -1:
+            return
+        for self.filename, filesize in self.pc.iter_walk(reverse=self.rev):
+            ret = self.ask_confirmation()
+            if ret == -1:
+                break
+            elif ret == 0:
+                continue
+            self.file_i += 1
+            self.filesize_aggr += filesize
+            args = self.prepare_args()
+            ret = self.exec_file(args)
+            if ret == -1:
+                self.ret = -1   # stopped by user
+                break
+        ProcessLoopBase.run_post(self)
+        return self.return_data()
+       
+
+##### Process Loop Copy
+class ProcessLoopCopy(ProcessLoopBase_2):
+    def __init__(self, action='', func=None, pc=None, *args):
+        super(ProcessLoopCopy, self).__init__(action, func, pc, *args)
+        self.rev = False
+        self.overwrite_all = not app.prefs.confirmations['overwrite']
+        self.overwrite_none = False
 
     def ask_confirmation(self):
-        if self.delete_all:
-            return 2
-        buf = 'Delete \'%s\'' % self.filename
-        if app.prefs.confirmations['delete']:
-            self.show_parent()
-            ans = messages.confirm_all('Delete', buf, 1)
-            if ans == -1:
-                return -1
-            elif ans == 0:
-                return 0
-            elif ans == 1:
-                return 1
-            elif ans == 2:
-                self.delete_all = True
-                return 2
+        return 1
 
     def prepare_args(self):
-        return (self.filename, ) + self.args
+        filename = self.filename.replace(self.pc.basepath+os.sep, '')
+        if self.overwrite_all:
+            return (filename, self.pc.basepath) + self.args + (False, )
+        else:
+            return (filename, self.pc.basepath) + self.args
 
     def process_response(self, result):
-        if type(result) == type((1,)): # error from child
+        if isinstance(result, unicode) or isinstance(result, str): # overwrite?
+            if self.overwrite_none:
+                self.ret.append(self.filename)
+                return 0
+            self.show_parent()
+            ans = messages.confirm_all_none(self.action,
+                                            'Overwrite \'%s\'' % result, 1)
+            if ans == -1:
+                self.ret.append(self.filename)
+                return -1
+            elif ans == -2:
+                self.ret.append(self.filename)
+                self.overwrite_none = True
+                return 0
+            elif ans == 0:
+                self.ret.append(self.filename)
+                return 0
+            elif ans == 1:
+                pass
+            elif ans == 2:
+                self.overwrite_all = True
+            filename = self.filename.replace(self.pc.basepath+os.sep, '')
+            args = (filename, self.pc.basepath) + self.args + (False, )
+            return self.exec_file(args)
+        elif isinstance(result, tuple): # error from child
+            self.ret.append(self.filename)
             self.show_parent()
             messages.error('%s \'%s\'' % (self.action, self.filename),
                            '%s (%s)' % result)
             return 0
         else:
             return 0
+
+
+##### Process Loop Delete
+class ProcessLoopDelete(ProcessLoopBase_2):
+    def __init__(self, action='', func=None, pc=None, *args):
+        super(ProcessLoopDelete, self).__init__(action, func, pc, *args)
+        self.rev = True
+        self.delete_all = not app.prefs.confirmations['delete']
+
+    def ask_confirmation(self):
+        if self.delete_all:
+            return 2
+        if app.prefs.confirmations['delete']:
+            self.show_parent()
+            ans = messages.confirm_all('Delete', 'Delete \'%s\'' % self.filename, 1)
+            if ans == 2:
+                self.delete_all = True
+            return ans
+   
+    def prepare_args(self):
+        return (self.filename, ) + self.args
+
+    def process_response(self, result):
+        if isinstance(result, tuple): # error from child
+            self.dlg.ishidden = True
+            self.show_parent()
+            messages.error('%s \'%s\'' % (self.action, self.filename),
+                           '%s (%s)' % result)
+        return 0
 
 
 ######################################################################
@@ -430,7 +524,7 @@ class ProcessFunc(object):
 
     anim_char = ('|', '/', '-', '\\')
 
-    def __init__(self, title = '', subtitle = '', func = None, *args):
+    def __init__(self, title='', subtitle='', func=None, *args):
         self.func = func
         self.args = args
         self.title = title[:app.maxw-14]
@@ -453,12 +547,6 @@ class ProcessFunc(object):
         self.show_parent()
 
     def show_parent(self):
-        # FIXME: this doesn't seem to work...
-#         if not self.dlg.pwin.hidden():
-#             self.dlg.pwin.hide()
-#         app.lpane.win.refresh()
-#         app.rpane.win.refresh()
-#         app.statusbar.win.refresh()
         app.display()
 
     def show_win(self):
@@ -553,7 +641,8 @@ class ProcessFunc(object):
 
 ######################################################################
 ##### run_shell
-def run_shell(cmd, path, return_output = False):
+# run command via shell and optionally return output, popen version
+def run_shell_popen(cmd, path, return_output=False):
     if not cmd:
         return 0, ''
     cmd = 'cd "%s"; %s' % (path, cmd)
@@ -608,6 +697,65 @@ def run_shell(cmd, path, return_output = False):
     else:
         return 0, ''
 
+# get output from a command run in shell, popen version
+def get_shell_output_popen(cmd):
+    i, a = os.popen4(cmd)
+    buf = a.read()
+    i.close(), a.close()
+    return buf.strip()
+
+# get output from a command run in shell, no stderr, popen version
+def get_shell_output2_popen(cmd):
+    i, o, e = os.popen3(cmd)
+    buf = o.read()
+    i.close(), o.close(), e.close()
+    if buf:
+        return buf.strip()
+    else:
+        return ''
+
+
+# run command via shell and optionally return output, subprocess version
+def run_shell_subprocess(cmd, path, return_output=False):
+    if not cmd:
+        return 0, ''
+    p = Popen(cmd, cwd=path, shell=True,
+              stdin=None, stdout=PIPE, stderr=PIPE, close_fds=True)
+    while p.wait() is None:
+        time.sleep(0.2)
+    output, error = p.stdout.read(), p.stderr.read()
+    p.stdout.close(), p.stderr.close()
+    if p.returncode < 0:
+        error = 'Exit code: %d\n' % p.returncode + error
+        return -1, error
+    if error != '':
+        return -1, error
+    if return_output:
+        return 0, output
+    else:
+        return 0, ''
+
+# get output from a command run in shell, subprocess version
+def get_shell_output_subprocess(cmd):
+    p = Popen(cmd, shell=True,
+              stdin=None, stdout=PIPE, stderr=STDOUT, close_fds=True)
+    while p.wait() is None:
+        time.sleep(0.1)
+    buf = p.stdout.read()
+    p.stdout.close()
+    return buf.strip() if buf else None
+
+# get output from a command run in shell without stderr, subprocess version
+def get_shell_output2_subprocess(cmd):
+    p = Popen(cmd, shell=True,
+              stdin=None, stdout=PIPE, stderr=PIPE, close_fds=True)
+    p.stderr.close()
+    while p.wait() is None:
+        time.sleep(0.1)
+    buf = p.stdout.read()
+    p.stdout.close()
+    return buf.strip() if buf else None
+
 
 ######################################################################
 ##### run_dettached
@@ -640,27 +788,6 @@ def run_dettached(prog, *args):
 
 
 ######################################################################
-##### get_shell_output
-# get output from a command run in shell
-def get_shell_output(cmd):
-    i, a = os.popen4(cmd)
-    buf = a.read()
-    i.close(), a.close()
-    return buf.strip()
-
-
-# get output from a command run in shell, no stderr
-def get_shell_output2(cmd):
-    i, o, e = os.popen3(cmd)
-    buf = o.read()
-    i.close(), o.close(), e.close()
-    if buf:
-        return buf.strip()
-    else:
-        return ''
-
-
-######################################################################
 ##### un/compress(ed) files
 # compress/uncompress file: gzip/gunzip, bzip2/bunzip2
 def do_compress_uncompress_file(filename, path, typ):
@@ -672,7 +799,7 @@ def do_compress_uncompress_file(filename, path, typ):
     if not os.path.isfile(fullfile):
         return -1, '%s: can\'t un/compress' % filename
     c = compress.check_compressed_file(fullfile)
-    if c == None:
+    if c is None:
         packager = compress.packagers_by_type[typ]
         c = packager(fullfile)
         cmd = c.build_compress_cmd()
@@ -681,7 +808,7 @@ def do_compress_uncompress_file(filename, path, typ):
     else:
         return -1, '%s: can\'t un/compress with %s' % \
             (filename, compress.packagers_by_type[typ].compress_prog)
-    st, msg = run_shell(cmd, path, return_output=True)
+    st, msg = run_shell(encode(cmd), encode(path), return_output=True)
     return st, msg
 
 def compress_uncompress_file(tab, typ):
@@ -689,15 +816,14 @@ def compress_uncompress_file(tab, typ):
         fs = tab.selections[:]
     else:
         fs = [tab.sorted[tab.file_i]]
-    ProcessUnCompressLoop('Un/Compressing file',
-                          do_compress_uncompress_file,
+    ProcessLoopUnCompress('Un/Compressing file', do_compress_uncompress_file,
                           fs, tab.path, typ).run()
     tab.selections = []
     app.regenerate()
 
 
 # uncompress directory
-def do_uncompress_dir(filename, path, dest, is_tmp = False):
+def do_uncompress_dir(filename, path, dest, is_tmp=False):
     if os.path.isabs(filename):
         fullfile = filename
         filename = os.path.basename(filename)
@@ -706,32 +832,32 @@ def do_uncompress_dir(filename, path, dest, is_tmp = False):
     if not os.path.isfile(fullfile):
         return -1, '%s: is not a file' % filename
     c = compress.check_compressed_file(fullfile)
-    if c == None:
+    if c is None:
         return -1, '%s: can\'t uncompress' % filename
     cmd = c.build_uncompress_cmd()
-    st, msg = run_shell(cmd, dest, return_output=True)
+    st, msg = run_shell(encode(cmd), encode(dest), return_output=True)
     if st < 0: # (-100, -1),
         # never reached if user stops (-100) because this process is killed
         c.delete_uncompress_temp(dest, is_tmp)
     return st, msg
 
 
-def uncompress_dir(tab, dest = None, is_tmp = False):
+def uncompress_dir(tab, dest=None, is_tmp=False):
     """uncompress tarred file in path directory"""
 
-    if dest == None:
+    if dest is None:
         dest = tab.path
     if tab.selections:
         fs = tab.selections[:]
     else:
         fs = [tab.sorted[tab.file_i]]
-    ProcessUnCompressLoop('Uncompressing file', do_uncompress_dir,
+    ProcessLoopUnCompress('Uncompressing file', do_uncompress_dir,
                           fs, tab.path, dest, is_tmp).run()
     tab.selections = []
 
 
 # compress directory: tar and gzip, bzip2
-def do_compress_dir(filename, path, typ, dest, is_tmp = False):
+def do_compress_dir(filename, path, typ, dest, is_tmp=False):
     if os.path.isabs(filename):
         fullfile = filename
         filename = os.path.basename(filename)
@@ -740,26 +866,26 @@ def do_compress_dir(filename, path, typ, dest, is_tmp = False):
     if not os.path.isdir(fullfile):
         return -1, '%s: is not a directory' % filename
     c = compress.packagers_by_type[typ](fullfile)
-    if c == None:
+    if c is None:
         return -1, '%s: can\'t compress' % filename
     cmd = c.build_compress_cmd()
-    st, msg = run_shell(cmd, dest, return_output = True)
+    st, msg = run_shell(encode(cmd), encode(dest), return_output=True)
     if st < 0: # (-100, -1):
         # never reached if user stops (-100) because this process is killed
         c.delete_compress_temp(dest, is_tmp)
     return st, msg
 
 
-def compress_dir(tab, typ, dest = None, is_tmp = False):
+def compress_dir(tab, typ, dest=None, is_tmp=False):
     """compress directory to current path"""
 
-    if dest == None:
+    if dest is None:
         dest = tab.path
     if tab.selections:
         fs = tab.selections[:]
     else:
         fs = [tab.sorted[tab.file_i]]
-    ProcessUnCompressLoop('Compressing file', do_compress_dir,
+    ProcessLoopUnCompress('Compressing file', do_compress_dir,
                           fs, tab.path, typ, dest, is_tmp).run()
     tab.selections = []
 
@@ -767,7 +893,7 @@ def compress_dir(tab, typ, dest = None, is_tmp = False):
 ######################################################################
 ##### find / grep
 # find/grep
-def do_findgrep(path, files, pattern, ignorecase = 0):
+def do_findgrep(path, files, pattern, ignorecase=0):
     # escape special chars
     pat_re = pattern.replace('\\', '\\\\\\\\')
     pat_re = pat_re.replace('-', '\\-')
@@ -786,7 +912,7 @@ def do_findgrep(path, files, pattern, ignorecase = 0):
           (sysprogs['find'], path, files, sysprogs['grep'], ign, pat_re)
     st, ret = ProcessFunc('Searching',
                           'Searching for \"%s\" in \"%s\" files' % (pattern, files),
-                          run_shell, cmd, path, True).run()
+                          run_shell, encode(cmd), path, True).run()
     if not ret:
         return 0, []
     if st < 0: # (-100, -1) => error
@@ -807,7 +933,7 @@ def do_findgrep(path, files, pattern, ignorecase = 0):
             else:
                 i = len(lst) - 2
                 while True:
-                    filename = ':'.join(lst[:i])
+                    filename = decode(':'.join(lst[:i]))
                     if os.path.exists(filename):
                         break
                     else:
@@ -825,7 +951,7 @@ def do_find(path, files):
     cmd = '%s %s -name \"%s\" -print' % (sysprogs['find'], path, files)
     st, ret = ProcessFunc('Searching',
                           'Searching for \"%s\" files' % files,
-                          run_shell, cmd, path, True).run()
+                          run_shell, encode(cmd), path, True).run()
     if not ret:
         return 0, []
     if st < 0: # (-100, -1) => error
@@ -836,8 +962,8 @@ def do_find(path, files):
     if len(ret) > 0:
         matches = []
         for filename in ret:
-            filename = filename.strip().replace(path, '')
-            if filename != None and filename != '':
+            filename = decode(filename).strip().replace(path, '')
+            if filename is not None and filename != '':
                 if filename[0] == os.sep and path != os.sep:
                     filename = filename[1:]
                 matches.append(filename)
@@ -851,8 +977,9 @@ def encode(buf):
 
 
 def decode(buf):
-    codecs_lst = (g_encoding, 'utf-8', 'latin-1', 'ascii')
-    for c in codecs_lst:
+    if isinstance(buf, unicode):
+        return buf
+    for c in codecs_list:
         try:
             buf = buf.decode(c)
         except UnicodeDecodeError:
@@ -863,30 +990,60 @@ def decode(buf):
         return buf.decode('ascii', 'replace')
 
 
+def ask_convert_invalid_encoding_filename(filename):
+    auto = app.prefs.options['automatic_file_encoding_conversion']
+    if auto == -1:
+        return False
+    elif auto == 1:
+        return True
+    elif auto == 0:
+        ret = messages.confirm('Detected invalid encoding',
+                               'In file <%s>, convert' % filename)
+        try:
+            app.display()
+        except:
+            pass
+        return (ret == 1)
+    else:
+        raise ValueError
+
+
 ######################################################################
 ##### useful functions
 def get_escaped_filename(filename):
     filename = filename.replace('$', '\\$')
     if filename.find('"') != -1:
         filename = filename.replace('"', '\\"')
-    return '%s' % filename
+    return encode(filename)
 
 
 def get_escaped_command(cmd, filename):
     filename = filename.replace('$', '\$')
     if filename.find('"') != -1:
         filename = filename.replace('"', '\\"')
-        return '%s \'%s\'' % (cmd, filename)
+        return '%s \'%s\'' % (encode(cmd), encode(filename))
     else:
-        return '%s \"%s\"' % (cmd, filename)
+        return '%s \"%s\"' % (encode(cmd), encode(filename))
 
 
-def run_on_current_file(program, tab):
-    cmd = get_escaped_command(app.prefs.progs[program],
-                              tab.get_fullpathfile())
+def run_on_current_file(program, filename):
+    cmd = get_escaped_command(app.prefs.progs[program], filename)
     curses.endwin()
     os.system(cmd)
     curses.curs_set(0)
+
+
+######################################################################
+if sys.version_info[:2] < (2, 4):
+    import popen2
+    run_shell = run_shell_popen
+    get_shell_output = get_shell_output_popen
+    get_shell_output2 = get_shell_output2_popen
+else:
+    from subprocess import Popen, PIPE, STDOUT
+    run_shell = run_shell_subprocess
+    get_shell_output = get_shell_output_subprocess
+    get_shell_output2 = get_shell_output2_subprocess
 
 
 ######################################################################

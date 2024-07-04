@@ -1,3 +1,77 @@
+Version 2.2 ("Approaching perfection") - 2010/05/22:
+
+  + New features
+    - use 2 progress bars in copy/move/delete dialog, one for files count
+      and other for files size
+    - added recursive chmod chown chgrp
+    - faster cursor movement
+      . Ctrl-l: center cursor in panel, so now edit-link is in 'L'
+      . Ctrl-cursor_up, Ctrl-P: move cursor 1/4th of page up
+      . Ctrl-cursor_down, Ctrl-N: move cursor 1/4th of page down
+      . P: move cursor 1/4th of page up in other panel
+      . N: move cursor 1/4th of page down in other panel
+    - file_menu new feature: a -> backup file. You can specify the extension
+      to use in .lfmrc
+    - added support for .xz compressed files
+    - Unicode & Encodings
+      . rewrite all internals to use unicode strings, but employ terminal
+        encoding (f.e. utf-8) to interact with the user or to display contents
+        in ncurses functions or to run commands in shell
+      . when lfm detects a file with invalid encoding name it asks the user to
+        convert it (can be automatic with the proper option in the
+        configuration, automatic_file_encoding_conversion, default 0 (ask)).
+        If not converted, lfm will display the file but won't operate on it.
+      . try more encodings when we get a filename with strange characters
+      . lfm will check and require a valid encoding before running
+    - Pyview:
+      . completely rewritten. Code is shorter and more beautiful now
+        Uses a new FileCache class to accelerate the retrieving of file lines
+      . displays contents between 2 and 4 times faster
+      . new command line flag -s/--stdin to force reading from stdin.
+        Now pyview doesn't wait for stdin input by default, so it starts much
+        faster. eg. $ ps efax | pyview -s
+    
+  + Minor changes
+    - add color entries for directories and exe_files
+    - expand ~ to user home
+    - make Tree follow .dotfiles behaviour, new keybinding Ctrl-H
+    - dialogs are bigger now
+    - show filesystem info rewritten
+    - show file info rewritten, now it shows correctly information
+      from fuse-mounted volumes
+    - added new "ebook" category, filetypes and formats
+  
+  + About the code
+    - since python v2.6+, popen* is deprecated, so make lfm check python
+      version and use popen* or subprocess accordingly
+    - correct some python idioms
+    - clean code
+
+  + Documentation
+    - Added "Files Name Encoding" and "FAQ" sections
+    - Added information about keybindings in permissions window
+    - Updated some other minor changes: wide char support, vfs, thanks
+
+  + lots of bugs fixed:
+    - file system information was not showed correctly sometimes
+    - devices major and minor numbers were not showed correctly
+    - crash in goto_dir if there aren't any historic entries
+    - crash in a void EntryLine after pressing BACKSPACE on some platforms
+    - unzip => overwrite files without prompting ("unzip -o" option) to avoid
+      ethernal waiting, as messages can not be seen by user
+    - fix make_dir error message
+    - recompressing a vfs compressed file leave some garbage on temporary dir
+    - don't try to copy fifo/socket/block-dev/char-dev files
+    - crash when we don't have enough permissions to write to dest
+    - show_dirs_size: don't show in stderr if we don't have perms for a dir
+    - can't browse /home/<user> as root if .gvfs is present
+    - EntryLine: non-ascii chars are not showed correctly
+    - lfm crashes with invalid encoding filenames
+    - increment owner and group space to avoid ugly look in 1-pane view
+    - when moving files, don't delete source if some error or if we don't
+      overwrite destination
+
+
 Version 2.1 ("What do you want for Christimas?") - 2008/12/21:
 
   + Ctrl-H now show/hide dot files
@@ -15,6 +89,7 @@ Version 2.1 ("What do you want for Christimas?") - 2008/12/21:
     - sorting by None doesn't crash anymore
 	- MenuWin dialog crashed when title length was greater than length of
       entries to show
+
 
 Version 2.0 ("Nine 1/2 weeks... ok, ok, and 3 years") - 2007/09/03:
 
@@ -76,9 +151,12 @@ Version 2.0 ("Nine 1/2 weeks... ok, ok, and 3 years") - 2007/09/03:
       . goto line 0 in pyview showed a blank screen
       . crash in file info if filename is too long
 
+
 Version 1.0 was never publically released - 2006
 
+
 Version 0.92 was never publically released - 2005
+
 
 Version 0.91 ("It rocks... yeah!") - 2004/06/30:
 
@@ -99,7 +177,9 @@ Version 0.91 ("It rocks... yeah!") - 2004/06/30:
   + code reorganized: actions.py, vfs.py
   + added classifiers to setup.py script
 
+
 Version 0.90 was never publically released
+
 
 Version 0.9 ("...and the day arrived") - 2002/09/05:
 
@@ -142,6 +222,7 @@ Version 0.9 ("...and the day arrived") - 2002/09/05:
             of crashing
           * last char in file is not showed
 
+
 Version 0.8 ("Close to Paradise") - 2002/03/04:
 
   + Implemented VFS feature to enter into .tar.gz and .tar.bz2 files
@@ -172,6 +253,7 @@ Version 0.8 ("Close to Paradise") - 2002/03/04:
           * "if wrap mode => fix prev/next page & up/down cursor". Now 
             they move to screen lines, not to physical lines
 
+
 Version 0.7 ("Hello Darling, I'm here") - 2001/11/30:
 
   + 'pyview', a new pager/viewer for use with lfm or standalone,
@@ -196,7 +278,9 @@ Version 0.7 ("Hello Darling, I'm here") - 2001/11/30:
   + Default configuration is now saved inmediately
   + Many other bugs fixed again (see ChangeLog)
 
+
 Version 0.6 was never publically released
+
 
 Version 0.5 ("Last call to London") - 2001/08/07:
 
@@ -219,6 +303,7 @@ Version 0.5 ("Last call to London") - 2001/08/07:
       - option 'b' does not exist in Solaris' 'du -s' command
       - fix a problem while moving files if destination has no enough space
       - many others
+
 
 Version 0.4 - 2001/07/19:
 

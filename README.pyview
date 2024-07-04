@@ -4,11 +4,11 @@ pyview - Last File Manager Viewer
 
 :Author: Iñigo Serna, inigoserna AT gmail DOT com
 
-:Version: 2.1, December 21th. 2008
+:Version: 2.2, May 22th. 2010
 
 :Home page: http://www.terra.es/personal7/inigoserna/lfm/
 
-:License: \(C\) 2001-8, Iñigo Serna
+:License: \(C\) 2001-10, Iñigo Serna
 
           This software has been realised under the `GPL License`__ version 3
           or later, read the COPYING_ file that comes with this package for
@@ -16,8 +16,7 @@ pyview - Last File Manager Viewer
 
           There is NO WARRANTY.
 
-:Last update: Sat Dec 20 23:35:13 2008
-
+:Last update: Sat May 22 11:18:35 2010
 
 .. contents:: Table of Contents
 
@@ -26,10 +25,11 @@ Introduction
 ============
 **pyview** is a pager (viewer) written in Python_.
 Though it was initially written to be used with lfm_,
-it can be used standalone too.
+it can be used standalone as well.
 
 Since version 0.9 it can read from standard input too
-(eg. `$ ps efax | pyview`).
+(eg. `$ ps efax | pyview -s`).
+Type `pyview -h` for more help.
 
 
 Keys

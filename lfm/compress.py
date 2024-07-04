@@ -43,14 +43,14 @@ class PackagerBase(object):
     def build_compress_cmd(self):
         newfile = self.filename + self.exts[0]
         if os.path.isfile(self.fullname):
-            if self.type in ('bz2', 'gz'):
+            if self.type in ('bz2', 'gz', 'xz'):
                 return self.compress_cmd % self.filename
-            elif self.type in ('tbz2', 'tgz'):
+            elif self.type in ('tbz2', 'tgz', 'txz'):
                 return # Don't use tar, it's a file
             else:
                 return self.compress_cmd % (self.filename, newfile)
         elif os.path.isdir(self.fullname):
-            if self.type in ('bz2', 'gz'):
+            if self.type in ('bz2', 'gz', 'xz'):
                 return # Don't compress without tar, it's a dir
             if self.need_tar:
                 return self.compress_cmd % (self.filename, newfile)
@@ -65,7 +65,7 @@ class PackagerBase(object):
         else:
             return self.compressXXX_cmd % (dest, src)
 
-    def delete_uncompress_temp(self, path, is_tmp = False):
+    def delete_uncompress_temp(self, path, is_tmp=False):
         if is_tmp:
             tmpfile = path
         else:
@@ -76,20 +76,14 @@ class PackagerBase(object):
             else:
                 return
             tmpfile = os.path.join(path, dirname)
-        try:
-            files.do_delete(tmpfile)
-        except OSError:
-            pass
+        files.delete_bulk(tmpfile, ignore_errors=True)
 
-    def delete_compress_temp(self, path, is_tmp = False):
+    def delete_compress_temp(self, path, is_tmp=False):
         if is_tmp:
             tmpfile = path
         else:
             tmpfile = os.path.join(path, self.filename + self.exts[0])
-        try:
-            files.do_delete(tmpfile)
-        except OSError:
-            pass
+        files.delete_bulk(tmpfile, ignore_errors=True)
 
 
 class PackagerTBZ2(PackagerBase):
@@ -132,12 +126,32 @@ class PackagerGZ(PackagerBase):
     compressXXX_cmd = compress_prog + ' %s'
 
 
+class PackagerTXZ(PackagerBase):
+    type = 'txz'
+    exts = ('.tar.xz', '.txz')
+    need_tar = True
+    uncompress_prog = compress_prog = sysprogs['xz']
+    uncompress_cmd = uncompress_prog + ' -d \"%s\" -c | ' + sysprogs['tar'] + ' xfi -'
+    compress_cmd = sysprogs['tar'] + ' cf - \"%s\" | ' + compress_prog + ' > \"%s\"'
+    compressXXX_cmd = sysprogs['tar'] + ' cf - %s | ' + compress_prog + ' > \"%s\"'
+
+
+class PackagerXZ(PackagerBase):
+    type = 'xz'
+    exts = ('.xz', )
+    need_tar = False
+    uncompress_prog = compress_prog = sysprogs['xz']
+    uncompress_cmd = uncompress_prog + ' -d \"%s\"'
+    compress_cmd = compress_prog + ' \"%s\"'
+    compressXXX_cmd = compress_prog + ' %s'
+
+
 class PackagerZIP(PackagerBase):
     type = 'zip'
     exts = ('.zip', )
     need_tar = False
     uncompress_prog = sysprogs['unzip']
-    uncompress_cmd = uncompress_prog + ' -q \"%s\"'
+    uncompress_cmd = uncompress_prog + ' -o -q \"%s\"'
     compress_prog = sysprogs['zip']
     compress_cmd = compress_prog + ' -qr \"%s\" \"%s\"'
     compressXXX_cmd = compress_prog + ' -qr \"%s\" %s'
@@ -164,9 +178,9 @@ class Packager7Z(PackagerBase):
     compressXXX_cmd = compress_prog + ' a \"%s\" %s'
 
 
-
 packagers = ( PackagerTBZ2, PackagerBZ2,
               PackagerTGZ, PackagerGZ,
+              PackagerTXZ, PackagerXZ,
               PackagerZIP, PackagerRAR,
               Packager7Z )
 
@@ -174,6 +188,8 @@ packagers_by_type = { 'tbz2': PackagerTBZ2,
                       'bz2': PackagerBZ2,
                       'tgz': PackagerTGZ,
                       'gz': PackagerGZ,
+                      'txz': PackagerTXZ,
+                      'xz': PackagerXZ,
                       'zip': PackagerZIP,
                       'rar': PackagerRAR,
                       '7z': Packager7Z }
