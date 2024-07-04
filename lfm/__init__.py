@@ -1,7 +1,7 @@
-# -*- coding: iso-8859-15 -*-
+# -*- coding: utf-8 -*-
 
 """
-Copyright (C) 2001-4, Iñigo Serna <inigoserna@telefonica.net>.
+Copyright (C) 2001-7, IÃ±igo Serna <inigoserna@telefonica.net>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -12,71 +12,39 @@ application for UNIX console.
 """
 
 
-##################################################
-##################################################
-AUTHOR = 'Iñigo Serna'
-VERSION = '0.91'
-DATE = '2001-4'
+######################################################################
+import locale
+locale.setlocale(locale.LC_ALL, '')
+g_encoding = locale.getpreferredencoding()
+
+
+######################################################################
+AUTHOR = 'IÃ±igo Serna'
+VERSION = '2.0'
+DATE = '2001-7'
 
 LFM_NAME = 'lfm - Last File Manager'
 PYVIEW_NAME = 'pyview'
 
-PREFSFILE = '.lfmrc'
 
-
-##################################################
+######################################################################
 ##### lfm
-app = None
+sysprogs = { 'tar': 'tar',
+             'bzip2': 'bzip2',
+             'gzip': 'gzip',
+             'zip': 'zip',
+             'unzip': 'unzip',
+             'rar': 'rar',
+             'grep': 'grep',
+             'find': 'find',
+             'which': 'which',
+             'xargs': 'xargs' }
 
-# defaultprogs = { 'shell': ('bash', 'ksh', 'tcsh', 'csh', 'sh'),
-#                  'pager': ('pyview', 'less', 'more', 'biew'),
-#                  'editor': ('mcedit', 'emacs', 'vi', 'joe'),
-#                  'find': ('find', ),
-#                  'egrep': ('egrep', 'grep'),
-#                  'tar': ('tar', ),
-#                  'gzip': ('gzip', ),
-#                  'bzip2': ('bzip2', ),
-#                  'zip': ('zip', ),
-#                  'unzip': ('unzip', ),
-#                  'web': ('galeon', 'mozilla', 'netscape', 'lynx', 'opera'),
-#                  'ogg': ('ogg123', ),
-#                  'mp3': ('mpg123', ),
-#                  'audio': ('esdplay', 'play', ),
-#                  'video': ('mplayer', 'xanim', 'aviplay'),
-#                  'graphics': ('ee', 'eog', 'gthumb', 'xv', 'gimp'),
-#                  'pdf' :('acroread', 'ggv', 'xpdf'),
-#                  'ps': ('ggv', 'gv'),
-#                  'tururu': ('tururu', 'sdfdsf', 'just to test') }
-defaultprogs = { 'shell': 'bash',
-                 'pager': 'pyview',
-                 'editor': 'mcedit',
-                 'find': 'find',
-                 'egrep': 'egrep',
-                 'tar': 'tar',
-                 'gzip': 'gzip',
-                 'bzip2': 'bzip2',
-                 'zip': 'zip',
-                 'unzip': 'unzip',
-                 'web': 'galeon',
-                 'ogg': 'ogg123',
-                 'mp3': 'mpg123',
-                 'audio': 'esdplay',
-                 'video': 'mplayer',
-                 'graphics': 'gthumb',
-                 'pdf': 'gpdf',
-                 'ps': 'ggv' }
-
-filetypes = { 'web': ('html', 'htm'),
-              'ogg': ('ogg', ),
-              'mp3': ('mp3', ),
-              'audio': ('wav', 'au', 'midi'),
-              'video': ('mpeg', 'mpg', 'avi', 'asf'),
-              'graphics': ('png', 'jpeg', 'jpg', 'gif', 'tiff', 'tif', 'xpm'),
-              'pdf': ('pdf', ),
-              'ps': ('ps', ) }
+TOGGLE_PANE, TAB_NEW, TAB_CLOSE = xrange(1, 4)
+PANE_MODE_HIDDEN, PANE_MODE_LEFT, PANE_MODE_RIGHT, PANE_MODE_FULL = xrange(4)
 
 
-##################################################
+######################################################################
 ##### pyview
 MODE_TEXT, MODE_HEX = 0, 1
 PYVIEW_README = """
@@ -119,7 +87,7 @@ Goto Line / Byte Offset
 =======================
     Enter the line number / byte offset you want to show.
 If number / byte is preceded by '0x' it is interpreted as hexadecimal.
-You can scroll relative lines from the current position using '+' or '-' 
+You can scroll relative lines from the current position using '+' or '-'
 character.
 
 Find
@@ -127,5 +95,5 @@ Find
     Type the string to search. It ignores case.
 """ % PYVIEW_NAME
 
-##################################################
-##################################################
+
+######################################################################

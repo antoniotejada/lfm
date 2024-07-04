@@ -1,3 +1,67 @@
+Version 2.0 ("Nine 1/2 weeks... ok, ok, and 3 years") - 2007/09/03:
+
+  + tabs implemented
+  + color files by extension [Andrey Skvortsov]
+  + new IPC code and API; more flexible, powerful and stable
+  + new un/compress vfs API, added support for .zip and .rar files
+  + make sort mode per tab, not globally
+  + support locale [Andrey Skvortsov]
+  + speed up loading directory contents
+  + speed cursor movement, don't waste much CPU
+  + use logging module in lfm and pyview for debugging
+  + overwrite_all_none: yes, all, no  => new options: "none", "skip all""
+  + rewrite/refactor most of code to make lfm more robust and clean
+  + preferences:
+    - change file name preferences.py => config.py
+    - use ConfigParser
+  + use tempfile secure versions mkdtemp() and mkstemp()
+  + added man pages [Sebastien Bacher]
+  + use reST for documentation
+  + check for python version 2.3 or higher in lfm and pyview
+  + updated to GPL v3 license
+  + and fixed lot of bugs, some of them:
+    - general:
+      . delete garbage if user stops action
+      . run 'do_special_view_file' as dettached from lfm window
+      . path expand in bookmarks ("~/") [Andrey Skvortsov]
+      . an ugly traceback crash appears when user starts "lfm path" and has 
+        no permissions to enter. Show error message and default to current 
+        directory
+      . lfm crashes when filename is not encoded with same codec than 
+        g_encoding utils.{decode|encode}. Needs curses module linked against 
+        ncursesw to work properly
+      . sort_mix_cases = 1 performance degrades on larger dirs.
+        Reported by Andrey Skvortsov
+      . escape filenames with chars $ ". Reported by Andrey Skvortsov
+    - user interface:
+      . maximize/minimize window don't crash lfm anymore
+      . dialogs appear at bad position after terminal is resized
+      . handle window resize in Tree mode
+      . refresh display after canceling completion dialog
+      . "the size of the right pane does not fill the last column in 
+        terminal if their number is odd" [Andrey Skvortsov]
+      . fix crash when "df" shows entries in two different lines (device 
+        name is too large, f.e. in linux lvm2 volumes)
+      . if you try to enter a directory with insufficient permissions, after 
+        the error message is closed the cursorline refreshes to the first line
+    - compress:
+      . added -i flag (--ignore-zeros) flag to tar [Andrey Skvortsov]
+      . standard tar needs - for flags
+    - vfs:
+      . vfs.py: regenerate_file, if user stops process, tempfile can't be 
+        deleted
+    - find/grep:
+      . escape special chars (- \ ( ) [ ]) in patterns
+      . don't crash when find/grep returns no results
+      . bug when matches occur in binary files
+    - pyview:
+      . goto line 0 in pyview showed a blank screen
+      . crash in file info if filename is too long
+
+Version 1.0 was never publically released - 2006
+
+Version 0.92 was never publically released - 2005
+
 Version 0.91 ("It rocks... yeah!") - 2004/06/30:
 
   + quite stable and robust, doesn't crash

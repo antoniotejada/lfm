@@ -1,45 +1,63 @@
 #!/usr/bin/env python
-# -*- coding: iso-8859-15 -*-
+# -*- coding: utf-8 -*-
+
+
+"""Last File Manager is a simple but powerful file manager for the UNIX console
+It has been developed with the ol' good Midnight Commander as model."""
+
 
 from distutils.core import setup
 import sys
 
+
 DOC_FILES = ['COPYING', 'README', 'README.pyview', 'NEWS', 'TODO', 'ChangeLog']
+MAN_FILES = ['lfm.1', 'pyview.1']
 
+classifiers = """\
+Development Status :: 5 - Production/Stable
+Environment :: Console :: Curses
+Intended Audience :: End Users/Desktop
+Intended Audience :: System Administrators
+License :: OSI Approved :: GNU General Public License (GPL)
+Natural Language :: English
+Operating System :: POSIX
+Operating System :: Unix
+Programming Language :: Python
+Topic :: Desktop Environment :: File Managers
+Topic :: System :: Filesystems
+Topic :: System :: Shells
+Topic :: System :: System Shells
+Topic :: Utilities
+"""
 
-classifiers = ["Development Status :: 4 - Beta",
-               "Environment :: Console :: Curses",
-               "Intended Audience :: End Users/Desktop",
-               "License :: OSI Approved :: GNU General Public License (GPL)",
-               "Programming Language :: Python",
-               "Natural Language :: English",
-               "Operating System :: POSIX",
-               "Operating System :: Unix",
-               "Topic :: Desktop Environment :: File Managers",
-               "Topic :: System :: Filesystems",
-               "Topic :: System :: Shells",
-               "Topic :: System :: System Shells"
-              ]
+doclines = __doc__.split("\n")
 
+print doclines
 
-if sys.version_info >= (2, 3):
-    addargs = {"classifiers": classifiers}
-else:
-    addargs = {}
-   
+if sys.version_info < (2, 3):
+    _setup = setup
+    def setup(**kwargs):
+        if kwargs.has_key("classifiers"):
+            del kwargs["classifiers"]
+        _setup(**kwargs)
+
 
 setup(name = 'lfm',
-      version = '0.91',
+      version = '2.0',
       license = 'GPL',
-      description = 'Last File Manager',
-      author = 'Iñigo Serna',
-      author_email = 'inigoserna@terra.es',
+      description = doclines[0],
+      long_description = '\n'.join(doclines[2:]),
+      author = 'IÃ±igo Serna',
+      author_email = 'inigoserna@telefonica.net',
       url = 'http://www.terra.es/personal7/inigoserna/lfm',
+      platforms = 'POSIX',
+      classifiers = filter(None, classifiers.split("\n")),
       py_modules = ['lfm/__init__', 'lfm/lfm', 'lfm/messages', 'lfm/files',
-                    'lfm/actions', 'lfm/utils', 'lfm/vfs',
-                    'lfm/preferences', 'lfm/pyview'],
+                    'lfm/actions', 'lfm/compress', 'lfm/utils', 'lfm/vfs',
+                    'lfm/config', 'lfm/pyview'],
       scripts = ['lfm/lfm', 'lfm/pyview'],
-      data_files = [('share/doc/lfm', DOC_FILES)]
+      data_files = [('share/doc/lfm', DOC_FILES),
+                    ('share/man/man1', MAN_FILES)]
 #      **addargs
      )
 

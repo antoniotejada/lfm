@@ -4,15 +4,19 @@ pyview - Last File Manager Viewer
 
 :Author: Iñigo Serna, inigoserna AT telefonica DOT net
 
-:Version: 0.91, June 30th.. 2004
+:Version: 2.0, September 3rd. 2007
 
-:License: \(C\) 2001-4, Iñigo Serna
+:Home page: http://www.terra.es/personal7/inigoserna/lfm/
 
-          This software has been realised under the `GPL License`__, 
-          see the COPYING_ file that comes with this package. 
+:License: \(C\) 2001-7, Iñigo Serna
+
+          This software has been realised under the `GPL License`__ version 3
+          or later, read the COPYING_ file that comes with this package for
+          more information. 
+
           There is NO WARRANTY.
 
-:Last update: Wed Jun 30 22:01:08 2004 CEST
+:Last update: Mon Sep  3 22:40:12 2007
 
 
 .. contents:: Table of Contents
@@ -21,8 +25,9 @@ pyview - Last File Manager Viewer
 Introduction
 ============
 **pyview** is a pager (viewer) written in Python_.
-Though it was initially written to be used with **lfm**,
+Though it was initially written to be used with lfm_,
 it can be used standalone too.
+
 Since version 0.9 it can read from standard input too
 (eg. `$ ps efax | pyview`).
 
@@ -30,12 +35,12 @@ Since version 0.9 it can read from standard input too
 Keys
 ====
 + **Movement**
-    - cursor_up, p, P
-    - cursor_down, n, N
-    - previous page, backspace, Ctrl-P
-    - next page, space, Ctrl-N
-    - home: first line
-    - end: last line
+    - cursor_up, k, K
+    - cursor_down, j, J
+    - previous page, backspace, Ctrl-B
+    - next page, space, Ctrl-F
+    - home, Ctrl-A: first line
+    - end, Ctrl-E: last line
     - cursor_left
     - cursor_right
 
@@ -50,7 +55,7 @@ Keys
     - 0..9: go to bookmark #
     - b, B: set bookmark #
     - Ctrl-O: open shell 'sh'. Type 'exit' to return to pyview
-    - q, Q, x, X, F3, F10: exit
+    - q, Q, x, X, F3, F10, Ctrl-Q: exit
 
 
 Goto Line / Byte Offset
@@ -69,4 +74,5 @@ Type the string to search. It ignores case.
 .. _python: http://www.python.org
 .. _COPYING: COPYING
 .. _GPL: http://www.gnu.org/licenses/licenses.html#GPL
+.. _lfm: README.html
 __ GPL_

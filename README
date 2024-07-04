@@ -2,17 +2,21 @@
 lfm - Last File Manager
 =======================
 
-:Author: I�igo Serna, inigoserna AT telefonica DOT net
+:Author: Iñigo Serna, inigoserna AT telefonica DOT net
 
-:Version: 0.91, June 30th. 2004
+:Version: 2.0, September 3rd. 2007
 
-:License: \(C\) 2001-4, I�igo Serna
+:Home page: http://www.terra.es/personal7/inigoserna/lfm/
 
-          This software has been realised under the `GPL License`__, 
-          see the COPYING_ file that comes with this package. 
+:License: \(C\) 2001-7, Iñigo Serna
+
+          This software has been realised under the `GPL License`__ version 3
+          or later, read the COPYING_ file that comes with this package for
+          more information. 
+
           There is NO WARRANTY.
 
-:Last update: Wed Jun 30 22:01:08 2004 CEST
+:Last update: Mon Sep  3 22:50:48 2007
 
 
 .. contents:: Table of Contents
@@ -24,57 +28,69 @@ Introduction
 UNIX console. It has been developed with the ol' good `Midnight
 Commander`__ as model.
 
-From version 0.6 and up *lfm* package also contains **pyview**, a
-text / hex file viewer to be used with or without **lfm**. 
-Read README.pyview_ for more info about it.
+Some of the features you can find in *lfm*:
 
+- console-based file manager for UNIX platforms
+- 1-pane or 2-pane view
+- bookmarks
+- vfs for compressed files
+- dialogs with entry completion
+- fast access to a shell
+- direct integration of find/grep, df and other tools
+- tabs per pane
+- color files by extension [Andrey Skvortsov]
+- fast file viewer with text and binary modes
+- ...and many others
+
+
+From version 0.6 and up *lfm* package also contains **pyview**, a
+text / hex file viewer to be used with or without *lfm*. 
+Read README.pyview_ for more info about it.
 
 Some screenshots:
 
-.. image:: lfm.png
 
-.. image:: pyview.png
+  **lfm**:
 
-
-Requirements
-============
-*Lfm* and *Pyview* are written in Python_ and need curses module.
-It needs Python v2.0 or maybe higher, it won't work with v1.5.
-Since version 0.90, *lfm* needs ncurses >= v5.x because of its
-handling of terminal resizing.
-
-All modern UNIX flavours (Linux, \*BSD, Solaris, etc) will run it without problems. 
-If they appear please notify me.
+  .. image:: lfm.png
 
 
-All over these years, I have tested on several platforms:
+  **pyview**:
 
-+--------------+-----------+----------------------+
-|      OS      |   PYTHON  |        Arch          |
-+==============+===========+======================+
-| Linux 2.6.6  |   2.3.4   |   Athlon             |
-+--------------+-----------+----------------------+
-| Linux 2.4.18 |   2.2.1   |   i686               |
-+--------------+-----------+----------------------+
-| Solaris 8    |   2.1     |   UltraSparc-II [#]_ |
-+--------------+-----------+----------------------+
+  .. image:: pyview.png
 
-
-.. [#] I needed to install ncurses and recompile python to use them. 
-       It doesn't work with the curses library which comes with Solaris 8.
-
-
-
-Also, take a look at TODO file to see bugs and *not-implemented-yet* (tm) 
-features.
+ 
 
 Type `lfm --help` or `pyview --help` for a complete list of options.
 
 Program preferences are saved in `~/.lfmrc` file.
 When the program starts the first time, it tries to discover the location
-of some apps in your system to configure lfm automatically, but it's not 
+of some apps in your system to configure *lfm* automatically, but it's not 
 perfect, so you should take a look to the configuration (`General Menu [F9] 
 -> Edit Configuration [c]`) and change it according to your preferences.
+
+
+Requirements
+============
+*Lfm* and *Pyview* are written in Python_ and require curses module.
+It needs Python v2.3 or higher, it won't work with older versions.
+
+Since version 0.90, *lfm* needs ncurses >= v5.x for the handling 
+of terminal resizing.
+
+All modern UNIX flavours (Linux, \*BSD, Solaris, etc) should run it without 
+problems. If they appear please notify me.
+
+Note that python curses module should be linked against ncursesw library 
+(instead of ncurses) to get wide characters support. This is the usual case 
+in later versions of Linux distributions, but maybe not the case in older 
+Linux or other UNIX platforms. Thus, expect problems when using multibyte 
+file names (f.e. UTF-8 or latin-1 encoded) if your curses module isn't 
+compiled against ncursesw. Anyway, I hope this issue will disappear with new 
+releases of those platforms, eventually.
+
+Also, take a look at TODO_ file to see bugs and *not-implemented-yet* (tm) 
+features.
 
 
 Download & Installation
@@ -85,6 +101,12 @@ Download & Installation
    +---------+------------------+------------+
    | Version |       File       |    Date    |
    +=========+==================+============+
+   |   2.0   | lfm-2.0.tar.gz_  | 2007/09/03 |
+   +---------+------------------+------------+
+   |   1.0   |  Never released  |   ~2006    |
+   +---------+------------------+------------+
+   |   0.92  |  Never released  |   ~2005    |
+   +---------+------------------+------------+
    |   0.91  | lfm-0.91.tar.gz_ | 2004/07/03 |
    +---------+------------------+------------+
    |   0.90  |  Never released  |            |
@@ -111,7 +133,7 @@ Download & Installation
 2. Uncompress file
 3. Build:
     `$ python setup.py build`
-4. Install, as root::
+4. Install, as root:
     `# python setup.py install`
 5. Run it:
     `$ lfm`
@@ -128,40 +150,49 @@ your `~/.bashrc`::
 	rm -f $LFMPATHFILE
     }
 
-If you don't use bash or csh shell, above lines must be different.
+If you don't use bash or csh shell, above lines could differ.
 
 
 Upgrading
 =========
-If you upgrade from version <= 0.9, please remove `~/.lfmrc` to regenerate
-a valid configuration file.
+If you upgrade from any older versions, please remove first `~/.lfmrc` to 
+regenerate a valid configuration as file format has changed. I advise you 
+to make a backup copy before.
+
+Also, note that some keys have changed since previous versions. 
+Read carefully following section.
 
 
 Keys
 ====
-Though most of keys are the same as in mc_, some differs.
-Here you have the complete list:
+These are the complete list of key bindings:
 
 + **Movement**
-    - cursor_up, p, P
-    - cursor_down, n, N
-    - previous page, backspace, Ctrl-P
-    - next page, space, Ctrl-N
-    - home: first file
-    - end: last file
+    - cursor_up, k, K
+    - cursor_down, j, J
+    - previous page, backspace, Ctrl-B
+    - next page, space, Ctrl-F
+    - home, Ctrl-A: first file
+    - end, Ctrl-E: last file
     - cursor_left: upper dir
     - cursor_right: enter dir / vfs
     - g, G: go to directory
     - Ctrl-S: go to file in current panel
     - 0..9: go to bookmark #
-    - Ctrl-D: select bookmark # from menu
+    - Ctrl-D, Ctrl-\\: select bookmark # from menu
     - b, B: set bookmark #
 
-+ **Panels**
-    - tab: other panel
-    - .: toggle 1/2 panels
-    - ,, Ctrl-U: change panels position (left->right, right->left)
-    - =: show same directory in both panels
++ **Panes**
+    - tab: other pane
+    - .: toggle 1/2 panes
+    - ,: Ctrl-U: change panes position (left->right, right->left)
+    - =: show same directory in both panes
+
++ **Tabs**:
+    - :: new tab
+    - !: close tab
+    - <: go to left tab
+    - >: go to right tab
 
 + **Selections**
     - insert: select item and go to next file
@@ -169,17 +200,17 @@ Here you have the complete list:
     - -: deselect group
     - \*: invert selection
 
-+ **Files / Dirextories operations**
++ **Files / Directories operations**
     - t, T: touch file
     - l, L: create link
     - Ctrl-L: edit link
-    - v, V, F3: view file
-    - e, E, F4: edit file
-    - c, C, F5: copy file/dir/selection
-    - m, M, F6: move file/dir/selection
-    - r, R: easy way to rename file/dir/selection
+    - F3: view file
+    - F4: edit file
+    - F5: copy file/dir/selection
+    - F6: move file/dir/selection
+    - F12: easy way to rename file/dir/selection
     - F7: make directory
-    - d, D, F8, del: delete file/dir/selection
+    - F8, del: delete file/dir/selection
     - enter: execute file, enter dir / vfs or view 'specially' depending on the extension of the regular file. It is executed in a thread that can be stopped and captures output
     - i, I: show file info
 
@@ -187,32 +218,34 @@ Here you have the complete list:
     - #: show directories size
     - s, S: sort files
     - /: find/grep files
-    - @: do something on file. Output is not captured, it is also not executed in a thread
+    - @: do something on file. Output is not captured
     - Ctrl-O: open shell. Type 'exit' to return to lfm
     - Ctrl-T: tree
-    - f, F, F2: file menu
-        - @: Do something on file(s)
-        - i: File(s) info
-        - p: Change file permissions, owner, group
-        - g: Gzip/gunzip file(s)
-        - b: Bzip2/bunzip2 file(s)
-        - x: Uncompress .tar.gz, .tar.bz2, .tar.Z
-        - u: Uncompress .tar.gz, etc in other panel
-        - c: Compress directory to .tar.gz
-        - d: Compress directory to .tar.bz2
+    - F2: file menu
+        - @: do something on file(s)
+        - i: file(s) info
+        - p: change file permissions, owner, group
+        - g: gzip/gunzip file(s)
+        - b: bzip2/bunzip2 file(s)
+        - x: uncompress .tar.gz, .tar.bz2, .zip, .rar
+        - u: uncompress .tar.gz, etc in other panel
+        - c: compress directory to .tar.gz
+        - d: compress directory to .tar.bz2
+        - z: compress directory to .zip
+        - r: compress directory to .rar 
     - F9: general menu 
-        - /: Find/grep file
+        - /: find/grep file
         - #: show directories size
         - s: sort files
         - t: tree
         - f: show filesystems info
         - o: open shell
         - c: edit configuration
-        - a: save configuration
+        - r: regenerate programs
     - Ctrl-R: refresh screen
     - h, H, F1: help
     - q, Q, F10: exit changing to current path
-    - x, X: quit
+    - Ctrl-Q: quit
 
 
 + Keys in *EntryLine* window:
@@ -220,29 +253,29 @@ Here you have the complete list:
     - enter: return path
     - tab: change to next entry or button
     - Ctrl-T: complete
-    - Ctrl-W: delete leftwards until /
+    - Ctrl-W: delete leftwards until / or beginning
     - Ctrl-D: delete all
     - left, right, home, end, backspace, del, insert, ...
     - Ctrl-C, ESC: quit
 
 + Keys in *SelectItem* window:
-    - up, p, P
-    - down, n, N
-    - next page, space
-    - previous page, backspace
-    - home
-    - end
+    - up, k, K
+    - down, j, J
+    - previous page, backspace, Ctrl-B
+    - next page, space, Ctrl-F
+    - home, Ctrl-A
+    - end, Ctrl-E
     - Ctrl-S: go to file/dir
     - enter: return path
     - Ctrl-C, q, Q, ESC: quit
 
 + Keys in *Tree* panel:
-    - up, p, P: up within current depth, without going out from directory
-    - down, n, N: down within current depth, without going out from directory
-    - previous page, backspace, Ctrl-P: same as up but page-size scroll
-    - next page, space, Ctrl-N: same as down but page-size scroll
-    - home: first directory
-    - end: last directory
+    - down, j, K: down within current depth, without going out from directory
+    - up, k, K: up within current depth, without going out from directory
+    - previous page, backspace, Ctrl-B: same as up but page-size scroll
+    - next page, space, Ctrl-F: same as down but page-size scroll
+    - home, Ctrl-A: first directory
+    - end, Ctrl-E: last directory
     - left: go out from directory
     - right: enter in directory
     - enter: return changing to directory
@@ -254,54 +287,76 @@ VFS
 You can navigate inside some special files (known as vfs files in lfm) just 
 *entering into* them (press *enter* or *cursor_right* when the cursor bar is
 over one of these files). By now, supported types are `.tar.gz`,
-`.tar.bz2` and `.zip` files. 
+`.tar.bz2`, `.zip` and `.rar` files. 
 
 The virtual directory name ('path_to_vfs_file#vfs/dir') is not propagated, so 
 tmpdir (`/tmp/@6421.2/dir`) is showed in the copy/move/... dialogs or when
 view/edit/... a file, but this is just an estetic issue.
 
-When returning from one of such vfs files, a question dialog is showed to
-allow you regenerate the vfs file (i.e., it is recompressed, so it could be
-slow in some machines) to update all modifications, but `lfm` checks if it can
-first, to avoid waste of time. This behaviour (rebuild or not rebuild, ask it
-or not) can be modified in the configuration file. By default the question is
-showed but it's set to *don't regenerate vfs*.
+When returning from one of such vfs files, a question dialog appears asking to
+allow you to regenerate the vfs file and update all changes (i.e., it is 
+compressed again, so it could be slow in some machines), but `lfm` checks if it 
+can do first, to avoid waste of time. This behaviour (rebuild or not rebuild, ask 
+it or not) can be modified in the configuration file. By default the question is
+showed but it's set to *not regenerate vfs*.
 In case of `panelize` vfs type (after find/grep), deleted / moved files
 are not deleted / moved in real path.
 
 
 History
 =======
-Some years ago I began to write a program like this in C, but after
+Many many years ago I began to write a program like this in C, but after
 some weeks of coding I never finished it... I'm too lazy, yes.
-Now, once I saw the light, I started writing `lfm` to learn python_.
+Then I saw the light and I started writing `lfm` to learn python_.
+
+Code evolved and application got more and more features, used by many
+people around the world on different UNIX systems.
+
+But after the release of version 0.91 (June 2004) they were not more releases.
+Not that I had stopped working on *lfm*, new code was written, tested,
+rewritten again... silently... but different reasons made me to postpone public
+releases... code refactoring, a new essential feature, source cleaning,
+a wedding, a child, ahem... more code refactoring....
+
+Anyway, from now on I'll do my best to release often.
 
 
 Thanks
 ======
 Thanks are obviously due to the whole python community, specially to GvR 
 (of course! ;-) and all the people who answered my questions in c.l.p.
+
 It's a great pleasure to code in a language like this.
 
 Alexei Gilchrist, for his cfm program from which I took some ideas.
 
 Midnight Commander developers, whose program was the guide.
 
-[This documentation has generated with `reStructuredText`__]
+And also to all the people who have contributed with ideas, reporting
+bugs and code over these years: Antoni Aloy, Sebastien Bacher, Witold
+Bołt, Fabian Braennstroem, Ondrej Certik, Kevin Coyner, Tim Daneliuk,
+Mike Dean, Christian Eichert, Steve Emms, Stephen R. Figgins, Ana
+Beatriz Guerrero Lopez, Tjabo Kloppenburg, Zoran Kolic, Max Kutny,
+Bartosz Oler, Piotr Ozarowski, Jerome Prudent, Mikhail Ramendik, Rod,
+Daniel T. Schmitt, Robin Siebler, Andrey Skvortsov, Espartaco Smith,
+Jörg Sonnenberger, Tim Terlegård, Edd Thompson, Walter van den Broek,
+Alejandro Weil and many others...
+You have made posible to run *lfm* in all those platforms!
 
 
-.. _sources: lfm-0.91.tar.gz
+
+.. _sources: lfm-2.0.tar.gz
 .. _README.pyview: README.pyview.html
+.. _TODO: TODO
 .. _NEWS: NEWS
 .. _ChangeLog: ChangeLog
 .. _COPYING: COPYING
 .. _GPL: http://www.gnu.org/licenses/licenses.html#GPL
 .. _mc: http://www.ibiblio.org/mc/
 .. _python: http://www.python.org
-.. _reST: http://docutils.sourceforge.net/rst.html
 __ GPL_
 __ mc_
-__ reST_
+.. _lfm-2.0.tar.gz: lfm-2.0.tar.gz
 .. _lfm-0.91.tar.gz: lfm-0.91.tar.gz
 .. _lfm-0.9.tar.gz: lfm-0.9.tar.gz
 .. _lfm-0.8.tar.gz: lfm-0.8.tar.gz

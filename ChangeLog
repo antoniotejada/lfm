@@ -1,3 +1,820 @@
+Mon Sep  3 23:03:32 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/__init__.py: version 2.0
+	* lfm/lfm.py:
+	* setup.py:
+	* PKG-INFO: 
+
+Mon Sep  3 22:59:56 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* README: update documentation to describe new features, changes, etc
+	* README.pyview: 
+	* NEWS:
+	* TODO:
+	* lfm.1: 
+	* pyview.1: 
+
+Sun Sep  2 20:12:56 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/config.py: added new file types extensions
+
+Sun Sep  2 17:23:01 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (findgrep): panelize: clean code
+
+Sun Sep  2 17:13:43 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (__do_change_perms): refactor: new function
+
+Sun Sep  2 17:05:56 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (show_dirs_size): simplify code
+
+Sun Sep  2 16:02:15 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/pyview.py (PyView.run): fix bug: goto line/byte 0
+
+Sat Sep  1 15:57:56 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/pyview.py (PyView): use standard lib logging module in debug
+	messages
+
+Sat Sep  1 15:53:16 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/pyview.py (FileView.show_text_wrap): simplify and clean code
+	* lfm/pyview.py (FileView.show_text_nowrap): 
+	* lfm/pyview.py (FileView.show_hex): 
+	* lfm/pyview.py (FileView.run): 
+
+Sat Sep  1 13:36:40 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/pyview.py (FileView.show_str): fix bug: sometimes a blank
+	space was added
+
+Fri Aug 31 23:53:11 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/messages.py (EntryLine.manage_keys): refresh app display
+	after canceling completion
+
+Fri Aug 31 23:48:01 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/messages.py (cursor_show2): move from lfm.py
+	* lfm/messages.py (cursor_show): 
+	* lfm/messages.py (cursor_hide): 
+
+Fri Aug 31 13:23:46 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/files.py (__do_sort): fix bug: "sort_mix_cases = 1 
+	performance degrades on larger dirs". Reported by Andrey
+	Skvortsov. This speeds up loading directory contents quite a lot
+	
+Fri Aug 31 10:32:45 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/files.py: move all constants to the top of the module
+
+Fri Aug 31 10:26:43 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/files.py (get_rdev): clean code
+
+Fri Aug 31 02:02:34 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/files.py (mkdtemp): use more secure tempfile.mkdtemp
+	* lfm/vfs.py (init): use files.mkdtemp
+	* lfm/vfs.py (copy): 
+	* lfm/vfs.py (pan_init): 
+	* lfm/vfs.py (pan_copy): 
+	* lfm/files.py (mktemp): use more secure tempfile.mkstemp
+	* lfm/pyview.py (create_temp_for_stdin): 
+	* lfm/vfs.py (regenerate_file): as files.mktemp calls
+	tempfile.mkstemp we don't need modify mask too
+
+Fri Aug 31 01:20:55 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (do_change_perms): refactoring: new function
+
+Thu Aug 30 23:36:10 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (cursor_right): now pressing cursor_right 
+	is the same as pressing enter
+
+Thu Aug 30 22:37:06 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (Tree.run): fix bug: catch window resize
+	* lfm/actions.py (Tree.__calculate_dims): refactor method
+
+Thu Aug 30 20:01:55 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (touch_file): fix bug: escape filenames
+	with chars $ ". Reported by Andrey Skvortsov
+	* lfm/actions.py (open_shell): 
+	* lfm/actions.py (do_special_view_file): 
+	* lfm/actions.py (do_view_file): 
+	* lfm/actions.py (do_edit_file): 
+	* lfm/actions.py (do_execute_file): 
+	* lfm/actions.py (do_something_on_file): 
+	* lfm/actions.py (do_show_file_info.show_info): 
+
+Thu Aug 30 18:30:26 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Vfs.get_file): refactoring: new method
+	* lfm/lfm.py (Vfs.get_fullpathfile): refactoring: new method
+	* lfm/utils.py (get_escaped_filename): refactoring: new functions
+	* lfm/utils.py (get_escaped_command): 
+	* lfm/utils.py (run_on_current_file): 
+
+Thu Aug 30 16:41:43 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/pyview.py (FileView.__init__): fix bug: pyview messages.py 
+	couldn't access window dimensions so it crashed
+	* lfm/pyview.py (InternalView.__init__):
+
+Thu Aug 30 11:35:32 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (usage): make error message more visible
+
+Thu Aug 30 11:30:15 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm: check python version 2.3 or higher
+	* lfm/pyview: check python version 2.3 or higher
+
+Thu Aug 30 11:13:49 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Pane.load_tabs_with_paths): fix bug: don't show ugly
+	traceback crash when user starts "lfm path" and has no permissions
+	to enter. Show error message and default to current directory
+	* lfm/lfm.py (TabVfs.init): propagate error back
+
+Thu Aug 30 10:20:44 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (lfm_start): modified the sequence in which tabs are
+	created and filled with path contents. Prepare code to support
+	sessions in a future
+	* lfm/lfm.py (main): 
+	* lfm/lfm.py (Lfm.__init__): pane contents are not filled in the
+	constructor anymore. Lfm.load_paths must be called explicitly
+	* lfm/lfm.py (Lfm.load_paths): new method
+	* lfm/lfm.py (Pane.load_tabs_with_paths): new method
+	* lfm/lfm.py (Pane.__init__): 
+	* lfm/lfm.py (TabVfs.__init__): self.init is not called in the
+	constructor anymore. Pane.load_tabs_with_paths must be called
+	explicitly
+
+	* lfm/lfm.py (Vfs.init_dir): the awful hack used here to get
+	preferences the first time is not needed anymore
+	* lfm/lfm.py (TabVfs.init): 
+
+Thu Aug 30 01:56:17 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_findgrep): escape '-' character in grep patterns
+
+Thu Aug 30 01:51:36 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/config.py: back to original '.lfmrc' configuration file name
+
+Thu Aug 30 01:28:11 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Vfs.enter_dir): Refactor code from actions.py to
+	these new methods
+	* lfm/lfm.py (Vfs.exit_dir): 
+	* lfm/actions.py (cursor_left): 
+	* lfm/actions.py (cursor_right): 
+	* lfm/actions.py (enter): 
+
+	* lfm/lfm.py (Vfs.enter_dir): fix bug: "if you try to enter a
+	directory with insufficient permissions, after the error message
+	is closed the cursorline refreshes to the first line""
+	This bug was first observed by Andrey, fixed by me
+
+Thu Aug 30 01:13:13 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Vfs.init): mark method as virtual
+
+Thu Aug 30 00:57:20 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Vfs.init_dir): error dialog must be in UI class
+	* lfm/lfm.py (TabVfs.init):
+
+Wed Aug 29 17:41:26 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/messages.py (CommonWindow.__init__): change curses.COLS and
+	curses.LINES by app.maxw and app.maxh fixing the position of
+	dialogs in maximized terminals.
+	Curses.{COLS|LINES} are constants defined at curses library start
+	and they don't modify their values when window resizes
+	* lfm/messages.py (FixSizeCommonWindow.__init__): 
+	* lfm/messages.py (FixSizeProgressBarWindow.__init__):
+	* lfm/messages.py (FixSizeProgressBarWindow.show):
+	* lfm/messages.py (Yes_No_Buttons.__init__): 
+	* lfm/messages.py (Entry.__init__): 
+	* lfm/messages.py (get_a_key):
+	* lfm/messages.py (confirm):
+	* lfm/messages.py (confirm_all(:)
+	* lfm/messages.py (confirm_all_none):
+	* lfm/messages.py (DoubleEntry):
+	* lfm/messages.py (SelectItem):
+	* lfm/messages.py (FindfilesWin):
+	* lfm/messages.py (MenuWin):
+	* lfm/messages.py (ChangePerms):
+	
+Mon Aug 27 23:07:24 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (StatusBar.display): fix crashes when filenames are
+	not encoded with same codec than LC tells us
+	* lfm/lfm.py (Pane.display_tabs): 
+	* lfm/lfm.py (Pane.display_files): 
+	* lfm/lfm.py (Pane.get_fileinfo_str_short): 
+	* lfm/lfm.py (Pane.get_fileinfo_str_long): 
+	* lfm/utils.py (encode): util functions to encode/decode filenames
+	* lfm/utils.py (decode): 
+
+Mon Aug 27 21:11:06 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Pane.manage_keys): the most expected fix to the
+	problems when maximizing windows. It was a stupid
+	curses.doupdate() missed. Andrey Skvortsov did it again!
+	Thanks, I ought you a beer.
+
+Mon Aug 27 20:56:52 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/__init__.py:  support locale. Andrey Skvortsov
+	* lfm/lfm.py (StatusBar.display):
+	* lfm/lfm.py (Pane.display_tabs): 
+	* lfm/lfm.py (Pane.display_files): 
+	* lfm/lfm.py (Vfs.get_fileinfo_str_short): 
+	* lfm/lfm.py (Vfs.get_fileinfo_str_long): 
+	
+Mon Aug 27 20:03:50 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Pane.__calculate_dims): right pane fill to the
+	last column in terminal if their number is odd. Andrey Skvortsov
+	* lfm/lfm.py (Pane.__calculate_columns): 
+
+Mon Aug 27 19:58:02 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Lfm.quit_program): refactoring: new method
+
+Mon Aug 27 17:52:18 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (select_group): clean code. Andrey Skvortsov
+
+Mon Aug 27 17:20:02 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Vfs.get_fileinfo_str_short): clean code
+	* lfm/lfm.py (Vfs.get_fileinfo_str_long): 
+
+Mon Aug 27 16:53:50 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Pane.display_files): colorize by files
+	extension. By Andrey Skvortsov
+	* lfm/lfm.py (Pane.get_filetypecolorpair): new function
+	* lfm/lfm.py (Lfm.init_ui): added colors for files by extension
+	* lfm/config.py: added option color_files
+	* lfm/config.py: added colors for fiels by extension
+
+Mon Aug 27 16:42:12 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Pane.display_files): replace old code with Andrey's
+	beautiful and clean code'
+	* lfm/lfm.py (Pane.__calculate_scrollbar_dims): 
+
+Mon Aug 27 13:47:36 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/config.py (load): consider path expand. Andrey Skvortsov
+
+Mon Aug 27 13:40:55 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (new_tab): Correct English messages. 
+	Andrey Skvortsov
+	* lfm/actions.py (close_tab): 
+
+Mon Aug 27 12:41:26 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/compress.py (PackagerTBZ2): user -i (--ignore-zeros) flag to 
+	avoid spureous warnings. Andrey Skvortsov
+	* lfm/compress.py (PackagerTGZ): 
+
+Tue Jul 31 01:19:11 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/files.py (get_fs_info): fix crash when "df" shows entries in
+	two different lines (dev is too large, f.e. in lvm2 volumes)
+
+Tue Jul 31 00:17:22 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Vfs.__init__): fix a stupid bug
+
+Tue Jul 31 00:12:16 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Lfm.run): simplify code
+	* lfm/lfm.py (Pane.init_ui): 
+	* lfm/lfm.py (Pane.display_tabs): 
+	* lfm/lfm.py (Pane.display_cursorbar): 
+
+Mon Jul 30 23:11:09 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Lfm.init_ui): rewrite code to not repeat default
+	colors in config.py
+
+Mon Jul 30 12:25:15 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/messages.py (EntryLine.manage_keys): added keycode 127, 
+	as konsole interprets backspace as such, again Andrey Skvortsov
+
+Mon Jul 30 11:57:39 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Pane.manage_keys): python suggests to use while 1 
+	to while True in speed sensitive routines. Nicely noticed by
+	Andrey Skvortsov
+
+Mon Jul 30 11:54:53 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/compress.py (PackagerZIP): zip flag needs to be -q instead 
+	of -X, catched by Andrey Skvortsov
+
+Mon Jul 30 11:52:07 2007  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/vfs.py (exit): 'ans' variable initilization was missing,
+	catched by Andrey Skvortsov
+
+Sat May 14 00:10:45 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (do_execute_file): fixed bug
+
+Fri May 13 00:32:59 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_findgrep): fixed stupid bug, status was missing
+
+Fri May 13 00:24:46 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (IPC): new InterProcessCommunication API
+	* lfm/utils.py (ProcessBaseLoop): use IPC class, clean code
+	* lfm/utils.py (ProcessFunc): use IPC class, clean code
+
+Thu May 12 23:50:37 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (show_dirs_size):
+	FIXED BUG: if stopped by user len(results) < len(dirs)
+
+Thu May 12 00:20:21 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (ProcessBaseLoop.check_keys): fixed bug
+
+Mon May  9 00:21:39 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (run_thread): old API deleted
+	* lfm/utils.py (ProcessLoop): old API deleted
+
+Mon May  9 00:17:28 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/vfs.py (init): adapted to new ProcessFunc, code cleaned, 
+	improved error handling
+	* lfm/vfs.py (regenerate_file): 
+
+Mon May  9 00:14:00 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_compress_uncompress_file): cleaned and
+	rewritten to use ProcessUnCompressLoop
+	* lfm/utils.py (compress_uncompress_file): 
+	* lfm/utils.py (do_uncompress_dir): 
+	* lfm/utils.py (uncompress_dir): 
+	* lfm/utils.py (do_compress_dir): 
+	* lfm/utils.py (compress_dir): 
+
+Sun May  8 23:55:20 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_findgrep): adapted to new ProcessFunc, code
+	cleaned, improved error handling
+	* lfm/utils.py (do_find): 
+
+Sun May  8 23:49:47 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (findgrep): improve errors handling
+
+Sun May  8 23:43:23 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (do_execute_file): use new ProcessFunc
+
+Sun May  8 23:41:37 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (ProcessFunc): cleaned and improved
+	* lfm/utils.py (run_shell): cleaned and improved
+
+Sun May  8 23:40:11 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (show_dirs_size): use ProcessDirSizeLoop
+	* lfm/actions.py (do_show_dirs_size): 
+
+Sun May  8 23:38:45 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (copy): cleaned and rewritten to use Process*Loop API
+	* lfm/actions.py (move): 
+	* lfm/actions.py (rename): 
+	* lfm/actions.py (delete): 
+
+Sun May  8 23:01:29 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/files.py (copy): code cleaning and function arguments arranged
+	* lfm/files.py (move): 
+	* lfm/files.py (delete): 
+
+Sun May  8 22:27:22 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (ProcessBaseLoop): new base virtual class
+	* lfm/utils.py (ProcessDirSizeLoop: new API
+	* lfm/utils.py (ProcessUnCompressLoop): 
+	* lfm/utils.py (ProcessCopyMoveLoop): 
+	* lfm/utils.py (ProcessRenameLoop): 
+	* lfm/utils.py (ProcessDeleteLoop): 
+
+Sun May  1 16:42:41 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (ProcessLoop.show_win): use progressbar window
+	* lfm/utils.py (ProcessLoop.process_output): 
+
+	* lfm/messages.py (FixSizeProgressBarWindow): new dialog
+	* lfm/messages.py (winprogress_nokey): wrapper for FixSizeProgressBarWindow
+
+Sun May  1 01:18:47 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_uncompress_dir): 
+	* lfm/utils.py (do_compress_dir): 
+	FIXED BUG: delete garbage if user stops process
+	* lfm/compress.py (PackagerBase.delete_uncompress_temp): 
+	* lfm/compress.py (PackagerBase.delete_compress_temp): 
+	* lfm/vfs.py (exit): 
+	* lfm/vfs.py (regenerate_file): 
+
+Sun May  1 00:19:23 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (ProcessFunc.check_keys): fixed typo
+
+Sat Apr 30 22:54:28 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (do_special_view_file): use run_dettached
+	and don't show crap messages from started app
+	* lfm/utils.py (run_dettached): new function
+
+Sat Apr 30 16:55:14 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_findgrep): 
+	FIXED BUG: special chars should be escaped, f.e. \ ( ) [ ]
+
+Sat Apr 30 16:25:36 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (enter): 
+	FIXED BUG: "enter" tries to create a vfs from a simple
+	bzipped or gzipped file
+
+Sat Apr 30 13:12:08 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_find): FIXED BUG: crashed when no results
+	* lfm/utils.py (do_findgrep): 
+
+Fri Apr 29 00:55:47 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (create_link): fixed a bug
+
+Fri Apr  1 00:02:14 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_findgrep): 
+	FIXED BUG: when found a match in a binary file, the output text is
+	not formatted in the way we wanted
+
+Wed Mar 30 22:42:44 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/files.py (get_fileinfo_dict): fixed a typo
+
+Wed Mar 30 21:40:13 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_findgrep): using new ProcessFunc and run_shell
+	* lfm/utils.py (do_find): 
+
+	* lfm/utils.py (do_compress_uncompress_file): using new
+	ProcessFunc and run_shell
+	* lfm/utils.py (do_uncompress_dir): 
+	* lfm/utils.py (do_compress_dir): 
+	* lfm/utils.py (compress_uncompress_file): using new ProcessLoop
+	* lfm/utils.py (uncompress_dir): 
+	* lfm/utils.py (compress_dir): 
+
+	* lfm/vfs.py (init): using new utils.do_uncompress_dire
+	* lfm/vfs.py (regenerate_file): using new ProcessFunc
+
+	* lfm/actions.py (show_dirs_size): using new ProcessLoop
+	* lfm/actions.py (do_execute_file): using new ProcessFunc
+
+Wed Mar 30 21:34:30 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (ProcessLoop): rewritten
+	* lfm/utils.py (ProcessFunc): rewritten
+	* lfm/utils.py (run_shell): rewritten, to be executed inside ProcessFunc
+
+Wed Mar 30 21:31:51 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (ProcessBase): removed
+	* lfm/utils.py (ProcessShell): removed, run_shell inside ProcessFunc
+
+Wed Mar 30 21:27:20 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (delete): cosmetic changes
+
+Tue Mar 29 23:28:07 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/messages.py (confirm_all): add a skip_all option
+	* lfm/messages.py (confirm_all): fix a silly bug ord 
+	* lfm/messages.py (confirm): 
+
+Mon Mar 28 03:26:25 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (compress_uncompress_file): now use ProcessLoop
+	* lfm/utils.py (uncompress_dir): 
+	* lfm/utils.py (compress_dir): 
+
+Mon Mar 28 03:26:14 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_compress_uncompress_file): now use ProcessShell
+	* lfm/utils.py (do_uncompress_dir): 
+	* lfm/utils.py (do_compress_dir): 
+	* lfm/utils.py (do_findgrep): 
+	* lfm/utils.py (do_find): 
+	* lfm/actions.py (do_execute_file):
+	* lfm/vfs.py (regenerate_file):
+
+Mon Mar 28 03:23:53 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (ProcessBase.init_gui): obbey gui flag
+	* lfm/utils.py (ProcessBase.end_gui): 
+	* lfm/utils.py (ProcessBase.show_win): 
+	* lfm/utils.py (ProcessBase.animate_cursor): 
+	* lfm/utils.py (ProcessBase.check_keys): 
+
+Mon Mar 28 03:22:57 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (ProcessShell): execute a shell command.
+	Obsoletes run_shell function
+
+Thu Mar 24 01:31:47 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (show_dirs_size): use ProcessLoop
+	* lfm/actions.py (do_show_dirs_size): 
+
+Thu Mar 24 01:29:06 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (ProcessBase): abstract class to execute functions
+	or commands in background. It will obsolete run_thread, run_shell
+	and run_loop
+	* lfm/utils.py (ProcessFunc): execute a function
+	* lfm/utils.py (ProcessLoop): execute a loop
+
+Thu Mar 24 01:26:47 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (loop_child_process): function name changed,
+	"child_process" is now "loop_child_process"
+	* lfm/utils.py (run_loop): use "loop_child_process"
+	* lfm/utils.py (get_shell_output): delete old debug print 
+	* lfm/utils.py (get_shell_output2): delete old debug print
+
+Wed Mar 23 01:06:46 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (do_execute_file): use run_shell
+	* lfm/actions.py (do_do_execute_file): removed, not needed anymore
+
+Wed Mar 23 00:08:20 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (show_dirs_size): function rewritten using 
+	run_loop, but don't work as child can't modify app data
+	* lfm/actions.py (do_show_dirs_size): new function
+
+Tue Mar 22 22:03:17 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (show_dirs_size): clean code
+	* lfm/files.py (__get_size): use get_shell_output2
+	* lfm/files.py (get_fileinfo): pardir_flag and show_dirs_size 
+	are boolean now, not int
+	* lfm/utils.py (get_shell_output2): new function
+	get output from a command run in shell, no stderr
+
+Tue Mar 22 21:04:44 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (findgrep): clean code
+	* lfm/utils.py (do_findgrep): clean code, call run_shell now
+	* lfm/utils.py (do_find): 
+
+Tue Mar 22 21:01:03 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (run_shell): added return_output flag
+	if true return output, else return status
+
+Tue Mar 22 20:00:33 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/__init__.py (sysprogs): added xargs
+
+Tue Mar 22 17:49:16 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/files.py: moved 'findgrep' and 'find' functions to utils.py
+	* lfm/utils.py (do_findgrep): moved function from files.py,
+	name changed to avoid collision
+	* lfm/utils.py (do_find): moved function from files.py,
+	name changed to avoid collision
+	* lfm/actions.py (findgrep): use functions from utils.py
+
+Tue Mar 22 17:30:57 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (get_shell_output): moved from old files.py:exec_cmd2
+	* lfm/files.py (exec_cmd2): moved to utils.py:get_shell_output
+	* lfm/files.py (exec_cmd): removed function
+	* lfm/preferences.py (Preferences.check_progs): 
+	use utils.py:get_shell_output
+
+Tue Mar 22 17:10:01 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/__init__.py (sysprogs): added find, grep, egrep, which
+	* lfm/__init__.py (defaultprogs): removed find, grep, egrep
+	* lfm/actions.py (findgrep): use 'find' and 'egrep' 
+	from __init__.py:sysprogs
+
+Tue Mar 22 16:51:34 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/__init__.py (sysprogs): hardcoding is a bad idea
+	"tar, bzip2, gzip, zip, unzip, rar, grep, find" defined here
+	* lfm/compress.py: use __init__.py:sysprogs
+	* lfm/pyview.py (FileView.__find): use __init__.py:sysprogs
+
+Tue Mar 22 14:30:13 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/pyview.py (FileView.__init__): grep is harcoded now, 
+	no need to look for it => faster start
+	* lfm/pyview.py (FileView.__find): changed os.popen for os.popen3
+	to capture error if grep is not found
+	* lfm/pyview.py (exec_cmd): removed, not needed anymore
+
+Tue Mar 22 13:23:20 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/vfs.py (init): 
+	FIXED BUG: make this work after last changes in run_shell 
+	* lfm/vfs.py (regenerate_file): 
+
+Tue Mar 22 13:03:57 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (run_shell): changes to run inside run_loop
+	* lfm/utils.py (do_compress_uncompress_file): 
+	* lfm/utils.py (do_uncompress_dir): 
+	* lfm/utils.py (uncompress_dir): 
+	* lfm/utils.py (do_compress_dir): 
+	* lfm/utils.py (compress_dir): 
+
+Tue Mar 22 13:03:09 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (run_loop): new API to execute a function for
+	each element in a list
+	* lfm/utils.py (child_process): 
+
+Tue Mar 22 13:02:53 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (run_thread): some stylist changes
+
+Mon Mar 21 23:34:33 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/messages.py (EntryLine.show): 
+	FIXED BUG: EntryLine wasn't showed completely
+
+Mon Mar 21 23:24:41 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/pyview.py (InternalView.init_curses): 
+	FIXED BUG: crash in file info if long file name
+
+Mon Mar 21 22:59:26 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (LfmApp): 
+	FIXED BUG: "lfm path1 path2" didn't work because shell lfm
+	function returned a string of args instead of a list which is
+	what we were asking for
+
+Mon Mar 21 01:03:32 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (general_menu): new option: Regenerate programs
+	removed option: Save config, it's superfluous
+	* lfm/preferences.py (Preferences.__init__): 
+	don't use defaultprogs directly, make a copy instead,
+	so we could regenerate them
+
+Mon Mar 21 00:57:46 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Lfm.__init__): 
+	don't check default programs at start so start is faster now
+
+Sun Mar 20 23:51:36 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/__init__.py (defaultprogs): tar, gzip, bzip2, zip, unzip
+	removed, these are system programs and must exist, so we don't 
+	check for them
+
+Sun Mar 20 21:24:00 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (run_shell): show error
+	FIXED BUG: get error if program finishes prematuraly
+
+Sun Mar 20 19:38:55 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* setup.py (setup): added forgotten lfm/compress
+
+Sun Mar 20 18:04:30 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (run_shell): new function to execute command
+	in shell, run_thread will be obsoleted
+
+Sun Mar 20 17:59:19 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/vfs.py (init):  updated to new compressing API, nicer code
+	* lfm/vfs.py (exit): 
+	* lfm/vfs.py (regenerate_file): 
+
+Sun Mar 20 17:50:59 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (cursor_right): updated to new compression API
+	* lfm/actions.py (enter): 
+	* lfm/actions.py (file_menu): added RAR un/compression
+
+Sun Mar 20 17:46:15 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (do_compress_uncompress_file): update to new
+	compression API
+	* lfm/utils.py (compress_uncompress_file): 
+	* lfm/utils.py (do_uncompress_dir): 
+	* lfm/utils.py (uncompress_dir): 
+	* lfm/utils.py (do_compress_dir): 
+	* lfm/utils.py (compress_dir): 
+
+Sun Mar 20 17:46:15 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/compress.py: new source file, un/compressing staff
+	The new API is more modular and easier to use
+	Supported packagers: TBZ2, BZ2, TGZ, GZ, ZIP, RAR
+
+Sun Mar 20 17:43:24 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/utils.py (run_thread): 
+	FIXED BUG: args passed to messages.win_nokey
+
+Sun Mar 20 17:42:04 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/__init__.py (DATE): updated
+
+Sat Mar 19 15:34:05 2005  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* default.css: new file: style sheet to build html docs 
+	
+Thu Oct 14 00:45:57 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/vfs.py (init): 
+	FIXED BUG: stopping vfs creation, doesn't return to original dir
+	
+Thu Oct 14 00:05:30 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (general_menu): 
+	FIXED BUG: reload configuration after modifying it
+
+Thu Oct 14 00:00:55 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/messages.py (win): fixed a typo
+
+Wed Oct 13 23:59:23 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Panel.manage_keys): speed up cursor move and try not
+	to waste much CPU
+
+Mon Aug  2 00:28:37 2004  Iñigo Serna  <inigoserna@telefonica.net>
+	* lfm/lfm.py.ok: deleted old files
+	* patches/*:
+
+Mon Jul 26 18:20:06 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* setup.py: man pages must be installed in $PREFIX/share/man
+
+Wed Jul 21 19:26:38 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/files.py (fix_chars_in_filename): 
+	FIX for debian bug #260401: some chars in filename make lfm crash
+	see http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=260401
+	for more info
+	* lfm/files.py (get_fileinfo_dict): use fix_chars_in_filename
+	* lfm/lfm.py (Lfm.__show_bars): 
+
+
+Sat Jul  3 11:45:28 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm.1, pyview.1: man files, thanks to Sebastien Bacher for them
+	* setup.py: more metadata for pypi, install man files
+
+Fri Jul  2 00:50:01 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Panel.__get_fileinfo_str_long): limit length of
+	owner and group strings
+
+Thu Jul  1 11:50:52 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/messages.py (MenuWin.__init__): fixed another crash because
+	of fucking curses.cur_set() returning ERR
+
 Wed Jun 30 22:24:05 2004  Iñigo Serna  <inigoserna@telefonica.net>
 
 	* setup.py: upgrade to version 0.91

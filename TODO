@@ -1,58 +1,75 @@
+============================================================================
+Last update:	Time-stamp: <2007-09-03 23:28:45 inigo>
+============================================================================
+
 General:
 ========
-High Priority:
-	+ speed up:
-		- copy, move, delete
-	+ historic navigation: mc: Alt-Y / Alt-U : < / >
-	+ scroll bar indicator when copying, moving or deleting
-	+ complex commands, make it configurable:
-		- show directory under cursor in the other panel: mc: Alt+O
-    + write doc section about preferences in .lfmrc
+Medium Priority:
+  + general
+    - use CONSTANTS instead of curses.color_pair(x)
+  + ui
+    - redesign dialogs to fill window dimensions
+    - don't redraw screen after each keystroke
+    - copy/move dialog: use file block-by-block progress bar
+    - tab views:
+      . 2 columns mode
+      . customized: permissions instead of date
+    - rewrite messages.py
+    - investigate if curses.Textbox could be interesting
+  + improvements over present features
+    - symlinks navigation. symlink has to return to a parent dir.
+    - non copied moved / renamed / deleted files should remain selected
+    - recursive chmod chown chgrp. Checkbuttons: recursive, ignore dirs
+    - exclude files (f.e. *.o) to grep
+      . ".#filename" are temporary emacs files/links
+  + new features:
+    - hot-key to toggle hidden files showing: C-h
+    - "save delete" option => move to ~/.Trash
+    - historic navigation: mc: Alt-Y / Alt-U
+    - command line
+      . make command-line run ipython interpreter
+    - global copy/cut/paste between tabs or panes
+    - crypt / hash files
+    - plugins system
 
 Low Priority (maybe some day):
-	+ make sort mode per panel, not globally
-	+ .rpm vfs
-	+ alt+keys
-	+ i18n
-	+ pyview: tab 4/8 chars
-	+ exclude files (f.e. *.o) to grep
+  + keybindings customization
+  + new vfs: .rpm, .deb, .jar, .xpi, .egg
+  + remote vfs: ssh, ftp, smb, webdav
+  + i18n
+  + sessions
+  + pyview: tab 4/8 chars
+  + complex commands, make it configurable:
+    - show directory under cursor in the other panel: mc: Alt+O
+    - exec some command over (selected files) with pattern substitution
+      eg. convert $file $file.jpeg
 
 Very Low Priority (never):
-	+ use optparse instead of getopt
-	+ use logging module for debugging
-	+ mouse
-	+ a gui for configuring colors
+  + mouse support
+  + a gui to configure preferences
 
 
-Bugs:
-=====
-+ vfs: - .tar.gz inside a .tar.gz file (vfs in vfs)
-       - in case of 'panelize' vfs type (after find/grep), deleted / moved 
-         files are not deleted / moved in real path
-       - tmpdir are showed in the copy/move/... dialogs or when view/edit/...
-         a file, instead of vfs dir (this is just a estetic issue)
+Known Bugs:
+===========
++ general:
+  - "lfm path" fails if path contains spaces, caused by shell 'lfm' function
+  - actions.py:
+    . after renaming a file, cursor should be placed over the new file name,
+      but this is not always posible because we don't know new file name
+  - if an error happens while copying/moving/uncompressing/... =>
+    => some rubbish remain in destination
 
-+ lfm.run_thread: sometimes some processes remain as zombies when stopped 
-                  by user or because of an error
++ compress.py:
+  - rar with password halts lfm, because process is waiting for a password =>
+    => timeout if not output and kill the spawned process
+  - recursively chmod +w temp files before deleting
 
-+ keys in Solaris terminal: look at Oleg Broytmann's mail in c.l.p
-on 10 Jul 2001 12:11:39 +0400
-
-
-Hacks:
-======
-+ 'app' global variable is badly carried from function to function
-
-+ Python os.stat doesn't have rdev in returned tuple,
-  which is needed for devices major and minor numbers
-
-+ Idem with 'getmntent' to get filesystem type
-
-+ The first time Panel.__init_dir is executed, it needs to know prefs,
-  so there is a hack to get it working
-
-+ We need to use a shell hack to change the directory after lfm exists
++ vfs.py:
+  - .tar.gz inside a .tar.gz file (vfs in vfs)
+  - tmpdir are showed in the copy/move/... dialogs or when view/edit/...
+    a file, instead of vfs dir (this is just a estetic issue)
+  - in case of 'panelize' vfs type (after find/grep), deleted / moved
+    files are not deleted / moved in real path
 
 
 ============================================================================
-Last update:	Wednesday June 30th, 2004 - 22:19:29 CET
