@@ -1,3 +1,137 @@
+Tue Aug  7 19:43:40 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (VERSION): release of version 0.5
+
+Tue Aug  7 19:02:39 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* setup.py (DOC_FILES): setup.py must install docs
+
+Tue Aug  7 18:23:20 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (__get_size): 'b' is not a valid flag for 'du -s'
+	in solaris, so get Kb and convert to bytes by hand
+
+Mon Aug  6 00:11:18 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (check_compressed_tarfile): new function splitted
+	from uncompress_dir for future uses
+
+Sun Aug  5 20:52:36 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (FindfilesWin.manage_keys): fixed what 'enter'
+	returns
+
+Sun Aug  5 20:28:23 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): implemented 'show filesystems
+	info'
+	* lfm/messages.py (show_fs_info): new function
+	* lfm/files.py (get_fs_info): new function
+
+Sun Aug  5 18:34:32 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* NEWS: added a new file with changes between versions
+
+Sun Aug  5 18:23:11 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (findgrep): fix a bug causing a crash when find and/or
+	grep returns nothing
+
+Sun Aug  5 18:00:02 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (move): when a problem appears while copying files,
+	then don't delete original file but do it with the destination, 
+	because it is only partially written
+
+Mon Jul 23 21:27:10 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): change x and q behaviour when
+	exiting. Now x exits to dir. in panel, q not
+
+Mon Jul 23 20:56:18 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (do_something_on_file): 
+	* lfm/lfm.py (compress_uncompress_file): 
+	* lfm/lfm.py (uncompress_dir): 
+	* lfm/lfm.py (compress_dir): 
+	* lfm/lfm.py (show_dirs_size): 
+	* lfm/lfm.py (findgrep): 
+	* lfm/lfm.py (sort): new functions to simplify Panel.manage_keys
+
+Mon Jul 23 01:21:35 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): implement 'p' in file menu:
+	change permissions, owner or group
+	* lfm/messages.py (ChangePerms): new window class
+	* lfm/files.py (get_owners): new functions
+	* lfm/files.py (get_groups): 
+	* lfm/files.py (set_perms): 
+	* lfm/files.py (set_owner_group): 
+
+Sun Jul 22 19:31:30 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): File and General menu
+	File menu: @, g, b, x, c
+	General menu: /, #, s, o, c, a
+
+Sun Jul 22 14:31:36 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (MenuWin): new window class to show file and
+	general menu
+
+Sun Jul 22 13:47:23 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/preferences.py (Preferences.check_defaultprogs): use
+	popen2.popen3 instead of os.popen to avoid messages in
+	stderr
+
+Sun Jul 22 13:45:55 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (findgrep): rewrite function not to show any
+	error to stderr. 2>/dev/null only works in bash-type shells
+
+Sun Jul 22 03:34:40 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* README: added info about changing directory at exit time
+
+Sun Jul 22 01:40:27 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py, lfm/files.py, lfm/messages.py,lfm/preferences.py: 
+	document modules
+
+Sun Jul 22 01:28:00 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (main): now lfm returns current path if exists via
+	'q' or F10 keys
+
+Sat Jul 21 23:24:54 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/preferences.py (Preferences): now preferences class has
+	its own file
+	* lfm/preferences.py (Preferences.check_defaultprogs): implemented
+	* lfm/preferences.py (Preferences.load): implemented
+	* lfm/preferences.py (Preferences.save): implemented
+	* lfm/preferences.py (Preferences.edit): basic implementation
+	using file edition
+
+Sat Jul 21 16:39:46 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Preferences.__init__): default pager changed to 'less'
+
+Fri Jul 20 19:15:31 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): find/grep implemented,
+	except panelize option
+	* lfm/files.py (findgrep): new functions
+	* lfm/files.py (find): 
+	* lfm/messages.py (FindfilesWin): new class to show find/grep
+	results
+
+Thu Jul 19 20:38:11 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): manage home and end properly 
+	* lfm/messages.py (EntryLine.manage_keys): 
+
 Thu Jul 19 18:14:00 2001  Iñigo Serna  <inigo@lethe.infernus.org>
 
 	* lfm/lfm.py (VERSION): version 0.4

@@ -1,3 +1,10 @@
+"""files.py
+
+This module defines files utilities for lfm.
+"""
+
+
+import sys
 import os
 import os.path
 import stat
@@ -30,11 +37,11 @@ def __get_size(file):
     """return the size of the directory or file via 'du -sk' command"""
 
     try:
-        buf = os.popen('du -sb \"%s\"' % file).read()
+        buf = os.popen('du -sk \"%s\"' % file).read()
     except:
         return 0
     else:
-        return int(buf.split()[0])
+        return int(buf.split()[0]) * 1024
 
 
 ########################################################################
@@ -101,8 +108,7 @@ def __get_filetype(file):
     if stat.S_ISREG(lmode) and (lmode & 0111):
         return FTYPE_EXE
     else:
-        return FTYPE_REG
-    return FTYPE_REG           # if no other type, regular file
+        return FTYPE_REG       # if no other type, regular file
 
 
 FT_TYPE = 0; FT_PERMS = 1
@@ -115,7 +121,6 @@ def get_fileinfo(file, pardir_flag = 0, show_dirs_size = 0):
 
     st = os.lstat(file)
     type = __get_filetype(file)
-    # FIXME: prefs size dirs... => and 0
     if (type == FTYPE_DIR or type == FTYPE_LNK2DIR) and not pardir_flag \
        and show_dirs_size:
         size = __get_size(file)
@@ -256,7 +261,7 @@ def get_fileinfostr(path, filename, filevalues):
         fname = filename[:12] + '~' + filename[-8:]
     else:
         fname = filename
-    perms = __perms2str(filevalues[1])
+    perms = perms2str(filevalues[1])
     if -15552000 < (time.time() - filevalues[FT_MTIME]) < 15552000:
         # filedate < 6 months from now, past or future
         mtime = time.strftime('%a %b %d %H:%M', time.localtime(filevalues[FT_MTIME]))
@@ -312,7 +317,7 @@ def get_fileinfostr_short(path, filename, filevalues):
     return buf
 
 
-def __perms2str(p):
+def perms2str(p):
     permis = ['x', 'w', 'r']
     perms = ['-'] * 9
     for i in range(9):
@@ -445,9 +450,14 @@ def move(path, file, destdir, check_fileexists = 1):
         fulldestdir = destdir
     try:
         do_copy(fullpath, fulldestdir)
-        do_delete(fullpath)
     except (IOError, os.error), (errno, strerror):
+        do_delete(fulldestdir)
         return (strerror, errno)
+    else:
+        try:
+            do_delete(fullpath)
+        except (IOError, os.error), (errno, strerror):
+            return (strerror, errno)
 
 
 # delete
@@ -482,3 +492,196 @@ def mkdir(path, newdir):
     except (IOError, os.error), (errno, strerror):
         return (strerror, errno)
 
+
+# find/grep
+def findgrep(path, files, pattern, find, egrep, ignorecase = 0):
+    if ignorecase:
+        ign = 'i'
+    else:
+        ign = ''
+
+#      # 2>/dev/null only work in bash-type shells
+#      cmd = '%s %s -name \"%s\" -print -exec %s -n%s \"%s\" {} \\; 2>/dev/null' % \
+#            (find, path, files, egrep, ign, pattern)
+#      try:
+#          c = os.popen(cmd, 'r')
+#      except:
+#          return -1
+
+#      quit = 0
+#      matches = []
+#      filename = ''
+#      while not quit:
+#          buf = c.readline()
+#          if buf == '':
+#              quit = 1
+#          if buf.find(':') == -1:
+#              filename = buf[:-1]
+#          else:
+#              try:
+#                  nline = int(buf.split(':')[0])
+#              except ValueError:
+#                  filename = buf[:-1]
+#              else:
+#                  filename = filename.replace(path, '')
+#                  if filename[0] == os.sep and path != os.sep:
+#                      filename = filename[1:]        
+#                  matches.append('%d:%s' % (nline, filename))
+#      c.close()
+
+    try:
+        fs =  [l[:-1] for l in os.popen('%s %s -name \"%s\" -print' %
+                                        (find, path, files)).readlines()]
+    except:
+        return -1
+    fs = [l for l in fs if not os.path.isdir(l)]
+    matches = []
+    for f in fs:
+        try:
+            buf = os.popen('%s -n%s \"%s\" %s' % (egrep, ign, pattern,
+                                                  f)).readlines()
+        except:
+            return -1
+        if not buf:
+            continue
+        for l in buf:
+            try:
+                nline = int(l.split(':')[0])
+            except ValueError:
+                nline = 0
+            f = f.replace(path, '')
+            if f[0] == os.sep and path != os.sep:
+                f = f[1:]        
+            matches.append('%d:%s' % (nline,f))
+
+    return matches
+
+
+def find(path, files, find):
+    cmd = '%s %s -name \"%s\" -print;' % (find, path, files)
+    try:
+        c = os.popen(cmd, 'r')
+    except:
+        return -1
+
+    quit = 0
+    matches = []
+    filename = ''
+    while not quit:
+        buf = c.readline()
+        if buf == '':
+            quit = 1
+        filename = buf[:-1]
+        filename = filename.replace(path, '')
+        if filename != None and filename != '':
+            if filename[0] == os.sep and path != os.sep:
+                filename = filename[1:]
+            matches.append(filename)
+    c.close()
+    return matches
+
+
+########################################################################
+########################################################################
+# utilities
+
+def get_owners():
+    """get a list with the users defined in the system"""
+
+    owners = [e[0] for e in pwd.getpwall()]
+    return owners
+
+
+def get_groups():
+    """get a list with the groups defined in the system"""
+    
+    groups = [e[0] for e in grp.getgrall()]
+    return groups
+
+
+def set_perms(file, perms):
+    """set permissions to a file"""
+
+    ps = 0
+    i = 8
+    for p in perms:
+        if p == 'x':
+            ps += 1 * 8 ** (i / 3)
+        elif p == 'w':
+            ps += 2 * 8 ** (i / 3)
+        elif p == 'r':
+            ps += 4 * 8 ** (i / 3)
+        elif p == 't' and i == 0:
+            ps += 1 * 8 ** 3
+        elif p == 's' and (i == 6 or i == 3):
+            if i == 6:
+                ps += 4 * 8 ** 3
+            else:
+                ps += 2 * 8 ** 3
+        i -= 1
+    try:
+        os.chmod(file, ps)
+    except (IOError, os.error), (errno, strerror):
+        return (strerror, errno)
+
+
+def set_owner_group(file, owner, group):
+    """set owner and group to a file"""
+    
+    try:
+        owner_n = pwd.getpwnam(owner)[2]
+    except:
+        owner_n = int(owner)
+    try:
+        group_n = grp.getgrnam(group)[2]
+    except:
+        group_n = int(group)        
+    try:
+        os.chown(file, owner_n, group_n)
+    except (IOError, os.error), (errno, strerror):
+        return (strerror, errno)
+
+
+def get_fs_info():
+    """return a list containing the info returned by 'df -k', i.e,
+    file systems size and occupation, in Mb. And the filesystem type:
+    [dev, size, used, available, use%, mount point, fs type]"""
+
+    try:
+        buf = os.popen('df -k').readlines()
+    except (IOError, os.error), (errno, strerror):
+        return (strerror, errno)
+    else:
+        fs = []
+        for l in buf:
+            if l[0] != os.sep:
+                continue
+            e = l.split()
+            e[0] = e[0]
+            e[1] = str(int(e[1]) / 1024)
+            e[2] = str(int(e[2]) / 1024)
+            e[3] = str(int(e[3]) / 1024)
+            e[4] = e[4]
+            fs.append(e)
+            
+
+        # get filesystems type
+        if sys.platform[:5] == 'linux':
+            es = open('/etc/fstab').readlines()
+            fstype_pos = 2
+        elif sys.platform[:5] == 'sunos':
+            es = open('/etc/vfstab').readlines()
+            fstype_pos = 3
+        else:
+            es = []
+        for f in fs:
+            fsdev = f[0]
+            for e in es:
+                if len(e) < 5:
+                    continue
+                if fsdev == e.split()[0]:
+                    f.append(e.split()[fstype_pos])
+                    break
+            else:
+                f.append('unknown')
+        return fs

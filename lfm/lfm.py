@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 
 # Copyright (C) 2001  Iñigo Serna
 #
@@ -17,6 +17,18 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
+"""
+Copyright (C) 2001, Iñigo Serna <inigoserna@terra.es>.
+All rights reserved.
+
+This software has been realised under the GPL License, see the COPYING
+file that comes with this package. There is NO WARRANTY.
+
+'Last File Manager' is (tries to be) a simple 'midnight commander'-type
+application for UNIX console.
+"""
+
+
 import os, os.path
 import sys, popen2
 import curses
@@ -24,15 +36,18 @@ from glob import glob
 
 from lfm import files
 from lfm import messages
+from lfm import preferences
 #import files
 #import messages
+#import preferences
 
 
 PROGNAME = 'lfm - Last File Manager'
-VERSION = '0.4'
+VERSION = '0.5'
 DATE = '2001'
 AUTHOR = 'Iñigo Serna'
 
+PREFSFILE = '.lfmrc'
 DEBUG = 0
 
 
@@ -55,7 +70,7 @@ class Lfm:
         self.panels = []            # list of panels
         self.panel = 0              # active panel
         # preferences
-        self.prefs = Preferences()
+        self.prefs = preferences.Preferences(PREFSFILE)
         self.modes = self.prefs.modes
         # panels
         self.init_curses()
@@ -153,11 +168,25 @@ class Lfm:
     def run(self):
         """run application"""
 
+        ret = self.prefs.load()
+        if ret == -1:
+            messages.error('Load Preferences',
+                           '\'%s\' does not exist\nusing default values' %
+                           PREFSFILE)
+        elif ret == -2:
+            messages.error('Load Preferences',
+                           '\'%s\' seems corrupted\nusing default values' %
+                           PREFSFILE)
         while 1:
             self.show()
             oldpanel = self.panels[self.panel].manage_keys()
-            if oldpanel == -1:
-                return
+            if oldpanel < 0:
+                if self.prefs.options['save_conf_at_exit']:
+                    self.prefs.save()
+                if oldpanel == -1:
+                    return self.panels[self.panel].path
+                else:
+                    return
             # change panel active
             if oldpanel == 0:
                 self.panel = 1
@@ -183,7 +212,7 @@ class Panel:
     def __init__(self, path, pos, app):
         self.pos = pos
         self.__init_curses()
-        self.__init_dir(path, app)
+        self.init_dir(path, app)
 
 
     # GUI
@@ -361,7 +390,7 @@ class Panel:
 
 
     # Files
-    def __init_dir(self, path, application = None):
+    def init_dir(self, path, application = None):
         try:
             self.nfiles, self.files = files.get_dir(path)
             # HACK: hack to achieve to pass prefs to this function
@@ -377,7 +406,7 @@ class Panel:
             self.sorted = files.sort_dir(self.files, sortmode,
                                          sort_mix_dirs, sort_mix_cases)
             self.file_i = self.file_a = self.file_z = 0
-            self.__fix_limits()
+            self.fix_limits()
             self.path = os.path.abspath(path)
             self.selections = []
         except OSError, (errno, strerror):
@@ -387,7 +416,7 @@ class Panel:
             return OSError
 
 
-    def __fix_limits(self):
+    def fix_limits(self):
         if self.file_i < 0:
             self.file_i = 0
         if self.file_i > self.nfiles - 1:
@@ -402,17 +431,17 @@ class Panel:
             self.file_z = self.nfiles - 1
 
 
-    def __refresh_panel(self, panel):
+    def refresh_panel(self, panel):
         """this is needed due to panel could be changed"""
 
         filename_old = panel.sorted[panel.file_i]
         selections_old = panel.selections[:]
-        panel.__init_dir(panel.path)
+        panel.init_dir(panel.path)
         try:
             panel.file_i = panel.sorted.index(filename_old)
         except ValueError:
             panel.file_i = 0
-        panel.__fix_limits()
+        panel.fix_limits()
         panel.selections = selections_old[:]
         for f in panel.selections:
             if f not in panel.sorted:
@@ -423,6 +452,7 @@ class Panel:
     def manage_keys(self):
         while 1:
             app.show()
+            chext = 0
             ch = self.win_files.getch()
 #              print 'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
 #                    (curses.keyname(ch), ch & 255, ch, ch)
@@ -433,52 +463,56 @@ class Panel:
 
             # to avoid extra chars input
             if ch == 0x1B:
+                chext = 1
+                ch = self.win_files.getch()
                 ch = self.win_files.getch()
 
             # cursor up
             if ch in [ord('p'), ord('P'), curses.KEY_UP]:
                 self.file_i -= 1
-                self.__fix_limits()
+                self.fix_limits()
             # cursor down
             elif ch in [ord('n'), ord('N'), curses.KEY_DOWN]:
                 self.file_i += 1
-                self.__fix_limits()
+                self.fix_limits()
             # page previous
             elif ch in [curses.KEY_PPAGE, curses.KEY_BACKSPACE,
                         0x08, 0x10]:                         # BackSpace, Ctrl-P
                 self.file_i -= self.dims[0]
                 if self.pos == 1 or self.pos == 2:
                     self.file_i += 3
-                self.__fix_limits()
+                self.fix_limits()
             # page next
             elif ch in [curses.KEY_NPAGE, ord(' '), 0x0E]:   # Ctrl-N
                 self.file_i += self.dims[0]
                 if self.pos == 1 or self.pos == 2:
                     self.file_i -= 3
-                self.__fix_limits()
+                self.fix_limits()
             # home
-            elif ch in [curses.KEY_HOME, 72, 348]:
+            elif (ch in [curses.KEY_HOME, 348]) or \
+                 (chext == 1) and (ch == 72):  # home
                 self.file_i = 0
-                self.__fix_limits()
+                self.fix_limits()
             # end
-            elif ch in [curses.KEY_END, 70, 351]:
+            elif (ch in [curses.KEY_END, 351]) or \
+                 (chext == 1) and (ch == 70):   # end
                 self.file_i = self.nfiles - 1
-                self.__fix_limits()
+                self.fix_limits()
             
             # cursor left
             elif ch in [curses.KEY_LEFT]:
                 if self.path != os.sep:
                     olddir = os.path.basename(self.path)
-                    self.__init_dir(os.path.dirname(self.path))
+                    self.init_dir(os.path.dirname(self.path))
                     self.file_i = self.sorted.index(olddir)
-                    self.__fix_limits()
+                    self.fix_limits()
             # cursor right
             elif ch in [curses.KEY_RIGHT]:
                 filename = self.sorted[self.file_i]
                 if self.files[filename][files.FT_TYPE] == files.FTYPE_DIR:
-                    self.__init_dir(os.path.join(self.path, filename))
+                    self.init_dir(os.path.join(self.path, filename))
                 elif self.files[filename][files.FT_TYPE] == files.FTYPE_LNK2DIR:
-                    self.__init_dir(files.get_linkpath(self.path, filename))
+                    self.init_dir(files.get_linkpath(self.path, filename))
                 else:
                     continue
             # go to directory
@@ -488,8 +522,8 @@ class Panel:
                 if todir == None or todir == "":
                     continue
                 todir = os.path.join(self.path, todir)
-                self.__init_dir(todir)
-                self.__fix_limits()
+                self.init_dir(todir)
+                self.fix_limits()
             # go to file
             elif ch in [0x13]:             # Ctrl-S
                 tofile = doEntry('Go to file', 'Type how file name begins')
@@ -503,15 +537,15 @@ class Panel:
                 else:
                     continue
                 self.file_i = self.sorted.index(f)
-                self.__fix_limits()
+                self.fix_limits()
 
             # go to bookmark
             elif 0x30 <= ch <= 0x39:       # 0..9
                 todir = app.prefs.bookmarks[ch - 0x30];
-                self.__init_dir(todir)
-                self.__fix_limits()
+                self.init_dir(todir)
+                self.fix_limits()
             # set bookmark
-            elif ch in [ord('b')]:
+            elif ch in [ord('b'), ord('B')]:
                 while 1:
                     ch = messages.get_a_key('Set bookmark',
                                             'Press 0-9 to save the bookmark in, Ctrl-C to quit')
@@ -520,64 +554,15 @@ class Panel:
                         break
                     elif ch == -1:                 # Ctrl-C
                         break
-            # edit bookmarks
-            elif ch in [ord('B')]:
-                messages.notyet('Edit bookmarks')
 
             # show directories size
             elif ch in [ord('#')]:
-                if self.selections:
-                    for f in self.selections:
-                        if self.files[f][files.FT_TYPE] != files.FTYPE_DIR and \
-                           self.files[f][files.FT_TYPE] != files.FTYPE_LNK2DIR:
-                            continue
-                        file = os.path.join(self.path, f)
-                        self.files[f] = files.get_fileinfo(file,
-                                                           show_dirs_size = 1)
-                else:
-                    for f in self.files.keys():
-                        if f == os.pardir:
-                            continue
-                        if self.files[f][files.FT_TYPE] != files.FTYPE_DIR and \
-                           self.files[f][files.FT_TYPE] != files.FTYPE_LNK2DIR:
-                            continue
-                        file = os.path.join(self.path, f)
-                        self.files[f] = files.get_fileinfo(file,
-                                                           show_dirs_size = 1)
+                show_dirs_size(self)
             # sorting mode
             elif ch in [ord('s'), ord('S')]:
-                while 1:
-                    ch = messages.get_a_key('Sorting mode',
-                                            'N(o), by (n)ame, by (s)ize, by (d)ate,\nuppercase if reversed order, Ctrl-C to quit')
-                    if ch in [ord('o'), ord('O')]:
-                        app.modes['sort'] = files.SORTTYPE_None
-                        break
-                    elif ch in [ord('n')]:
-                        app.modes['sort'] =  files.SORTTYPE_byName
-                        break
-                    elif ch in [ord('N')]:
-                        app.modes['sort'] =  files.SORTTYPE_byName_rev
-                        break
-                    elif ch in [ord('s')]:
-                        app.modes['sort'] = files.SORTTYPE_bySize
-                        break
-                    elif ch in [ord('S')]:
-                        app.modes['sort'] = files.SORTTYPE_bySize_rev
-                        break
-                    elif ch in [ord('d')]:
-                        app.modes['sort'] = files.SORTTYPE_byDate
-                        break
-                    elif ch in [ord('D')]:
-                        app.modes['sort'] = files.SORTTYPE_byDate_rev
-                        break
-                    elif ch == -1:                 # Ctrl-C
-                        break
-                old_filename = self.sorted[self.file_i]
-                old_selections = self.selections[:]
-                self.__init_dir(self.path)
-                self.file_i = self.sorted.index(old_filename)
-                self.selections = old_selections 
-            
+                app.show()
+                sort(self)
+
             # tab => other panel
             elif ch in [ord('\t')]:
                 if self.pos == 3:
@@ -599,7 +584,7 @@ class Panel:
                         app.panels[1].pos = 3
                 app.panels[0].__init_curses()
                 app.panels[1].__init_curses()
-                self.__fix_limits()
+                self.fix_limits()
             # change panels position
             elif ch in [ord(','), 0x15]:    # Ctrl-U
                 if self.pos == 3:
@@ -611,15 +596,15 @@ class Panel:
             # show the same directory in two panels
             elif ch in [ord('=')]:
                 otherpanel = app.get_otherpanel()
-                otherpanel.__init_dir(self.path)
-                otherpanel.__fix_limits()
+                otherpanel.init_dir(self.path)
+                otherpanel.fix_limits()
                 
             # select item
             elif ch in [curses.KEY_IC]:
                 filename = self.sorted[self.file_i]
                 if filename == os.pardir:
                     self.file_i += 1
-                    self.__fix_limits()
+                    self.fix_limits()
                     continue
                 try:
                     self.selections.index(filename)
@@ -628,7 +613,7 @@ class Panel:
                 else:
                     self.selections.remove(filename)
                 self.file_i += 1
-                self.__fix_limits()
+                self.fix_limits()
             # select group
             elif ch in [ord('+')]:
                 pattern = doEntry('Select group', 'Type pattern', '*')
@@ -659,55 +644,30 @@ class Panel:
                 if self.files[filename][files.FT_TYPE] == files.FTYPE_DIR:
                     if filename == os.pardir:
                         olddir = os.path.basename(self.path)
-                        self.__init_dir(os.path.dirname(self.path))
+                        self.init_dir(os.path.dirname(self.path))
                         self.file_i = self.sorted.index(olddir)
-                        self.__fix_limits()
+                        self.fix_limits()
                     else:
-                        self.__init_dir(os.path.join(self.path, filename))
+                        self.init_dir(os.path.join(self.path, filename))
                 elif self.files[filename][files.FT_TYPE] == files.FTYPE_LNK2DIR:
-                    self.__init_dir(files.get_linkpath(self.path, filename))
+                    self.init_dir(files.get_linkpath(self.path, filename))
                 elif self.files[filename][files.FT_TYPE] == files.FTYPE_EXE:
-                    curses.endwin()
-                    os.system(os.path.join(self.path,
-                                           self.sorted[self.file_i]))
-                    curses.curs_set(0)
-                    self.__refresh_panel(self)
-                    self.__refresh_panel(app.get_otherpanel())
+                    do_execute_file(self)
                 elif self.files[filename][files.FT_TYPE] == files.FTYPE_REG:
-                    curses.endwin()
-                    fullfilename = os.path.join(self.path, self.sorted[self.file_i])
-                    os.system('%s \"%s\"' % (app.prefs.progs['pager'], fullfilename))
-                    curses.curs_set(0)
+                    do_view_file(self)
                 else:
                     continue
 
             # do something on file
             elif ch in [ord('@')]:
-                cmd = doEntry('Do something on file(s)', 'Enter command')
-                if cmd:
-                    curses.endwin()
-                    if len(self.selections):
-                        for f in self.selections:
-                            fullfilename = os.path.join(self.path, f)
-                            os.system('%s \"%s\"' % (cmd, fullfilename))
-                        self.selections = []
-                    else:
-                        fullfilename = os.path.join(self.path,
-                                                    self.sorted[self.file_i])
-                        os.system('%s \"%s\"' % (cmd, fullfilename))
-                    curses.curs_set(0)
-                    self.__refresh_panel(self)
-                    self.__refresh_panel(app.get_otherpanel())
-
+                do_something_on_file(self)
             # special regards
             elif ch in [0xF1]:
                 messages.win('Special Regards',
                              '  Maite zaitut, Montse\n   T\'estimo molt, Montse')
             # find/grep
             elif ch in [ord('/')]:
-                fs, pat = doDoubleEntry('Find files', 'Filename', '*', 1, 1,
-                                        'Content', '', 1, 0)
-
+                findgrep(self)
             # touch file
             elif ch in [ord('t'), ord('T')]:
                 newfile = doEntry('Touch file', 'Type file name')
@@ -720,8 +680,8 @@ class Panel:
                     app.show()
                     messages.error('Touch file', '%s: %s' % (newfile, err))
                 curses.curs_set(0)
-                self.__refresh_panel(self)
-                self.__refresh_panel(app.get_otherpanel())
+                self.refresh_panel(self)
+                self.refresh_panel(app.get_otherpanel())
             # create link
             elif ch in [ord('l'), ord('L')]:
                 pass
@@ -750,8 +710,8 @@ class Panel:
                     app.show()
                     messages.error('Edit link', '%s (%s)' % ans,
                                    self.sorted[self.file_i])
-                self.__refresh_panel(self)
-                self.__refresh_panel(app.get_otherpanel())
+                self.refresh_panel(self)
+                self.refresh_panel(app.get_otherpanel())
             # edit link
             elif ch in [0x0C]:             # Ctrl-L
                 fullfilename = os.path.join(self.path, self.sorted[self.file_i])
@@ -769,8 +729,8 @@ class Panel:
                         app.show()
                         messages.error('Edit link', '%s (%s)' % ans,
                                        self.sorted[self.file_i])
-                self.__refresh_panel(self)
-                self.__refresh_panel(app.get_otherpanel())
+                self.refresh_panel(self)
+                self.refresh_panel(app.get_otherpanel())
 
             # shell
             elif ch in [0x0F]:             # Ctrl-O
@@ -778,25 +738,14 @@ class Panel:
                 os.system('cd \"%s\"; %s' % (self.path,
                                              app.prefs.progs['shell']))
                 curses.curs_set(0)
-                self.__refresh_panel(self)
-                self.__refresh_panel(app.get_otherpanel())
+                self.refresh_panel(self)
+                self.refresh_panel(app.get_otherpanel())
             # view
             elif ch in [ord('v'), ord('V'), curses.KEY_F3]:
-                curses.endwin()
-                fullfilename = os.path.join(self.path, self.sorted[self.file_i])
-                os.system('%s \"%s\"' % (app.prefs.progs['pager'],
-                                         fullfilename))
-                curses.curs_set(0)
+                do_view_file(self)
             # edit
             elif ch in [ord('e'), ord('E'), curses.KEY_F4]:
-                curses.endwin()
-                fullfilename = os.path.join(self.path, self.sorted[self.file_i])
-                os.system('%s \"%s\"' % (app.prefs.progs['editor'],
-                                         fullfilename))
-                curses.curs_set(0)
-                self.__refresh_panel(self)
-                self.__refresh_panel(app.get_otherpanel())
-
+                do_edit_file(self)
             # copy
             elif ch in [ord('c'), ord('C'), curses.KEY_F5]:
                 otherpanel = app.get_otherpanel()
@@ -858,8 +807,8 @@ class Panel:
                             messages.error('Copy', '%s (%s)' % ans, filename)
                     else:
                         continue
-                self.__refresh_panel(self)
-                self.__refresh_panel(otherpanel)
+                self.refresh_panel(self)
+                self.refresh_panel(otherpanel)
 
             # move
             elif ch in [ord('m'), ord('M'), curses.KEY_F6]:
@@ -923,8 +872,8 @@ class Panel:
                             messages.error('Move', '%s (%s)' % ans, filename)
                     else:
                         continue
-                self.__refresh_panel(self)
-                self.__refresh_panel(otherpanel)
+                self.refresh_panel(self)
+                self.refresh_panel(otherpanel)
 
             # make directory
             elif ch in [curses.KEY_F7]:
@@ -936,8 +885,8 @@ class Panel:
                     messages.error('Make directory',
                                    '%s (%s)' % ans, newdir)
                     continue
-                self.__refresh_panel(self)
-                self.__refresh_panel(app.get_otherpanel())
+                self.refresh_panel(self)
+                self.refresh_panel(app.get_otherpanel())
 
             # delete
             elif ch in [ord('d'), ord('D'), curses.KEY_F8, curses.KEY_DC]:
@@ -981,13 +930,13 @@ class Panel:
                     if ans:
                         app.show()
                         messages.error('Delete', '%s (%s)' % ans, filename)
-                self.__init_dir(self.path)
+                self.init_dir(self.path)
                 if file_i_old > self.nfiles:
                     self.file_i = self.nfiles
                 else:
                     self.file_i = file_i_old
-                self.__fix_limits()
-                self.__refresh_panel(app.get_otherpanel())
+                self.fix_limits()
+                self.refresh_panel(app.get_otherpanel())
 
             # help
             elif ch in [ord('h'), ord('H'), curses.KEY_F1]:
@@ -995,19 +944,163 @@ class Panel:
 
             # file menu
             elif ch in [ord('f'), ord('F'), curses.KEY_F2]:
-                messages.notyet('File Menu')
+                menu = [ '@    Do something on file(s)',
+                         'i    File Info',
+                         'p    Change file permissions, owner, group',
+                         'g    Gzip/gunzip file(s)',
+                         'b    Bzip2/bunzip2 file(s)',
+                         'x    Uncompress .tar.gz, .tar.bz2, .tar.Z',
+                         'c    Compress directory',
+                         'y    Encrypt/decrypt file' ]
+                cmd = messages.MenuWin('File Menu', menu).run()
+                if cmd == -1:
+                    continue
+                cmd = cmd[0]
+                if cmd == '@':
+                    app.show()
+                    do_something_on_file(self)
+                elif cmd == 'i':
+                    app.show()
+                    messages.notyet('File info')
+                elif cmd == 'p':
+                    if self.selections:
+                        app.show()
+                        i = 0
+                        change_all = 0
+                        for file in self.selections:
+                            i += 1
+                            if not change_all:
+                                ret = messages.ChangePerms(file, self.files[file],
+                                                       app, i,
+                                                       len(self.selections)).run()
+                                if ret == -1:
+                                    break
+                                elif ret == 0:
+                                    continue
+                                elif ret[3] == 1:
+                                    change_all = 1                            
+                            filename = os.path.join(self.path, file)
+                            ans = files.set_perms(filename, ret[0])
+                            if ans:
+                                app.show()
+                                messages.error('Chmod', '%s (%s)' % ans,
+                                               filename)
+                            ans = files.set_owner_group(filename, ret[1], ret[2])
+                            if ans:
+                                app.show()
+                                messages.error('Chown', '%s (%s)' % ans,
+                                               filename)
+                        self.selections = []
+                    else:
+                        file = self.sorted[self.file_i]
+                        if file == os.pardir:
+                            continue
+                        app.show()
+                        ret = messages.ChangePerms(file, self.files[file],
+                                                   app).run()
+                        if ret == -1:
+                            continue
+                        filename = os.path.join(self.path, file)
+                        ans = files.set_perms(filename, ret[0])
+                        if ans:
+                            app.show()
+                            messages.error('Chmod', '%s (%s)' % ans, filename)
+                        ans = files.set_owner_group(filename, ret[1], ret[2])
+                        if ans:
+                            app.show()
+                            messages.error('Chown', '%s (%s)' % ans, filename)
+                    self.refresh_panel(self)
+                    self.refresh_panel(app.get_otherpanel())
+                elif cmd == 'g':
+                    compress_uncompress_file(self, 'gzip')
+                elif cmd == 'b':
+                    compress_uncompress_file(self, 'bzip2')
+                elif cmd == 'x':
+                    uncompress_dir(self)
+                    old_file = self.sorted[self.file_i]
+                    self.refresh_panel(self)
+                    self.file_i = self.sorted.index(old_file)
+                    old_file = app.get_otherpanel().sorted[app.get_otherpanel().file_i]
+                    self.refresh_panel(app.get_otherpanel())
+                    app.get_otherpanel().file_i = app.get_otherpanel().sorted.index(old_file)
+                elif cmd == 'c':
+                    compress_dir(self)
+                    old_file = self.sorted[self.file_i]
+                    self.refresh_panel(self)
+                    self.file_i = self.sorted.index(old_file)
+                    old_file = app.get_otherpanel().sorted[app.get_otherpanel().file_i]
+                    self.refresh_panel(app.get_otherpanel())
+                    app.get_otherpanel().file_i = app.get_otherpanel().sorted.index(old_file)
+                elif cmd == 'y':
+                    app.show()
+                    messages.notyet('Encrypt/decrypt file')
 
             # general menu
             elif ch in [curses.KEY_F9]:
-                messages.notyet('General Menu')
+                menu = [ '/    Find/grep file(s)',
+                         '#    Show directories size',
+                         's    Sort files',
+                         't    Tree',
+                         'f    Show filesystems info',
+                         'o    Open shell',
+                         'c    Edit configuration',
+                         'a    Save configuration' ]
+                cmd = messages.MenuWin('General Menu', menu).run()
+                if cmd == -1:
+                    continue
+                cmd = cmd[0]
+                if cmd == '/':
+                    app.show()
+                    findgrep(self)
+                elif cmd == '#':
+                    show_dirs_size(self)
+                elif cmd == 's':
+                    app.show()
+                    sort(self)
+                elif cmd == 't':
+                    messages.notyet('Tree')
+                elif cmd == 'f':
+                    fs = files.get_fs_info()
+                    if type(fs) != type([]):
+                        app.show()
+                        messages.error('Show filesystems info', fs)
+                        continue
+                    app.show()
+                    messages.show_fs_info('Show filesystems info', fs)
+                elif cmd == 'o':
+                    curses.endwin()
+                    os.system('cd \"%s\"; %s' % (self.path,
+                                                 app.prefs.progs['shell']))
+                    curses.curs_set(0)
+                    self.refresh_panel(self)
+                    self.refresh_panel(app.get_otherpanel())
+                elif cmd == 'c':
+                    app.prefs.edit(app)
+                    app.prefs.load()
+                elif cmd == 'a':
+                    app.prefs.save()
 
             # refresh screen
             elif ch in [0x12]:             # Ctrl-r
                 app.show()
 
             # exit
-            elif ch in [ord('x'), ord('X'), ord('q'), ord('Q'), curses.KEY_F10]:
-                return -1
+            elif ch in [ord('q'), ord('Q'), curses.KEY_F10]:
+                if app.prefs.confirmations['quit']:
+                    ans = messages.confirm('Last File Manager',
+                                           'Quit Last File Manager', 1)
+                    if ans == 1:
+                        return -1
+                else:
+                    return -1
+            elif ch in [ord('x'), ord('X')]:
+                if app.prefs.confirmations['quit']:
+                    ans = messages.confirm('Last File Manager',
+                                           'Quit Last File Manager', 1)
+                    if ans == 1:
+                        return -2
+                else:
+                    return -2
 
             # no more keys
             else:
@@ -1015,30 +1108,376 @@ class Panel:
 
 
 ##################################################
-##### preferences
+##### Actions
 ##################################################
-class Preferences:
-    """Preferences class"""
+
+# do view file
+def do_view_file(panel):
+    curses.endwin()
+    fullfilename = os.path.join(panel.path, panel.sorted[panel.file_i])
+    os.system('%s \"%s\"' % (app.prefs.progs['pager'], fullfilename))
+    curses.curs_set(0)
+
+
+# do edit file
+def do_edit_file(panel):
+    curses.endwin()
+    fullfilename = os.path.join(panel.path, panel.sorted[panel.file_i])
+    os.system('%s \"%s\"' % (app.prefs.progs['editor'], fullfilename))
+    curses.curs_set(0)
+    panel.refresh_panel(panel)
+    panel.refresh_panel(app.get_otherpanel())
+
+
+# do execute file
+def do_execute_file(panel):
+    parms = doEntry('Execute file', 'Enter arguments')
+    if parms == None:
+        return
+    elif parms == '':
+        cmd = os.path.join(panel.path, panel.sorted[panel.file_i])
+    else:                
+        cmd = '%s \"%s\"' % (os.path.join(panel.path, panel.sorted[panel.file_i]),
+                             parms)
+    curses.endwin()
+    os.system(cmd)
+    curses.curs_set(0)
+    panel.refresh_panel(panel)
+    panel.refresh_panel(app.get_otherpanel())
+
+
+##### File Menu
+# do something on file
+def do_something_on_file(panel):
+    cmd = doEntry('Do something on file(s)', 'Enter command')
+    if cmd:
+        curses.endwin()
+        if len(panel.selections):
+            for f in panel.selections:
+                fullfilename = os.path.join(panel.path, f)
+                os.system('%s \"%s\"' % (cmd, fullfilename))
+            panel.selections = []
+        else:
+            fullfilename = os.path.join(panel.path,
+                                        panel.sorted[panel.file_i])
+            os.system('%s \"%s\"' % (cmd, fullfilename))
+        curses.curs_set(0)
+        panel.refresh_panel(panel)
+        panel.refresh_panel(app.get_otherpanel())
+
+
+# compress/uncompress file: gzip/gunzip, bzip2/bunzip2
+def compress_uncompress_file(panel, prog):
+    comp = app.prefs.progs[prog]
+    if comp == '':
+        app.show()
+        messages.error(prog, 'No %s program found in path' % prog)
+        return
+    if panel.selections:
+        for file in panel.selections:
+            fullfile = os.path.join(panel.path, file)
+            if not os.path.isfile(fullfile):
+                app.show()
+                messages.error(comp, '%s: Can\'t un/compress' % file)
+                continue
+            if prog == 'gzip':
+                ext = '.gz'
+            else:
+                ext = '.bz2'
+            if len(file) > len(ext) and file[-len(ext):] == ext:
+                os.system('%s -d %s' % (comp, fullfile))
+            else:
+                os.system('%s %s' % (comp, fullfile))
+        old_file = panel.file_i
+        panel.init_dir(panel.path)
+        panel.file_i = old_file
+        old_file = app.get_otherpanel().file_i
+        panel.refresh_panel(app.get_otherpanel())
+        app.get_otherpanel().file_i = old_file
+    else:
+        file = panel.sorted[panel.file_i]
+        fullfile = os.path.join(panel.path, file)
+        if not os.path.isfile(fullfile):
+            app.show()
+            messages.error(comp, '%s: Can\'t un/compress' % file)
+            return
+        if prog == 'gzip':
+            ext = '.gz'
+        else:
+            ext = '.bz2'
+        if len(file) > len(ext) and file[-len(ext):] == ext:
+            os.system('%s -d %s' % (comp, fullfile))
+        else:
+            os.system('%s %s' % (comp, fullfile))
+        old_file = panel.file_i
+        panel.refresh_panel(panel)
+        panel.file_i = old_file
+        old_file = app.get_otherpanel().file_i
+        panel.refresh_panel(app.get_otherpanel())
+        app.get_otherpanel().file_i = old_file
+
+# uncompress directory
+def check_compressed_tarfile(file):
+    """check if correct compressed and tarred file, if so returns compress
+    program"""
     
-    def __init__(self):
-        # default preferences
-        self.progs = { 'shell':'bash', 'pager':'biew', 'editor':'mcedit' }
-        self.bookmarks = [ '/',
-                           '/home/inigo',
-                           '/home/inigo/personal',
-                           '/home/inigo/devel/mine/lfm',
-                           '/zzz/compiling/gnome',
-                           '/zzz/compiling/python',
-                           '/zzz/compiling/linux',
-                           '/etc',
-                           '/root',
-                           '/dfsdf' ]
-        self.modes = { 'sort': files.SORTTYPE_byName,
-                       'sort_mix_dirs': 0, 'sort_mix_cases': 0 }
-        self.confirmations = { 'delete': 1, 'overwrite': 1 }
+    if (len(file) > 7 and file[-7:] == '.tar.gz') or \
+       (len(file) > 4 and file[-4:] == '.tgz') or \
+       (len(file) > 6 and file[-6:] == '.tar.Z'):
+        return app.prefs.progs['gzip']
+    elif (len(file) > 8 and file[-8:] == '.tar.bz2'):
+        return app.prefs.progs['bzip2']
+    else:
+        return -1
+
+
+def uncompress_dir(panel):
+    """uncompress tarred file to current directory"""
+    
+    if app.prefs.progs['tar'] == '':
+        app.show()
+        messages.error('Uncompress directory', 'No tar program found in path')
+        return
+    if panel.selections:
+        for file in panel.selections:
+            comp = check_compressed_tarfile(file)
+            if comp == -1:
+                app.show()
+                messages.error('Uncompress',
+                               '%s: is not a valid compressed file' % file)
+                continue
+            elif comp == '':
+                app.show()
+                messages.error('Uncompress directory',
+                               'No uncompress program found in path')
+                return
+            oe, i = popen2.popen4('cd %s; %s -d %s -c | %s xvf -; echo END' %
+                                  (panel.path, comp, file, app.prefs.progs['tar']))
+            while oe.readline() != 'END\n':
+                pass
+        panel.selections = []
+    else:
+        file = panel.sorted[panel.file_i]
+        comp = check_compressed_tarfile(file)
+        if comp == -1:
+            app.show()
+            messages.error('Uncompress',
+                           '%s: is not a valid compressed file' % file)
+            return
+        elif comp == '':
+            app.show()
+            messages.error('Uncompress directory',
+                           'No uncompress program found in path')
+            return
+        oe, i = popen2.popen4('cd %s; %s -d %s -c | %s xvf -; echo END' %
+                              (panel.path, comp, file, app.prefs.progs['tar']))
+        while oe.readline() != 'END\n':
+            pass
+
+
+# compress directory
+def compress_dir(panel):
+    """compress directory to current path"""
+
+    if app.prefs.progs['tar'] == '':
+        app.show()
+        messages.error('Compress directory', 'No tar program found in path')
+        return
+    if app.prefs.progs['gzip'] == '':
+        app.show()
+        messages.error('Compress directory', 'No gzip program found in path')
+        return
+    if panel.selections:
+        for file in panel.selections:
+            fullfile = os.path.join(panel.path, file)
+            if not os.path.isdir(fullfile):
+                app.show()
+                messages.error('Compress directory',
+                               '%s: is not a directory' % file)
+                continue
+            oe, i = popen2.popen4('cd %s; %s cvf - %s | %s >%s.tar.gz; echo END' %
+                                  (panel.path, app.prefs.progs['tar'], file,
+                                   app.prefs.progs['gzip'], file))
+            while oe.readline() != 'END\n':
+                pass
+        panel.selections = []
+    else:
+        file = panel.sorted[panel.file_i]
+        fullfile = os.path.join(panel.path, file)
+        if not os.path.isdir(fullfile):
+            app.show()
+            messages.error('Compress directory',
+                           '%s: is not a directory' % file)
+            return
+        oe, i = popen2.popen4('cd %s; %s cvf - %s | %s >%s.tar.gz; echo END' %
+                              (panel.path, app.prefs.progs['tar'],
+                               file, app.prefs.progs['gzip'], file))
+        while oe.readline() != 'END\n':
+            pass
+
+
+##### General Menu
+# show directories size
+def show_dirs_size(panel):
+    if panel.selections:
+        for f in panel.selections:
+            if panel.files[f][files.FT_TYPE] != files.FTYPE_DIR and \
+               panel.files[f][files.FT_TYPE] != files.FTYPE_LNK2DIR:
+                continue
+            file = os.path.join(panel.path, f)
+            panel.files[f] = files.get_fileinfo(file,
+                                               show_dirs_size = 1)
+    else:
+        for f in panel.files.keys():
+            if f == os.pardir:
+                continue
+            if panel.files[f][files.FT_TYPE] != files.FTYPE_DIR and \
+               panel.files[f][files.FT_TYPE] != files.FTYPE_LNK2DIR:
+                continue
+            file = os.path.join(panel.path, f)
+            panel.files[f] = files.get_fileinfo(file,
+                                               show_dirs_size = 1)
+
+
+# find and grep
+def findgrep(panel):
+    fs, pat = doDoubleEntry('Find files', 'Filename', '*', 1, 1,
+                            'Content', '', 1, 0)
+    if fs == None or fs == '':
+        return
+    path = os.path.dirname(fs)
+    fs = os.path.basename(fs)
+    if path == None or path == '':
+        path = panel.path
+    if path[0] != os.sep:
+        path = os.path.join(panel.path, path)
+    if pat:
+        m = files.findgrep(path, fs, pat, app.prefs.progs['find'],
+                           app.prefs.progs['egrep'])
+        if not m:
+            app.show()
+            messages.error('Find/Grep', 'No files found')
+            return
+        elif m == -1:
+            app.show()
+            messages.error('Find/Grep', 'Error while creating pipe')
+            return
+    else:
+        m = files.find(path, fs, app.prefs.progs['find'])
+        if not m:
+            app.show()
+            messages.error('Find/Grep', 'No files found')
+            return
+        elif m == -1:
+            app.show()
+            messages.error('Find', 'Error while creating pipe')
+            return        
+    find_quit = 0
+    par = ''
+    while not find_quit:
+        cmd, par = messages.FindfilesWin(m, par).run()
+        if par:
+            par2 = par.split(':')
+            if len(par2) == 2:
+                try:
+                    line = int(par2[0])
+                except ValueError:
+                    line = 0
+                    f = os.path.join(path, par)
+                else:
+                    f = os.path.join(path, par2[1])
+            else:
+                line = 0
+                f = os.path.join(path, par)
+            if os.path.isdir(f):
+                todir = f
+                tofile = None
+            else:
+                todir = os.path.dirname(f)
+                tofile = os.path.basename(f)
+        if cmd == 0:             # goto file
+            panel.init_dir(todir)
+            if tofile:
+                panel.file_i = panel.sorted.index(tofile)
+            panel.fix_limits()
+            find_quit = 1
+        elif cmd == 1:
+            messages.notyet('Panelize')
+        elif cmd == 2:           # view
+            if tofile:
+                curses.curs_set(0)
+                curses.endwin()
+                os.system('%s +%d \"%s\"' %
+                          (app.prefs.progs['pager'], line, f))
+                curses.curs_set(0)
+            else:
+                messages.error('View', 'it\'s a directory',
+                               todir)
+        elif cmd == 3:           # edit
+            if tofile:
+                curses.endwin()
+                if line > 0:
+                    os.system('%s +%d \"%s\"' %
+                              (app.prefs.progs['editor'], line, f))
+                else:
+                    os.system('%s \"%s\"' %
+                              (app.prefs.progs['editor'], f))
+                curses.curs_set(0)
+                panel.refresh_panel(panel)
+                panel.refresh_panel(app.get_otherpanel())
+            else:
+                messages.error('Edit', 'it\'s a directory',
+                               todir)
+        elif cmd == 4:           # do something on file
+            cmd2 = doEntry('Do something on file',
+                           'Enter command')
+            if cmd2:
+                curses.endwin()
+                os.system('%s \"%s\"' % (cmd2, f))
+                curses.curs_set(0)
+                panel.refresh_panel(panel)
+                panel.refresh_panel(app.get_otherpanel())
+        else:
+            find_quit = 1
+
+
+# sort
+def sort(panel):
+    while 1:
+        ch = messages.get_a_key('Sorting mode',
+                                'N(o), by (n)ame, by (s)ize, by (d)ate,\nuppercase if reversed order, Ctrl-C to quit')
+        if ch in [ord('o'), ord('O')]:
+            app.modes['sort'] = files.SORTTYPE_None
+            break
+        elif ch in [ord('n')]:
+            app.modes['sort'] =  files.SORTTYPE_byName
+            break
+        elif ch in [ord('N')]:
+            app.modes['sort'] =  files.SORTTYPE_byName_rev
+            break
+        elif ch in [ord('s')]:
+            app.modes['sort'] = files.SORTTYPE_bySize
+            break
+        elif ch in [ord('S')]:
+            app.modes['sort'] = files.SORTTYPE_bySize_rev
+            break
+        elif ch in [ord('d')]:
+            app.modes['sort'] = files.SORTTYPE_byDate
+            break
+        elif ch in [ord('D')]:
+            app.modes['sort'] = files.SORTTYPE_byDate_rev
+            break
+        elif ch == -1:                 # Ctrl-C
+            break
+    old_filename = panel.sorted[panel.file_i]
+    old_selections = panel.selections[:]
+    panel.init_dir(panel.path)
+    panel.file_i = panel.sorted.index(old_filename)
+    panel.selections = old_selections 
 
 
 ##################################################
+##### Wrappers
 ##################################################
 def doEntry(title, help, path = '', with_historic = 1, with_complete = 1):
     curpath = app.panels[app.panel].path
@@ -1132,7 +1571,7 @@ def main(win, path, npanels):
     app = Lfm(path, npanels)
     if app == OSError:
         sys.exit(-1)
-    app.run()
+    return app.run()
 
     
 if __name__ == '__main__':
@@ -1189,7 +1628,7 @@ if __name__ == '__main__':
         usage(sys.argv[0], 'Incorrect number of arguments')
         sys.exit(-1)
 
-    DEBUGFILE = "./lfm-log.%d" % os.getuid()
+    DEBUGFILE = "./lfm-log.%d" % os.getpid()
     if DEBUG:
         debug = open(DEBUGFILE, 'w')
         debug.write('********** Start:   ')
@@ -1197,10 +1636,16 @@ if __name__ == '__main__':
         sys.stdout = debug
         sys.stderr = debug
 
-    curses.wrapper(main, paths, npanels)
+    path = curses.wrapper(main, paths, npanels)
 
     if DEBUG:
         debug.write('********** End:     ')
         debug.write(time.ctime(time.time()) + ' **********\n')
         debug.close()
 
+    sys.stdout = sys.__stdout__
+    sys.stdout = sys.__stderr__
+    if path:
+        f = open('/tmp/lfm-%s.path' % (os.getppid()), 'w')
+        f.write(path)
+        f.close()

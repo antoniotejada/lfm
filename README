@@ -9,7 +9,7 @@ file that comes with this package. There is NO WARRANTY.
 
 Introduction:
 =============
-Last File Manager' is (tries to be) a simple 'midnight commander'-type
+'Last File Manager' is (tries to be) a simple 'midnight commander'-type
 application for UNIX console.
 
 It is written in python and uses curses module.
@@ -32,6 +32,8 @@ Take a look at TODO file to see bugs and not implemented features.
 
 Type 'lfm --help' for a complete list of options.
 
+Program preferences are saved in '~/.lfmrc' file.
+
 
 Install
 =======
@@ -45,6 +47,20 @@ type:		$ python setup.py build
 and as root:	# python setup.py install	
 
 and then just type 'lfm' to run it.
+
+To let lfm to cd to panel's current directory after quiting with
+'q', 'Q' or F10 keys, you must add to /etc/bashrc or to your ~/.bashrc
+next code:
+
+  lfm()
+  {
+	/usr/bin/lfm $*		# type here full path to executable
+	LFMPATHFILE=/tmp/lfm-$$.path
+	cd `cat $LFMPATHFILE`
+	rm -f $LFMPATHFILE
+  }
+
+If you don't use bash or csh shell, above lines must be different.
 
 
 Keys:
@@ -62,10 +78,9 @@ Here you have the complete list:
     - curses_left: upper dir
     - curses_right: enter dir
     - g, G: go to directory
-    - Ctrl-S: go to file
+    - Ctrl-S: go to file in current panel
     - 0..9: go to bookmark #
-    - b: set bookmark #
-    - B: edit bookmarks	(NOT YET)
+    - b, B: set bookmark #
 
 + Panels
     - tab: other panel
@@ -93,14 +108,16 @@ Here you have the complete list:
 + Other
     - #: show directories size
     - s, S: sort files
+    - /: find/grep files
     - enter: execute file, enter dir or view if regular file
     - @: do something on file
     - Ctrl-O: open shell. Type 'exit' to return
-    - x, X, q, Q, F10: quit
+    - x, X, F10: exit changing to current path
+    - q, Q: quit
     - h, H, F1: help	(NOT YET)
-    - f, F, F2: file menu	(NOT YET)
-    - F9: general menu	(NOT YET)
-	- Ctrl-R: refresh screen
+    - f, F, F2: file menu
+    - F9: general menu
+    - Ctrl-R: refresh screen
 
 * Keys in EntryLine window:
   - Ctrl-C: quit
@@ -129,6 +146,7 @@ Some years ago I began to write a program like this in C, but after
 some weeks of coding I never finished it... I'm too lazy, yes.
 Now, once I've seen the light, I am writting 'lfm' to learn python.
 
+
 Thanks:
 =======
 
@@ -142,4 +160,4 @@ Midnight Commander developers, whose program was the guide.
 
 
 ============================================================================
-Last update:	Thursday 19 July 2001 18:46:54 CEST
+Last update:	Sunday 22 July 2001 01:26:14 CEST

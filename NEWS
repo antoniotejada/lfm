@@ -1,0 +1,25 @@
+Version 0.5 ("Last call to London") - 2001/08/07:
+
+  + F2 file menu, added many functions
+  + F9 general menu, added many functions
+  + Implemented find and grep
+  + File permissions, owner and group has a window now
+  + Implemented preferences, edition has to be improved, of course,
+    but loading and saving works
+  + Added 'show filesystems info' feature
+  + Now 'q' or F10 exits to current path, see proper README section
+  + Default pager changed to 'less'
+  + Documentation has been improved
+  + 'setup.py' now installs docs
+  + Many bug fixes and functions rewrites:
+      - home and end keys work ok now
+      - not all people use bash-type shells, so don't use 2>&1
+      - use popen2.popen3 instead of os.popen to catch messages
+      - manage problems with move while files don't fit into destination
+      - option 'b' does not exist in Solaris' 'du -s' command
+      - fix a problem while moving files if destination has no enough space
+      - many others
+
+Version 0.4 - 2001/07/19:
+
+  + First public release

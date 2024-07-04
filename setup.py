@@ -2,17 +2,19 @@
 
 from distutils.core import setup
 
-DOC_FILES = ['COPYING', 'README', 'TODO']
+DOC_FILES = ['COPYING', 'README', 'NEWS', 'TODO', 'ChangeLog']
 
 setup(name = 'lfm',
-      version = '0.4',
+      version = '0.5',
       licence = 'GPL',	# spelling error in distutils
       description = 'Last File Manager',
       author = 'Iñigo Serna',
       author_email = 'inigoserna@terra.es',
       url = '',
-      py_modules = ['lfm/__init__', 'lfm/lfm', 'lfm/messages', 'lfm/files'],
-      scripts = ['lfm/lfm']
+      py_modules = ['lfm/__init__', 'lfm/lfm', 'lfm/messages', 'lfm/files',
+                    'lfm/preferences'],
+      scripts = ['lfm/lfm'],
+      data_files = [('share/doc/lfm', DOC_FILES)]
       )
 
 

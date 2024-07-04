@@ -1,3 +1,9 @@
+"""messages.py
+
+This module contains some windows for lfm use.
+"""
+
+
 import sys
 import os.path
 import curses
@@ -22,6 +28,8 @@ class CommonWindow:
                 length = len(l)
         h = min(len(lines) + 4, curses.LINES - 2)
         w = min(max(length+6, 27+4), curses.COLS - 2)
+        if len(lines) > 1:  # -1, because len adds newline char
+            w -= 1
         try:
             self.border = curses.newwin(h, w, 
                                         (curses.LINES-h) / 2,
@@ -40,7 +48,10 @@ class CommonWindow:
         self.body.erase()
         self.border.box(0, 0)
         self.border.addstr(0, (w-len(title)-2)/2, ' ' + title + ' ')
-        self.body.addstr(1, 1, text)
+        if h == 5:
+            self.body.addstr(1, 1, text)
+        else:
+            self.body.addstr(1, 0, text)
         self.border.addstr(h-1, (w-27)/2, ' Press any key to continue ')
         self.border.refresh()
         self.body.refresh()
@@ -90,6 +101,28 @@ def notyet(title):
                  curses.color_pair(1),
                  curses.color_pair(4),
                  curses.color_pair(4)).run()
+
+
+##################################################
+##################################################
+def show_fs_info(title, fs):
+    """show file systems info"""
+
+    # FIXME: rewrite
+    buf = []
+    buf.append('Filesystem  FS type  Total Mb    Used  Avail.  Use%  Mount point')
+    buf.append('')
+    for l in fs:
+        buf.append('%-10s  %-9s  %6s  %6s  %6s  %4s  %s' % \
+                   (l[0], l[6], l[1], l[2], l[3], l[4], l[5]))
+    buf[1] = '-' * len(max(buf))
+    buf = '\n'.join(buf)
+    CommonWindow(title, buf,
+                 curses.color_pair(1),
+                 curses.color_pair(1),
+                 curses.color_pair(1) | curses.A_BOLD,
+                 curses.color_pair(1)).run()
+
 
 
 ##################################################
@@ -298,140 +331,6 @@ def confirm_all(title, question, default = 0):
 
 ##################################################
 ##################################################
-class SelectItem:
-    """A window to select an item"""
-
-    def __init__(self, entries, y0, x0):
-        h = (curses.LINES - 1) - (y0 + 1) + 1
-        w = min(max(map(len, entries)), curses.COLS/2) + 4
-        try:
-            self.win = curses.newwin(h, w, y0, x0)
-        except curses.error:
-            print 'Can\'t create window'
-            sys.exit(-1)
-        self.win.keypad(1)
-        curses.curs_set(0)
-        self.win.attrset(curses.color_pair(4))
-        self.win.bkgdset(curses.color_pair(4))
-
-        self.entries = entries
-        self.entry_i = 0
-        
-
-    def show(self):
-        self.win.erase()
-        self.win.attrset(curses.color_pair(4))
-        self.win.refresh()
-        self.win.box(0, 0)
-        y, x = self.win.getbegyx()
-        h, w = self.win.getmaxyx()
-        entry_a = self.entry_i / (h-2) * (h-2)
-        for i in range(h-2):
-            try:
-                line = self.entries[entry_a + i]
-            except IndexError:
-                line = ''
-            if len(line) > w - 2:
-                if (w - 2) % 2 == 0:     # even
-                    line = line[:(w-2)/2] + '~' + line[-(w-2)/2+2:]
-                else:                    # odd
-                    line = line[:(w-2)/2+1] + '~' + line[-(w-2)/2+2:]
-            if line != '':
-                self.win.addstr(i+1, 2, line, curses.color_pair(4))
-        self.win.refresh()
-        # cursor
-        cursor = curses.newpad(1, w - 2)
-        cursor.attrset(curses.color_pair(1) | curses.A_BOLD)
-        cursor.bkgdset(curses.color_pair(1))
-        cursor.erase()
-        line = self.entries[self.entry_i]
-        if len(line) > w - 2:
-            if (w - 2) % 2 == 0:         # even
-                line = line[:(w-2)/2] + '~' + line[-(w-2)/2+2:]
-            else:                        # odd
-                line = line[:(w-2)/2+1] + '~' + line[-(w-2)/2+2:]
-        cursor.addstr(0, 1, line, curses.color_pair(1) | curses.A_BOLD)
-        y += 1; x += 1
-        cursor.refresh(0, 0, y + self.entry_i % (h - 2),
-                       x, y + self.entry_i % (h - 2), x + w - 3)
-        # scrollbar
-        if len(self.entries) > h:
-            n = (h-2) * (h-2) / len(self.entries)
-            if n == 0:
-                n = 1
-            a = self.entry_i /(h-2) * (h-2)
-            y0 = a * (h-2) / len(self.entries)
-            if y0 < 0:
-                y0 = 0
-            elif y0 + n > (h-2):
-                y0 = (h-2) - n
-        else:
-            y0 = 0
-            n = 0
-        self.win.vline(y0 + 1, w - 1, curses.ACS_CKBOARD, n)
-        if entry_a != 0:
-            self.win.vline(1, w - 1, '^', 1)
-            if n == 1 and (y0 + 1 == 1):
-                self.win.vline(2, w - 1, curses.ACS_CKBOARD, n)
-        if len(self.entries) - 1 > entry_a + h - 3:
-            self.win.vline(h - 2, w - 1, 'v', 1)
-            if n == 1 and (y0 + 1 == h - 2):
-                self.win.vline(h - 3, w - 1, curses.ACS_CKBOARD, n)
-
-
-    def manage_keys(self):
-        h, w = self.win.getmaxyx()
-        while 1:
-            self.show()
-            ch = self.win.getch()
-            if ch in [0x03, ord('q'), ord('Q')]:       # Ctrl-C
-                return -1
-            elif ch in [curses.KEY_UP, ord('p'), ord('P')]:
-                if self.entry_i != 0:
-                    self.entry_i -= 1
-            elif ch in [curses.KEY_DOWN, ord('n'), ord('n')]:
-                if self.entry_i != len(self.entries) - 1:
-                    self.entry_i += 1
-            elif ch in [curses.KEY_PPAGE, curses.KEY_BACKSPACE, 0x08, 0x10]:
-                if self.entry_i < (h - 3):
-                    self.entry_i = 0
-                else:
-                    self.entry_i -= (h - 2)
-            elif ch in [curses.KEY_NPAGE, ord(' '), 0x0E]:
-                if self.entry_i + (h-2) > len(self.entries) - 1:
-                    self.entry_i = len(self.entries) - 1
-                else:
-                    self.entry_i += (h - 2)
-            elif ch in [curses.KEY_HOME, 72, 348]:
-                self.entry_i = 0
-            elif ch in [curses.KEY_END, 70, 351]:
-                self.entry_i = len(self.entries) - 1
-            elif ch in [0x13]:     # Ctrl-S
-                theentries = self.entries[self.entry_i:]
-                ch2 = self.win.getkey()
-                for e in theentries:
-                    if e.find(ch2) == 0:
-                        break
-                else:
-                    continue
-                self.entry_i = self.entries.index(e)
-            elif ch in [10, 13]:   # enter
-                return self.entries[self.entry_i]
-            else:
-                curses.beep()
-
-
-    def run(self):
-        selected = self.manage_keys()
-        try:         # some terminals don't allow '2'
-            curses.curs_set(2)
-        except:
-            curses.curs_set(1)
-        return selected
-
-
-##################################################
-##################################################
 class Yes_No_Buttons:
     """Yes/No buttons"""
 
@@ -535,12 +434,15 @@ class EntryLine:
     def manage_keys(self):
         while 1:
             self.show()
+            chext = 0
             ch = self.entry.getch()            
 #              print 'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
 #                    (curses.keyname(ch), ch & 255, ch, ch)
             if ch == 0x1B:                # to avoid extra chars input
+                chext = 1
                 ch = self.entry.getch()
-            elif ch in [0x03]:            # Ctrl-C
+                ch = self.entry.getch()
+            if ch in [0x03]:            # Ctrl-C
                 return -1
             elif ch in [curses.KEY_UP]:
                 if self.with_historic:
@@ -578,6 +480,10 @@ class EntryLine:
                     else:
                         y, x = self.entry.getbegyx()
                         selected = SelectItem(entries, y + 1, x - 2).run()
+                        try:         # some terminals don't allow '2'
+                            curses.curs_set(2)
+                        except:
+                            curses.curs_set(1)
                     if selected != -1:
                         self.text = files.join(self.text, selected)
                         self.pos = len(self.text)
@@ -610,21 +516,23 @@ class EntryLine:
                     self.ins = 0
                 else:
                     self.ins = 1                    
-            elif ch in [curses.KEY_HOME, 72, 348]:      # home
+            elif (ch in [curses.KEY_HOME, 348]) or \
+                 (chext == 1) and (ch == 72):  # home
                 self.pos = 0
-            elif ch in [curses.KEY_END, 70, 351]:       # end
+            elif (ch in [curses.KEY_END, 351]) or \
+                 (chext == 1) and (ch == 70):   # end
                 self.pos = len(self.text)
             elif ch in [curses.KEY_LEFT] and self.pos > 0:
                 self.pos -= 1
             elif ch in [curses.KEY_RIGHT] and self.pos < len(self.text):
                 self.pos += 1
             elif ch in [8, curses.KEY_BACKSPACE] and len(self.text) > 0 and \
-                 self.pos > 0:    # del
+                 self.pos > 0:    # backspace
                 self.text = self.text[:self.pos-1] + self.text[self.pos:]
                 self.pos -= 1
-            elif ch in [curses.KEY_DC] and self.pos < len(self.text):  # supr
+            elif ch in [curses.KEY_DC] and self.pos < len(self.text):  # del
                 self.text = self.text[:self.pos] + self.text[self.pos+1:]
-            elif len(self.text) < 255 and 32 <= ch <= 255:
+            elif len(self.text) < 255 and 32 <= ch <= 255 and not chext:
                 if self.ins:
                     self.text = self.text[:self.pos] + chr(ch) + self.text[self.pos:]
                     self.pos += 1
@@ -872,3 +780,657 @@ class DoubleEntry:
         else:
             return None, None
 
+
+##################################################
+##################################################
+class SelectItem:
+    """A window to select an item"""
+
+    def __init__(self, entries, y0, x0, entry_i = ''):
+        h = (curses.LINES - 1) - (y0 + 1) + 1
+        w = min(max(map(len, entries)), curses.COLS/2) + 4
+        try:
+            self.win = curses.newwin(h, w, y0, x0)
+        except curses.error:
+            print 'Can\'t create window'
+            sys.exit(-1)
+        self.win.keypad(1)
+        curses.curs_set(0)
+        self.win.attrset(curses.color_pair(4))
+        self.win.bkgdset(curses.color_pair(4))
+
+        self.entries = entries
+        try:
+            self.entry_i = self.entries.index(entry_i)
+        except:
+            self.entry_i = 0
+        
+
+    def show(self):
+        self.win.erase()
+        self.win.attrset(curses.color_pair(4))
+        self.win.refresh()
+        self.win.box(0, 0)
+        y, x = self.win.getbegyx()
+        h, w = self.win.getmaxyx()
+        entry_a = self.entry_i / (h-2) * (h-2)
+        for i in range(h-2):
+            try:
+                line = self.entries[entry_a + i]
+            except IndexError:
+                line = ''
+            if len(line) > w - 3:
+                if (w - 3) % 2 == 0:     # even
+                    line = line[:(w-3)/2] + '~' + line[-(w-3)/2+2:]
+                else:                    # odd
+                    line = line[:(w-3)/2+1] + '~' + line[-(w-3)/2+2:]
+            if line != '':
+                self.win.addstr(i+1, 2, line, curses.color_pair(4))
+        self.win.refresh()
+        # cursor
+        cursor = curses.newpad(1, w - 2)
+        cursor.attrset(curses.color_pair(1) | curses.A_BOLD)
+        cursor.bkgdset(curses.color_pair(1))
+        cursor.erase()
+        line = self.entries[self.entry_i]
+        if len(line) > w - 2:
+            if (w - 2) % 2 == 0:         # even
+                line = line[:(w-2)/2] + '~' + line[-(w-2)/2+2:]
+            else:                        # odd
+                line = line[:(w-2)/2+1] + '~' + line[-(w-2)/2+2:]
+        cursor.addstr(0, 1, line, curses.color_pair(1) | curses.A_BOLD)
+        y += 1; x += 1
+        cursor.refresh(0, 0, y + self.entry_i % (h - 2),
+                       x, y + self.entry_i % (h - 2), x + w - 3)
+        # scrollbar
+        if len(self.entries) > h - 2:
+            n = (h-2) * (h-2) / len(self.entries)
+            if n == 0:
+                n = 1
+            a = self.entry_i /(h-2) * (h-2)
+            y0 = a * (h-2) / len(self.entries)
+            if y0 < 0:
+                y0 = 0
+            elif y0 + n > (h-2):
+                y0 = (h-2) - n
+        else:
+            y0 = 0
+            n = 0
+        self.win.vline(y0 + 1, w - 1, curses.ACS_CKBOARD, n)
+        if entry_a != 0:
+            self.win.vline(1, w - 1, '^', 1)
+            if n == 1 and (y0 + 1 == 1):
+                self.win.vline(2, w - 1, curses.ACS_CKBOARD, n)
+        if len(self.entries) - 1 > entry_a + h - 3:
+            self.win.vline(h - 2, w - 1, 'v', 1)
+            if n == 1 and (y0 + 1 == h - 2):
+                self.win.vline(h - 3, w - 1, curses.ACS_CKBOARD, n)
+
+
+    def manage_keys(self):
+        h, w = self.win.getmaxyx()
+        while 1:
+            self.show()
+            ch = self.win.getch()
+            if ch in [0x03, ord('q'), ord('Q')]:       # Ctrl-C
+                return -1
+            elif ch in [curses.KEY_UP, ord('p'), ord('P')]:
+                if self.entry_i != 0:
+                    self.entry_i -= 1
+            elif ch in [curses.KEY_DOWN, ord('n'), ord('n')]:
+                if self.entry_i != len(self.entries) - 1:
+                    self.entry_i += 1
+            elif ch in [curses.KEY_PPAGE, curses.KEY_BACKSPACE, 0x08, 0x10]:
+                if self.entry_i < (h - 3):
+                    self.entry_i = 0
+                else:
+                    self.entry_i -= (h - 2)
+            elif ch in [curses.KEY_NPAGE, ord(' '), 0x0E]:
+                if self.entry_i + (h-2) > len(self.entries) - 1:
+                    self.entry_i = len(self.entries) - 1
+                else:
+                    self.entry_i += (h - 2)
+            elif ch in [curses.KEY_HOME, 72, 348]:
+                self.entry_i = 0
+            elif ch in [curses.KEY_END, 70, 351]:
+                self.entry_i = len(self.entries) - 1
+            elif ch in [0x13]:     # Ctrl-S
+                theentries = self.entries[self.entry_i:]
+                ch2 = self.win.getkey()
+                for e in theentries:
+                    if e.find(ch2) == 0:
+                        break
+                else:
+                    continue
+                self.entry_i = self.entries.index(e)
+            elif ch in [10, 13]:   # enter
+                return self.entries[self.entry_i]
+            else:
+                curses.beep()
+
+
+    def run(self):
+        selected = self.manage_keys()
+        return selected
+
+
+##################################################
+##################################################
+class FindfilesWin:
+    """A window to select a file"""
+
+    def __init__(self, entries, entry_i = ''):
+        y0 = 1
+        h = (curses.LINES - 1) - (y0 + 1) + 1
+        # w = max(map(len, entries)) + 4
+        w = 64
+        x0 = (curses.COLS - w) / 2
+        try:
+            self.win = curses.newwin(h, w, y0, x0)
+        except curses.error:
+            print 'Can\'t create window'
+            sys.exit(-1)
+        self.win.keypad(1)
+        curses.curs_set(0)
+        self.win.attrset(curses.color_pair(4))
+        self.win.bkgdset(curses.color_pair(4))
+        self.entries = entries
+        try:
+            self.entry_i = self.entries.index(entry_i)
+        except:
+            self.entry_i = 0
+        self.btn_active = 0
+        
+
+    def show(self):
+        self.win.erase()
+        self.win.attrset(curses.color_pair(4))
+        self.win.refresh()
+        self.win.box(0, 0)
+        y, x = self.win.getbegyx()
+        h, w = self.win.getmaxyx()
+        entry_a = self.entry_i / (h-4) * (h-4)
+        for i in range(h-4):
+            try:
+                line = self.entries[entry_a + i]
+            except IndexError:
+                line = ''
+            if len(line) >= w - 3:
+                if (w - 3) % 2 == 0:     # even
+                    line = line[:(w-3)/2] + '~' + line[-(w-3)/2+3:]
+                else:                    # odd
+                    line = line[:(w-3)/2+1] + '~' + line[-(w-3)/2+3:]
+            if line != '':
+                self.win.addstr(i+1, 2, line, curses.color_pair(4))
+        self.win.refresh()
+        # cursor
+        cursor = curses.newpad(1, w - 2)
+        cursor.attrset(curses.color_pair(1) | curses.A_BOLD)
+        cursor.bkgdset(curses.color_pair(1))
+        cursor.erase()
+        line = self.entries[self.entry_i]
+        if len(line) >= w - 3:
+            if (w - 2) % 2 == 0:         # even
+                line = line[:(w-2)/2] + '~' + line[-(w-2)/2+3:]
+            else:                        # odd
+                line = line[:(w-2)/2+1] + '~' + line[-(w-2)/2+3:]
+        cursor.addstr(0, 1, line, curses.color_pair(1) | curses.A_BOLD)
+        y += 1; x += 1
+        cursor.refresh(0, 0, y + self.entry_i % (h - 4),
+                       x, y + self.entry_i % (h - 4), x + w - 3)
+        # scrollbar
+        if len(self.entries) > h - 4:
+            n = (h-4) * (h-4) / len(self.entries)
+            if n == 0:
+                n = 1
+            a = self.entry_i /(h-4) * (h-4)
+            y0 = a * (h-4) / len(self.entries)
+            if y0 < 0:
+                y0 = 0
+            elif y0 + n > (h-4):
+                y0 = (h-4) - n
+        else:
+            y0 = 0
+            n = 0
+        self.win.vline(y0 + 1, w - 1, curses.ACS_CKBOARD, n)
+        if entry_a != 0:
+            self.win.vline(1, w - 1, '^', 1)
+            if n == 1 and (y0 + 1 == 1):
+                self.win.vline(2, w - 1, curses.ACS_CKBOARD, n)
+        if len(self.entries) - 1 > entry_a + h - 3:
+            self.win.vline(h - 4, w - 1, 'v', 1)
+            if n == 1 and (y0 + 1 == h - 4):
+                self.win.vline(h - 5, w - 1, curses.ACS_CKBOARD, n)
+
+        self.win.hline(h - 3, 1, curses.ACS_HLINE, w - 2)
+        self.win.hline(h - 3, 0, curses.ACS_LTEE, 1)
+        self.win.hline(h - 3, w - 1, curses.ACS_RTEE, 1)
+        self.win.addstr(h - 2, 3,
+                        '[ Go ]  [ Panelize ]  [ View ]  [ Edit ]  [ Do ]  [ Quit ]',
+                        curses.color_pair(4))
+        if self.btn_active == 0:
+            attr0 = curses.color_pair(1) | curses.A_BOLD
+            attr1 = attr2 = attr3 = attr4 = attr5 = curses.color_pair(4)
+        elif self.btn_active == 1:
+            attr1 = curses.color_pair(1) | curses.A_BOLD
+            attr0 = attr2 = attr3 = attr4 = attr5 = curses.color_pair(4)
+        elif self.btn_active == 2:
+            attr2 = curses.color_pair(1) | curses.A_BOLD
+            attr0 = attr1 = attr3 = attr4 = attr5 = curses.color_pair(4)
+        elif self.btn_active == 3:
+            attr3 = curses.color_pair(1) | curses.A_BOLD
+            attr0 = attr1 = attr2 = attr4 = attr5 = curses.color_pair(4)
+        elif self.btn_active == 4:
+            attr4 = curses.color_pair(1) | curses.A_BOLD
+            attr0 = attr1 = attr2 = attr3 = attr5 = curses.color_pair(4)
+        else:
+            attr5 = curses.color_pair(1) | curses.A_BOLD
+            attr0 = attr1 = attr2 = attr3 = attr4 = curses.color_pair(4)
+        self.win.addstr(h - 2, 3, '[ Go ]', attr0)
+        self.win.addstr(h - 2, 11, '[ PAnelize ]', attr1)
+        self.win.addstr(h - 2, 25, '[ View ]', attr2)
+        self.win.addstr(h - 2, 35, '[ Edit ]', attr3)
+        self.win.addstr(h - 2, 45, '[ Do ]', attr4)
+        self.win.addstr(h - 2, 53, '[ Quit ]', attr5)
+        self.win.refresh()
+
+
+    def manage_keys(self):
+        h, w = self.win.getmaxyx()
+        while 1:
+            self.show()
+            ch = self.win.getch()
+            if ch in [0x03, ord('q'), ord('Q')]:       # Ctrl-C
+                return -1, None
+            elif ch in [curses.KEY_UP, ord('p'), ord('P')]:
+                if self.entry_i != 0:
+                    self.entry_i -= 1
+            elif ch in [curses.KEY_DOWN, ord('n'), ord('n')]:
+                if self.entry_i != len(self.entries) - 1:
+                    self.entry_i += 1
+            elif ch in [curses.KEY_PPAGE, curses.KEY_BACKSPACE, 0x08, 0x10]:
+                if self.entry_i < (h - 5):
+                    self.entry_i = 0
+                else:
+                    self.entry_i -= (h - 4)
+            elif ch in [curses.KEY_NPAGE, ord(' '), 0x0E]:
+                if self.entry_i + (h-4) > len(self.entries) - 1:
+                    self.entry_i = len(self.entries) - 1
+                else:
+                    self.entry_i += (h - 4)
+            elif ch in [curses.KEY_HOME, 72, 348]:
+                self.entry_i = 0
+            elif ch in [curses.KEY_END, 70, 351]:
+                self.entry_i = len(self.entries) - 1
+            elif ch in [0x13]:     # Ctrl-S
+                theentries = self.entries[self.entry_i:]
+                ch2 = self.win.getkey()
+                for e in theentries:
+                    if e.find(ch2) == 0:
+                        break
+                else:
+                    continue
+                self.entry_i = self.entries.index(e)
+            elif ch in [9]:        # tab
+                if self.btn_active == 5:
+                    self.btn_active = 0
+                else:
+                    self.btn_active += 1
+            elif ch in [10, 13]:   # enter
+                if self.btn_active == 0:
+                    return 0, self.entries[self.entry_i]
+                elif self.btn_active == 1:
+                    return 1, None
+                elif self.btn_active == 2:
+                    return 2, self.entries[self.entry_i]
+                elif self.btn_active == 3:
+                    return 3, self.entries[self.entry_i]
+                elif self.btn_active == 4:
+                    return 4, self.entries[self.entry_i]
+                elif self.btn_active == 5:
+                    return -1, None
+            elif ch in [ord('a'), ord('A')]:
+                return 1, None                
+            elif ch in [curses.KEY_F3, ord('v'), ord('V')]:
+                return 2, self.entries[self.entry_i]
+            elif ch in [curses.KEY_F4, ord('e'), ord('E')]:
+                return 3, self.entries[self.entry_i]
+            elif ch in [ord('@'), ord('d'), ord('D')]:
+                return 4, self.entries[self.entry_i]
+            else:
+                curses.beep()
+
+
+    def run(self):
+        selected = self.manage_keys()
+        return selected
+
+
+##################################################
+##################################################
+class MenuWin:
+    """A window to select a menu option"""
+
+    def __init__(self, title, entries):
+        h = len(entries) + 4
+        w = max(map(len, entries)) + 4
+        y0 = (curses.LINES - h) / 2
+        x0 = (curses.COLS - w) / 2
+        try:
+            self.win = curses.newwin(h, w, y0, x0)
+        except curses.error:
+            print 'Can\'t create window'
+            sys.exit(-1)
+        self.win.keypad(1)
+        curses.curs_set(0)
+        self.win.attrset(curses.color_pair(3))
+        self.win.bkgdset(curses.color_pair(3))
+        self.title = title
+        self.entries = entries
+        self.entry_i = 0
+        self.keys = [e[0] for e in entries]
+        
+
+    def show(self):
+        self.win.erase()
+        self.win.attrset(curses.color_pair(3))
+        self.win.refresh()
+        self.win.box(0, 0)
+        y, x = self.win.getbegyx()
+        h, w = self.win.getmaxyx()
+        attr = curses.color_pair(7)
+        self.win.addstr(0, (w-len(self.title)-2)/2, ' %s ' % self.title, attr)
+        for i in range(h-2):
+            try:
+                line = self.entries[i]
+            except IndexError:
+                line = ''
+            if line != '':
+                self.win.addstr(i+2, 2, line, curses.color_pair(3))
+        self.win.refresh()
+        # cursor
+        cursor = curses.newpad(1, w - 2)
+        cursor.attrset(curses.color_pair(1) | curses.A_BOLD)
+        cursor.bkgdset(curses.color_pair(1))
+        cursor.erase()
+        line = self.entries[self.entry_i]
+        cursor.addstr(0, 1, line, curses.color_pair(1) | curses.A_BOLD)
+        y += 1; x += 1
+        cursor.refresh(0, 0, y + self.entry_i % (h - 4) + 1,
+                       x, y + self.entry_i % (h - 4) + 1, x + w - 3)
+
+
+    def manage_keys(self):
+        h, w = self.win.getmaxyx()
+        self.show()
+        while 1:
+            self.show()
+            chext = 0
+            ch = self.win.getch()
+            if ch == 0x1B:
+                chext = 1
+                ch = self.win.getch()
+                ch = self.win.getch()
+            if ch in [0x03, ord('q'), ord('Q')]:       # Ctrl-C
+                return -1
+            elif ch in [curses.KEY_UP]:
+                if self.entry_i != 0:
+                    self.entry_i -= 1
+            elif ch in [curses.KEY_DOWN]:
+                if self.entry_i != len(self.entries) - 1:
+                    self.entry_i += 1
+            elif (ch in [curses.KEY_HOME, 348, curses.KEY_PPAGE, 0x08, 0x10,
+                         curses.KEY_BACKSPACE]) or (chext == 1) and (ch == 72):
+                self.entry_i = 0
+            elif (ch in [curses.KEY_END, 351, curses.KEY_NPAGE, ord(' '), 0x0E]) \
+                 or (chext == 1) and (ch == 70):   # end
+                self.entry_i = len(self.entries) - 1
+            elif ch in [0x13]:     # Ctrl-S
+                theentries = self.entries[self.entry_i:]
+                ch2 = self.win.getkey()
+                for e in theentries:
+                    if e.find(ch2) == 0:
+                        break
+                else:
+                    continue
+                self.entry_i = self.entries.index(e)
+            elif ch in [10, 13]:   # enter
+                return self.entries[self.entry_i]
+            elif 0 <= ch <= 255 and chr(ch).lower() in self.keys:
+                return self.entries[self.keys.index(chr(ch).lower())]
+            else:
+                curses.beep()
+
+
+    def run(self):
+        selected = self.manage_keys()
+        return selected
+
+
+##################################################
+##################################################
+class ChangePerms:
+    """A window to change permissions, owner or group"""
+
+    def __init__(self, file, fileinfo, app, i = 0, n = 0):
+        h = 6 + 4
+        w = 55 + 4
+        y0 = (curses.LINES - h) / 2
+        x0 = (curses.COLS - w) / 2
+        try:
+            self.win = curses.newwin(h, w, y0, x0)
+        except curses.error:
+            print 'Can\'t create window'
+            sys.exit(-1)
+        self.win.keypad(1)
+        curses.curs_set(0)
+        self.win.attrset(curses.color_pair(1))
+        self.win.bkgdset(curses.color_pair(1))
+
+        self.app = app
+        self.file = file
+        self.perms_old = files.perms2str(fileinfo[files.FT_PERMS])
+        self.perms = [l for l in self.perms_old]
+        self.owner = fileinfo[files.FT_OWNER]
+        self.group = fileinfo[files.FT_GROUP]
+        self.owner_old = self.owner[:]
+        self.group_old = self.group[:]
+        self.i = i
+        self.n = n
+        self.entry_i = 0
+        
+
+
+    def show_btns(self):
+        h, w = self.win.getmaxyx()
+        attr1 = curses.color_pair(1) | curses.A_BOLD
+        attr2 = curses.color_pair(9) | curses.A_BOLD
+        self.win.addstr(h - 2, w - 21, '[<Ok>]', attr1)
+        self.win.addstr(h - 2, w - 13, '[ Cancel ]', attr1)
+        if self.entry_i == 5:
+            self.win.addstr(h - 2, w - 21, '[<Ok>]', attr2)
+        elif self.entry_i == 6:
+            self.win.addstr(h - 2, w - 13, '[ Cancel ]', attr2)
+        if self.i:
+            self.win.addstr(h - 2, 3, '[ All ]', attr1)
+            self.win.addstr(h - 2, 12, '[ Ignore ]', attr1)
+            if self.entry_i == 7:
+                self.win.addstr(h - 2, 3, '[ All ]', attr2)
+            elif self.entry_i == 8:
+                self.win.addstr(h - 2, 12, '[ Ignore ]', attr2)
+
+    
+    def show(self):
+        h, w = self.win.getmaxyx()
+        self.win.erase()
+        self.win.attrset(curses.color_pair(1))
+        self.win.refresh()
+        self.win.box(0, 0)
+        attr = curses.color_pair(1) | curses.A_BOLD
+        title = 'Change permissions, owner or group'
+        self.win.addstr(0, (w-len(title)-2)/2, ' %s ' % title, attr)
+        self.win.addstr(2, 2, '\'%s\'' % self.file, attr)
+        if self.i:
+            self.win.addstr(2, w-12-2, '%4d of %-4d' % (self.i, self.n))
+        self.win.addstr(4, 7, 'owner  group  other        owner         group')
+        self.win.addstr(5, 2, 'new: [---]  [---]  [---]     [----------]  [----------]')
+        self.win.addstr(6, 2, 'old: [---]  [---]  [---]     [----------]  [----------]')
+        self.win.addstr(6, 8, self.perms_old[0:3])
+        self.win.addstr(6, 15, self.perms_old[3:6])
+        self.win.addstr(6, 22, self.perms_old[6:9])
+        l = len(self.owner_old)
+        if l > 10:
+            owner = self.owner_old[:10]
+        else:
+            owner = self.owner_old + '-' * (10-l)
+        self.win.addstr(6, 32, owner)
+        l = len(self.group_old)
+        if l > 10:
+            group = self.group_old[:10]
+        else:
+            group = self.group_old + '-' * (10-l)
+        self.win.addstr(6, 46, group)
+        
+        perms = ''.join(self.perms)
+        self.win.addstr(5, 8, perms[0:3])
+        self.win.addstr(5, 15, perms[3:6])
+        self.win.addstr(5, 22, perms[6:9])
+        l = len(self.owner)
+        if l > 10:
+            owner = self.owner[:10]
+        else:
+            owner = self.owner + '-' * (10-l)
+        self.win.addstr(5, 32, owner)
+        l = len(self.group)
+        if l > 10:
+            group = self.group[:10]
+        else:
+            group = self.group + '-' * (10-l)
+        self.win.addstr(5, 46, group)
+        if self.entry_i == 0:
+            self.win.addstr(5, 8, perms[0:3],
+                            curses.color_pair(5) | curses.A_BOLD)
+        elif self.entry_i == 1:
+            self.win.addstr(5, 15, perms[3:6],
+                            curses.color_pair(5) | curses.A_BOLD)
+        elif self.entry_i == 2:
+            self.win.addstr(5, 22, perms[6:9],
+                            curses.color_pair(5) | curses.A_BOLD)
+        elif self.entry_i == 3:
+            self.win.addstr(5, 32, owner,
+                            curses.color_pair(5) | curses.A_BOLD)
+        elif self.entry_i == 4:
+            self.win.addstr(5, 46, group,
+                            curses.color_pair(5) | curses.A_BOLD)
+        self.show_btns()
+        self.win.refresh()
+
+
+    def manage_keys(self):
+        y, x = self.win.getbegyx()
+        while 1:
+            self.show()
+            ch = self.win.getch()
+            if ch in [0x03, ord('c'), ord('C'), ord('q'), ord('Q')]:
+                return -1
+            elif ch in [ord('\t'), 0x09, curses.KEY_DOWN, curses.KEY_RIGHT]:
+                if self.i:
+                    if self.entry_i == 8:
+                        self.entry_i = 0
+                    else:
+                        self.entry_i += 1
+                else:
+                    if self.entry_i == 6:
+                        self.entry_i = 0
+                    else:
+                        self.entry_i += 1
+            elif ch in [curses.KEY_UP, curses.KEY_LEFT]:
+                if self.i:
+                    if self.entry_i == 0:
+                        self.entry_i = 8
+                    else:
+                        self.entry_i -= 1
+                else:
+                    if self.entry_i == 0:
+                        self.entry_i = 6
+                    else:
+                        self.entry_i -= 1
+            elif ch in [ord('r'), ord('R')]:
+                if not 0 <= self.entry_i <= 2:
+                    continue
+                d = self.entry_i * 3
+                if self.perms[d] == 'r':
+                    self.perms[d] = '-'
+                else:
+                    self.perms[d] = 'r'
+            elif ch in [ord('w'), ord('W')]:
+                if not 0 <= self.entry_i <= 2:
+                    continue
+                d = 1 + self.entry_i * 3
+                if self.perms[d] == 'w':
+                    self.perms[d] = '-'
+                else:
+                    self.perms[d] = 'w'
+            elif ch in [ord('x'), ord('X')]:
+                if not 0 <= self.entry_i <= 2:
+                    continue
+                d = 2 + self.entry_i * 3
+                if self.perms[d] == 'x':
+                    self.perms[d] = '-'
+                else:
+                    self.perms[d] = 'x'
+            elif ch in [ord('t'), ord('T')]:
+                if not self.entry_i == 2:
+                    continue
+                if self.perms[8] == 't':
+                    self.perms[8] = self.perms_old[8]
+                else:
+                    self.perms[8] = 't'
+            elif ch in [ord('s'), ord('S')]:
+                if not 0 <= self.entry_i <= 1:
+                    continue
+                d = 2 + self.entry_i * 3
+                if self.perms[d] == 's':
+                    self.perms[d] = self.perms_old[d]
+                else:
+                    self.perms[d] = 's'
+            elif ch in [10, 13]:
+                if self.entry_i == 3:
+                    owners = files.get_owners()
+                    try:
+                        owners.index(self.owner)
+                    except:
+                        owners.append(self.owner)
+                    ret = SelectItem(owners, y + 6, x + 32, self.owner).run()
+                    if ret != -1:
+                        self.owner = ret
+                    self.app.show()
+                elif self.entry_i == 4:
+                    groups = files.get_groups()
+                    try:
+                        groups.index(self.group)
+                    except:
+                        groups.append(self.group)
+                    ret = SelectItem(groups, y + 6, x + 32, self.group).run()
+                    if ret != -1:
+                        self.group = ret
+                    self.app.show()
+                elif self.entry_i == 6:
+                    return -1
+                elif self.i and self.entry_i == 7:
+                    return self.perms, self.owner, self.group, 1
+                elif self.i and self.entry_i == 8:
+                    return 0
+                else:
+                    return self.perms, self.owner, self.group, 0
+            elif self.i and ch in [ord('i'), ord('I')]:
+                return 0
+            elif self.i and ch in [ord('a'), ord('A')]:
+                return self.perms, self.owner, self.group, 1
+            else:
+                curses.beep()
+
+
+    def run(self):
+        selected = self.manage_keys()
+        return selected

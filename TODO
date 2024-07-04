@@ -3,26 +3,11 @@ Not Yet Implemented:
 + F1, h: help
 
 + F2, f: file menu
-	p - perms, owner, group
 	i - file info
-	@ - do something with file
-	g - gzip / gunzip
-	b - bzip2 / bunzip2
-	x - uncompress (tar.gz, tar.bz2)
-	c - compress (..)
 	y - encrypt/decrypt file
 
 + F9: Menu
-	/ - find, grep
-	  - df -k
-	  - du -sk
 	t - tree
-	s - shell
-	b - edit bookmarks
-	c - configuration  
-	  - save configuration
-
-+ /: find, grep
 
 + i: file info
 
@@ -36,27 +21,31 @@ Not Yet Implemented:
 
 General:
 ========
-+ exit to the current directory, look at mc hack
++ rewrite messages.show_fs_info()
 
-+ preferences: load, save, edit
-	- apps: shell, pager, editor
-	- confirmations: overwrite, delete
-	- sort: mode, mix_dirs, mix_cases
-	- historic: ?
++ capture output when executing file: ENTER, @
+
++ check errors while un/compressing
+
++ find/grep: panelize
+
++ preferences: edit, load/save historic
 
 + if action is time-consuming => threads... => | \ - /
 
-+ check if arg[1] = file, not a dir => view
++ internal viewer
 
 + look at distutils.file_util, distutils.dir_util, distutil.filelist, ...
 
-+ document functions and modules
++ document functions
 
 
-HACKS:
+Hacks:
 ======
 + Python os.stat doesn't have rdev in returned tuple,
   which is needed for devices major and minor numbers
+
++ Idem with 'getmnent' to get filesystem type
 
 + The first time Panel.__init_dir is executed, it needs to know prefs,
   so there is a hack to get it working
@@ -67,18 +56,21 @@ HACKS:
 + Completition code is a mess: we need to know panels path, but inside
   files.py and messages.py files we don't have access to 'app'
 
++ We need to use a shell hack to change the directory after lfm exists
 
-BUGS:
+
+Bugs:
 =====
++ messages.SelectItem, messages.FindfilesWin, messages.MenuWin,
+  messages.ChangePerms: upperleft corner disappears
+
 + lfm crashes in X when resizing terminal => handle SIGWINCH signal
 
-+ if panel2 has dir. 'a' and in panel1 it is deleted, it crashs
++ if panel2 has dir. 'a' and in panel1 'a' is deleted, lfm crashes
 
 + keys in Solaris terminal: look at the mail of Oleg Broytmann in c.l.p
 on 10 Jul 2001 12:11:39 +0400
 
 
 ============================================================================
-Last update:	Thursday 19 July 2001 18:46:54 CEST
-
-
+Last update:	Sunday 5 August 2001 19:04:37 CEST
