@@ -1,6 +1,7 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
+# -*- coding: iso-8859-15 -*-
 
-# Copyright (C) 2001-2  Iñigo Serna
+# Copyright (C) 2001-4  Iñigo Serna
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +19,7 @@
 
 
 """
-Copyright (C) 2001-2, Iñigo Serna <inigoserna@telefonica.net>.
+Copyright (C) 2001-4, Iñigo Serna <inigoserna@telefonica.net>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -193,9 +194,9 @@ class InternalView:
                 if ch in [ord('n'), ord('N'), curses.KEY_DOWN]:
                     if self.y < self.nlines - 1:
                         self.y += 1
-                elif ch in [curses.KEY_HOME, 348, 72]:
+                elif ch in [curses.KEY_HOME, 0x16A]:
                     self.y = 0
-                elif ch in [curses.KEY_END, 351, 70]:
+                elif ch in [curses.KEY_END, 0x181]:
                     self.y = self.nlines - 1
                 elif ch in [curses.KEY_PPAGE, 0x08, 0x10, curses.KEY_BACKSPACE]:
                     self.y -= curses.LINES - 2
@@ -205,7 +206,7 @@ class InternalView:
                     self.y += curses.LINES - 2
                     if self.y > self.nlines - 1:
                         self.y = self.nlines - 1
-                elif ch in [ord('q'), ord('Q'), ord('x'), ord('X'),
+                elif ch in [0x1B, ord('q'), ord('Q'), ord('x'), ord('X'),
                             curses.KEY_F3, curses.KEY_F10]:
                     quit = 1
         else:
@@ -219,8 +220,9 @@ class InternalView:
 class FileView:
     """Main application class"""
 
-    def __init__(self, file, line, mode, stdin_flag):
-        self.file = file
+    def __init__(self, win, filename, line, mode, stdin_flag):
+        self.win = win        # root window, need for resizing
+        self.file = filename
         self.mode = mode
         self.wrap = 0
         self.stdin_flag = stdin_flag
@@ -228,15 +230,15 @@ class FileView:
         self.pos = 0
         self.col = 0
         try:
-            self.__get_file_info(file)
+            self.__get_file_info(filename)
         except (IOError, os.error), (errno, strerror):
             messages.error('%s' % PYVIEW_NAME,
-                           '%s (%s)' % (strerror, errno), file)
+                           '%s (%s)' % (strerror, errno), filename)
             sys.exit(-1)
         if self.nbytes == 0:
-            messages.error('View \'%s\'' % file, 'File is empty')
+            messages.error('View \'%s\'' % filename, 'File is empty')
             sys.exit(-1)
-        self.fd = open(file)
+        self.fd = open(filename)
         self.line = 0
         try:
             if mode == MODE_TEXT:
@@ -278,13 +280,14 @@ class FileView:
     def init_curses(self):
         """initialize curses stuff: windows, colors, ..."""
 
+        self.maxh, self.maxw = self.win.getmaxyx()
         curses.cbreak()
         curses.raw()
         curses.curs_set(0)
         try:
             self.win_title = curses.newwin(1, 0, 0, 0)
-            self.win_file = curses.newwin(curses.LINES-2, 0, 1, 0)     # h, w, y, x
-            self.win_status = curses.newwin(1, 0, curses.LINES-1, 0)
+            self.win_file = curses.newwin(self.maxh-2, 0, 1, 0)     # h, w, y, x
+            self.win_status = curses.newwin(1, 0, self.maxh-1, 0)
         except curses.error:
             print 'Can\'t create windows'
             sys.exit(-1)
@@ -309,6 +312,19 @@ class FileView:
             self.win_status.attrset(curses.color_pair(1))
             self.win_status.bkgdset(curses.color_pair(1))
         self.win_file.keypad(1)
+
+
+    def resize_window(self):
+        h, w = self.win.getmaxyx()
+        self.maxh, self.maxw = h, w
+        if w == 0 or h == 2:
+            return
+        self.win.resize(h, w)
+        self.win_title.resize(1, w)
+        self.win_file.resize(h-2, w)
+        self.win_status.resize(1, w)
+        self.win_status.mvwin(h-1, 0)
+        self.show()
 
 
     def __move_lines(self, lines):
@@ -356,7 +372,7 @@ class FileView:
     
     def __get_lines_text(self):
         lines = []
-        for i in range(curses.LINES - 2):
+        for i in range(self.maxh - 2):
             l = self.fd.readline().rstrip().replace('\t', ' ' * 4)
             lines.append(l)
         self.fd.seek(self.pos)
@@ -367,7 +383,7 @@ class FileView:
     def __get_prev_lines_text(self):
         lines = []
         i = 0
-        for i in range(curses.LINES - 2):
+        for i in range(self.maxh - 2):
             line_i = self.line - 1 - i
             if line_i < 0:
                 break
@@ -420,22 +436,22 @@ class FileView:
         self.win_file.refresh()
         y = 0
         for l in lines:
-            lwin = curses.newpad(1, curses.COLS + 1)
+            lwin = curses.newpad(1, self.maxw + 1)
             lwin.erase()
-            l = l[self.col:self.col + curses.COLS]
-            if len(l) == curses.COLS:
-                l = l[:curses.COLS-1]
+            l = l[self.col:self.col + self.maxw]
+            if len(l) == self.maxw:
+                l = l[:self.maxw-1]
                 self.show_str(lwin, l)
-                lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS-1)
+                lwin.refresh(0, 0, y + 1, 0, y + 1, self.maxw-1)
                 lwin2 = curses.newpad(1, 2)
                 lwin2.erase()
                 attr = curses.color_pair(2) | curses.A_BOLD
                 lwin2.addch('>', attr)
-                lwin2.refresh(0, 0, y + 1, curses.COLS-1, y + 1, curses.COLS-1)
+                lwin2.refresh(0, 0, y + 1, self.maxw-1, y + 1, self.maxw-1)
                 del(lwin2)
             else:
                 self.show_str(lwin, l)
-                lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS)
+                lwin.refresh(0, 0, y + 1, 0, y + 1, self.maxw-1)
             del(lwin)
             y += 1
         self.win_file.refresh()
@@ -447,53 +463,53 @@ class FileView:
         self.win_file.refresh()
         y = 0
         for l in lines:
-            if y > curses.LINES - 2:
+            if y > self.maxh - 2:
                 break
-            if len(l) <= curses.COLS:
-                lwin = curses.newpad(1, curses.COLS + 1)
+            if len(l) <= self.maxw:
+                lwin = curses.newpad(1, self.maxw + 1)
                 lwin.erase()
-                if len(l) != curses.COLS:
+                if len(l) != self.maxw:
                     self.show_str(lwin, l)
-                    lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS)
+                    lwin.refresh(0, 0, y + 1, 0, y + 1, self.maxw-1)
                 else:
                     self.show_str(lwin, l[:-1])
-                    lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS-1)
+                    lwin.refresh(0, 0, y + 1, 0, y + 1, self.maxw-1)
                     lwin2 = curses.newpad(1, 2)
                     lwin2.erase()
                     self.show_chr(lwin2, l[-1])
-                    lwin2.refresh(0, 0, y + 1, curses.COLS-1,
-                                  y + 1, curses.COLS-1)
+                    lwin2.refresh(0, 0, y + 1, self.maxw-1,
+                                  y + 1, self.maxw-1)
                     del(lwin2)
 
                 del(lwin)
                 y += 1
             else:
                 while len(l) > 0:
-                    lwin = curses.newpad(1, curses.COLS + 1)
+                    lwin = curses.newpad(1, self.maxw + 1)
                     lwin.erase()
-                    l2 = l[:curses.COLS]
-                    if len(l2) == curses.COLS:
+                    l2 = l[:self.maxw]
+                    if len(l2) == self.maxw:
                         self.show_str(lwin, l2[:-1])
-                        lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS-1)
+                        lwin.refresh(0, 0, y + 1, 0, y + 1, self.maxw-1)
                         lwin2 = curses.newpad(1, 2)
                         lwin2.erase()
                         self.show_chr(lwin2, l2[-1:])
-                        lwin2.refresh(0, 0, y + 1, curses.COLS-1,
-                                      y + 1, curses.COLS-1)
+                        lwin2.refresh(0, 0, y + 1, self.maxw-1,
+                                      y + 1, self.maxw-1)
                         del(lwin2)
                     else:
                         self.show_str(lwin, l2)
-                        lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS)
+                        lwin.refresh(0, 0, y + 1, 0, y + 1, self.maxw-1)
                     del(lwin)
                     y += 1
-                    if y > curses.LINES - 2:
+                    if y > self.maxh - 2:
                         break
-                    l = l[curses.COLS:]
+                    l = l[self.maxw:]
         self.win_file.refresh()
 
 
     def __move_hex(self, lines):
-        self.pos = self.pos & 0xFFFFFFF0
+        self.pos = self.pos & 0xFFFFFFF0L
         if lines > 0:
             if self.pos + lines * 16 > self.nbytes - 1:
                 self.pos = self.nbytes - 1
@@ -517,36 +533,54 @@ class FileView:
             self.line = i
 
 
-    def __get_lines_hex(self):
+    def __get_lines_hex(self, chars_per_line = 16):
         self.__move_hex(0)
-        lines = self.fd.read(16 * (curses.LINES - 2))
+        lines = self.fd.read(chars_per_line * (self.maxh - 2))
         le = len(lines)
-        if le != 16 * (curses.LINES - 2):
-            for i in range(16 * (curses.LINES - 2) - le):
+        if le != chars_per_line * (self.maxh - 2):
+            for i in range(chars_per_line * (self.maxh - 2) - le):
                 lines += chr(0)
         self.fd.seek(self.pos)
         return lines
 
 
     def show_hex(self):
-        lines = self.__get_lines_hex()
+        if self.maxw >= 152:
+            chars_per_line = 32
+        elif self.maxw >= 134:
+            chars_per_line = 28
+        elif self.maxw >= 116:
+            chars_per_line = 24
+        elif self.maxw >= 98:
+            chars_per_line = 20
+        elif self.maxw >= 80:
+            chars_per_line = 16
+        elif self.maxw >= 62:
+            chars_per_line = 12
+        elif self.maxw >= 44:
+            chars_per_line = 8
+        elif self.maxw >= 26:
+            chars_per_line = 4
+        else:
+            return
+        lines = self.__get_lines_hex(chars_per_line)
         self.win_file.erase()
         self.win_file.refresh()
-        for y in range(curses.LINES - 2):
-            lwin = curses.newpad(1, curses.COLS + 1)
+        for y in range(self.maxh - 2):
+            lwin = curses.newpad(1, self.maxw + 1)
             lwin.erase()
             attr = curses.color_pair(2) | curses.A_BOLD
-            lwin.addstr(0, 0, '%8.8X ' % (self.pos + 16 * y), attr)
-            for i in range(4):
+            lwin.addstr(0, 0, '%8.8X ' % (self.pos + chars_per_line * y), attr)
+            for i in range(chars_per_line / 4):
                 buf = ''
                 for j in range(4):
-                    buf += '%2.2X ' % (ord(lines[y*16 + 4 * i + j]) & 0xFF)
+                    buf += '%2.2X ' % (ord(lines[y*chars_per_line + 4 * i + j]) & 0xFF)
                 lwin.addstr(buf)
-                if i != 3:
+                if i != chars_per_line / 4 - 1:
                     lwin.addch(curses.ACS_VLINE)
                     lwin.addch(' ')
-            for i in range(16):
-                c = lines[y*16 + i]
+            for i in range(chars_per_line):
+                c = lines[y*chars_per_line + i]
                 if curses.ascii.iscntrl(c) or ord(c) in range(0x7F, 0xA0):
                     lwin.addch(ord('.'))
                 elif curses.ascii.isascii(c):
@@ -556,8 +590,54 @@ class FileView:
                 else:
                     lwin.addch(ord('.'))
 
-            lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS - 1)
+            lwin.refresh(0, 0, y + 1, 0, y + 1, self.maxw - 1)
         self.win_file.refresh()
+
+
+    def show_title(self):
+        if self.maxw > 20:
+            if self.stdin_flag:
+                title = 'STDIN'
+            else:
+                title = os.path.basename(self.file)
+            if len(title) > self.maxw-52:
+                title = title[:self.maxw-58] + '~' + title[-5:]
+            self.win_title.addstr('File: %s' % title)
+        if self.maxw >= 67:
+            if self.col != 0 or self.wrap:
+                self.win_title.addstr(0, int(self.maxw/2) - 14, 'Col: %d' % self.col)
+            buf = 'Bytes: %d/%d' % (self.pos, self.nbytes)
+            self.win_title.addstr(0, int(self.maxw/2) - 5, buf)
+            buf = 'Lines: %d/%d' % (self.line + 1, self.nlines)
+            self.win_title.addstr(0, int(self.maxw * 3 / 4) - 4, buf)
+        if self.maxw > 5:
+            self.win_title.addstr(0, self.maxw - 5,
+                                  '%3d%%' % (int(self.pos * 100 / self.nbytes)))
+
+
+    def show_status(self):
+        if self.maxw > 40:
+            if self.stdin_flag:
+                path = 'STDIN'
+            else:
+                path = os.path.dirname(self.file)
+                if not path or path[0] != os.sep:
+                    path = os.path.join(os.getcwd(), path)
+            if len(path) > self.maxw - 37:
+                path = '~' + path[-(self.maxw - 38):]
+            self.win_status.addstr('Path: %s' % path)
+        if self.maxw > 30:
+            if self.mode == 0:
+                mode = 'TEXT'
+            else:
+                mode = 'HEX'
+            self.win_status.addstr(0, self.maxw - 30, 'View mode: %s' % mode)
+            if self.wrap:
+                wrap = 'YES'
+            else:
+                wrap = 'NO'
+            if self.mode == MODE_TEXT:
+                self.win_status.addstr(0, self.maxw - 10, 'Wrap: %s' % wrap)
 
 
     def show(self):
@@ -567,23 +647,11 @@ class FileView:
         self.win_file.erase()
         self.win_status.erase()
 
+        if self.maxh < 3:
+            return
+        
         # title
-        if self.stdin_flag:
-            title = 'STDIN'
-        else:
-            title = os.path.basename(self.file)
-        if len(title) > curses.COLS-52:
-            title = title[:curses.COLS-58] + '~' + title[-5:]
-        self.win_title.addstr('File: %s' % title)
-        if self.col != 0 or self.wrap:
-            self.win_title.addstr(0, int(curses.COLS/2) - 14, 'Col: %d' % self.col)
-        buf = 'Bytes: %d/%d' % (self.pos, self.nbytes)
-        self.win_title.addstr(0, int(curses.COLS/2) - 5, buf)
-        buf = 'Lines: %d/%d' % (self.line + 1, self.nlines)
-        self.win_title.addstr(0, int(curses.COLS * 3 / 4) - 4, buf)
-        self.win_title.addstr(0, curses.COLS - 5,
-                              '%3d%%' % (int(self.pos * 100 / self.nbytes)))
-
+        self.show_title()
         # file
         if self.mode == MODE_TEXT:
             if self.wrap:
@@ -592,28 +660,8 @@ class FileView:
                 self.show_text_nowrap()
         else:
             self.show_hex()
-
         # status
-        if self.stdin_flag:
-            path = 'STDIN'
-        else:
-            path = os.path.dirname(self.file)
-            if not path or path[0] != os.sep:
-                path = os.path.join(os.getcwd(), path)
-        if len(path) > curses.COLS - 37:
-            path = '~' + path[-(curses.COLS - 38):]
-        self.win_status.addstr('Path: %s' % path)
-        if self.mode == 0:
-            mode = 'TEXT'
-        else:
-            mode = 'HEX'
-        if self.wrap:
-            wrap = 'YES'
-        else:
-            wrap = 'NO'
-        self.win_status.addstr(0, curses.COLS - 30, 'View mode: %s' % mode)
-        if self.mode == MODE_TEXT:
-            self.win_status.addstr(0, curses.COLS - 10, 'Wrap: %s' % wrap)
+        self.show_status()
 
         self.win_title.refresh()
         self.win_file.refresh()
@@ -695,14 +743,7 @@ class FileView:
 
         self.show()
         while 1:
-            chext = 0
             ch = self.win_file.getch()
-
-            # to avoid extra chars input
-            if ch == 0x1B:
-                chext = 1
-                ch = self.win_file.getch()
-                ch = self.win_file.getch()
 
             # cursor up
             if ch in [ord('p'), ord('P'), curses.KEY_UP]:
@@ -711,9 +752,9 @@ class FileView:
                         if self.col == 0:
                             if self.line > 0:
                                 self.__move_lines(-1)
-                                self.col = int(self.__get_line_length() / curses.COLS) * curses.COLS
+                                self.col = int(self.__get_line_length() / self.maxw) * self.maxw
                         else:
-                            self.col -= curses.COLS
+                            self.col -= self.maxw
                     else:
                         self.__move_lines(-1)
                 else:
@@ -724,10 +765,10 @@ class FileView:
                 if self.mode == MODE_TEXT:
                     if self.wrap:
                         if self.line >= self.nlines - 1 and \
-                               self.__get_line_length() < (curses.COLS * (curses.LINES - 2)):
+                               self.__get_line_length() < (self.maxw * (self.maxh - 2)):
                             pass
                         else:
-                            self.col += curses.COLS
+                            self.col += self.maxw
                             if self.col >= self.__get_line_length():
                                 self.col = 0
                                 self.__move_lines(1)
@@ -749,7 +790,7 @@ class FileView:
                             lines.insert(0, line0)
                         else:
                             line0 = ''
-                        y = curses.LINES - 2
+                        y = self.maxh - 2
                         for i in range(len(lines)):
                             y -= 1
                             dy = 0
@@ -758,15 +799,15 @@ class FileView:
                             exit1 = 0
                             len2 = len(lines[i])
                             lenz = len2
-                            while len2 > curses.COLS:
+                            while len2 > self.maxw:
                                 dy += 1
                                 y -= 1
                                 if y < 0:
                                     i += 1
-                                    dy = int(lenz / curses.COLS) + 1 - dy
+                                    dy = int(lenz / self.maxw) + 1 - dy
                                     exit1 = 1
                                     break
-                                len2 -= curses.COLS
+                                len2 -= self.maxw
                             if exit1:
                                 break
                         else:
@@ -776,16 +817,16 @@ class FileView:
                         if y < 0:
                             self.__move_lines(-i)
                             if i == 0:
-                                self.col = (dy - 1) * curses.COLS
+                                self.col = (dy - 1) * self.maxw
                             else:
-                                self.col = dy * curses.COLS
+                                self.col = dy * self.maxw
                         else:
-                            self.__move_lines(-(curses.LINES-2))
+                            self.__move_lines(-(self.maxh-2))
                             self.col = 0
                     else:
-                        self.__move_lines(-(curses.LINES-2))
+                        self.__move_lines(-(self.maxh-2))
                 else:
-                    self.__move_hex(-(curses.LINES-2))
+                    self.__move_hex(-(self.maxh-2))
                 self.show()
             # page next
             elif ch in [curses.KEY_NPAGE, ord(' '), 0x0E]:   # Ctrl-N
@@ -797,34 +838,33 @@ class FileView:
                         for i in range(len(lines)):
                             y += 1
                             dy = 0
-                            if y > curses.LINES - 2:
+                            if y > self.maxh - 2:
                                 break
                             exit1 = 0
                             len2 = len(lines[i])
-                            while len2 > curses.COLS:
+                            while len2 > self.maxw:
                                 dy += 1
                                 y += 1
-                                if y > curses.LINES - 2:
+                                if y > self.maxh - 2:
                                     exit1 = 1
                                     break
-                                len2 -= curses.COLS
+                                len2 -= self.maxw
                             if exit1:
                                 break
                         else:
                             i += 1
                         self.__move_lines(i)
                         if i == 0:
-                            self.col += dy * curses.COLS
+                            self.col += dy * self.maxw
                         else:
-                            self.col = dy * curses.COLS
+                            self.col = dy * self.maxw
                     else:
-                        self.__move_lines(curses.LINES-2)
+                        self.__move_lines(self.maxh-2)
                 else:
-                    self.__move_hex(curses.LINES-2)
+                    self.__move_hex(self.maxh-2)
                 self.show()
             # home
-            elif (ch in [curses.KEY_HOME, 348]) or \
-                 (chext == 1) and (ch == 72):  # home
+            elif (ch in [curses.KEY_HOME, 0x16A]):  # home
                 if self.mode == MODE_TEXT:
                     self.__move_lines(-self.nlines)
                 else:
@@ -832,8 +872,7 @@ class FileView:
                 self.col = 0
                 self.show()
             # end
-            elif (ch in [curses.KEY_END, 351]) or \
-                 (chext == 1) and (ch == 70):   # end
+            elif (ch in [curses.KEY_END, 0x181]):   # end
                 if self.mode == MODE_TEXT:
                     self.__move_lines(self.nlines)
                 else:
@@ -852,7 +891,7 @@ class FileView:
             elif ch in [curses.KEY_RIGHT]:
                 if self.mode == MODE_HEX or self.wrap:
                     continue
-                if self.col + curses.COLS < self.col_max + 2:
+                if self.col + self.maxw < self.col_max + 2:
                     self.col += 10
                     self.show()
 
@@ -986,6 +1025,10 @@ class FileView:
                 InternalView('Help for %s' % PYVIEW_NAME, buf).run()
                 self.show()
 
+            # resize window
+            elif ch in [curses.KEY_RESIZE]:
+                self.resize_window()
+                
             # quit
             elif ch in [ord('q'), ord('Q'), ord('x'), ord('X'),
                         curses.KEY_F3, curses.KEY_F10]:
@@ -1021,9 +1064,9 @@ Options:
 """ % (PYVIEW_NAME, VERSION, DATE, AUTHOR, prog)
 
 
-def main(win, file, line, mode, stdin_flag):
+def main(win, filename, line, mode, stdin_flag):
 
-    app = FileView(file, line, mode, stdin_flag)
+    app = FileView(win, filename, line, mode, stdin_flag)
     if app == OSError:
         sys.exit(-1)
     return app.run()
@@ -1034,7 +1077,7 @@ def PyView(sysargs):
 
     # defaults
     DEBUG = 0
-    file = ''
+    filename = ''
     line = 0
     mode = MODE_TEXT
     
@@ -1083,21 +1126,20 @@ def PyView(sysargs):
                     usage(sysargs[0], '<%s> is not a valid line number' % line)
                     sys.exit(-1)
             else:
-                file = arg
+                filename = arg
         except IndexError:
             break
-    if file == '' and not stdin_flag:
+    if filename == '' and not stdin_flag:
         usage(sysargs[0], 'File is missing')
         sys.exit(-1)
     if stdin_flag:
-        file = create_temp_for_stdin(stdin)
+        filename = create_temp_for_stdin(stdin)
     else:
-        if not os.path.isfile(file):
+        if not os.path.isfile(filename):
             usage(sysargs[0], '<%s> is not a valid file' % file)            
             sys.exit(-1)
 
-
-    DEBUGFILE = "./pyview-log.%d" % os.getpid()
+    DEBUGFILE = './pyview-log.debug'
     if DEBUG:
         debug = open(DEBUGFILE, 'w')
         debug.write('********** Start:   ')
@@ -1105,7 +1147,7 @@ def PyView(sysargs):
         sys.stdout = debug
         sys.stderr = debug
 
-    curses.wrapper(main, file, line, mode, stdin_flag)
+    curses.wrapper(main, filename, line, mode, stdin_flag)
     
     if DEBUG:
         debug.write('********** End:     ')
@@ -1116,7 +1158,7 @@ def PyView(sysargs):
     sys.stdout = sys.__stderr__
 
     if stdin_flag:
-        os.unlink(file)
+        os.unlink(filename)
 
 
 if __name__ == '__main__':

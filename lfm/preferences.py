@@ -1,3 +1,5 @@
+# -*- coding: iso-8859-15 -*-
+
 """prefences.py
 
 This module defines the preferences class for lfm.
@@ -19,19 +21,20 @@ PROGNAME = 'lfm - Last File Manager'
 class Preferences:
     """Preferences class"""
     
-    def __init__(self, prefsfile, defaultprogs):
+    def __init__(self, prefsfile, defaultprogs, filetypes):
         self.file = os.path.abspath(os.path.expanduser(os.path.join('~',
                                                                     prefsfile)))
         self.file_start = '#' * 10 + ' ' + PROGNAME + ' ' + \
                           'Preferences File' + ' ' + '#' * 10
-        self.progs = {}
-        self.check_defaultprogs(defaultprogs)
+        self.progs = defaultprogs
+        self.filetypes = filetypes
         self.modes = { 'sort': files.SORTTYPE_byName,
                        'sort_mix_dirs': 0, 'sort_mix_cases': 0 }
         self.confirmations = { 'delete': 1, 'overwrite': 1, 'quit': 0,
                                'ask_rebuild_vfs': 1}
         self.options = { 'save_conf_at_exit': 1, 'show_output_after_exec': 1,
-                         'rebuild_vfs': 0}
+                         'rebuild_vfs': 0, 'detach_terminal_at_exec': 1,
+                         'show_dotfiles': 1 }
         self.bookmarks = [ '/',
                            '/home/inigo',
                            '/home/inigo/personal',
@@ -56,13 +59,11 @@ class Preferences:
                 'current_selected_file': ('yellow', 'cyan') }
 
 
-    def check_defaultprogs(self, progs):
-        for k, vs in progs.items():
-            for v in vs:
-                r = files.exec_cmd('which \"%s\"' % v)
-                if r:
-                    self.progs[k] = r.strip()
-                    break
+    def check_progs(self, progs):
+        for k, v in progs.items():
+            r = files.exec_cmd2('which \"%s\"' % v)
+            if r:
+                self.progs[k] = v
             else:
                 self.progs[k] = ''
                 
@@ -93,13 +94,27 @@ class Preferences:
             b[0] = b[0].strip()
             b[1] = b[1].strip()
             if section == 'programs':
-                for k in self.progs.keys():
-                    if b[0] == k:
-                        self.progs[k] = b[1]
-#                          print 'Program->%s = %s' % (k, b[1])
-                        break
-                else:
-                    print 'Bad program option:', b[0]
+#                 for k in self.progs.keys():
+#                     if b[0] == k:
+#                         self.progs[k] = b[1]
+# #                         print 'Program->%s = %s' % (k, b[1])
+#                         break
+#                 else:
+#                     print 'Bad program option:', b[0]
+                self.progs[b[0]] = b[1]
+#                 print 'Program->%s = %s' % (b[0] , b[1])
+            elif section == 'file types':
+#                 for k in self.filetypes.keys():
+#                     if b[0] == k:
+#                         lst = [t.strip() for t in b[1].split(',')]
+#                         self.filetypes[k] = tuple(lst)
+#                         print 'File Types->%s = %s' % (k, tuple(lst))
+#                         break
+#                 else:
+#                     print 'Bad program option:', b[0]
+                lst = [t.strip() for t in b[1].split(',')]
+                self.filetypes[b[0]] = tuple(lst)
+#                 print 'File Types->%s = %s' % (b[0], tuple(lst))
             elif section == 'modes':
                 try:
                     val = int(b[1])
@@ -109,10 +124,13 @@ class Preferences:
                     for k in self.modes.keys():
                         if b[0] == k:
                             self.modes[k] = val
-#                            print 'Mode->%s = %d' % (k, val)
+#                             print 'Mode->%s = %d' % (k, val)
                             break
                     else:
                         print 'Bad mode option:', b[0]
+                elif b[0] == 'sort' and 0 <= val <= 6:
+                    self.modes['sort'] = val
+#                     print 'Mode->%s = %d' % ('sort', val)
                 else:
                     print 'Bad mode value:', l
             elif section == 'confirmations':
@@ -124,7 +142,7 @@ class Preferences:
                     for k in self.confirmations.keys():
                         if b[0] == k:
                             self.confirmations[k] = val
-#                            print 'Confirmations->%s = %d' % (k, val)
+#                             print 'Confirmations->%s = %d' % (k, val)
                             break
                     else:
                         print 'Bad confirmation option:', b[0]
@@ -139,7 +157,7 @@ class Preferences:
                     for k in self.options.keys():
                         if b[0] == k:
                             self.options[k] = val
-#                            print 'Options->%s = %d' % (k, val)
+#                             print 'Options->%s = %d' % (k, val)
                             break
                     else:
                         print 'Bad option option:', b[0]
@@ -153,7 +171,7 @@ class Preferences:
                 if 0 <= n <= 9:
                     if os.path.isdir(b[1]):
                         self.bookmarks[n] = b[1]
-#                        print 'Bookmark[%d] = %s' % (n, b[1])
+#                         print 'Bookmark[%d] = %s' % (n, b[1])
                     elif not b[1]:
                         # No bookmark defined -- it's not an error. We should
                         # not be so verbose.
@@ -184,6 +202,11 @@ class Preferences:
         f.write('[ Programs ]\n')
         for k, v in self.progs.items():
             f.write('%s: %s\n' % (k, v))
+        f.write('\n')
+        # filetypes
+        f.write('[ File Types ]\n')
+        for k, vs in self.filetypes.items():
+            f.write('%s: %s\n' % (k, ', '.join(vs)))
         f.write('\n')
         # modes
         f.write('[ Modes ]\n')

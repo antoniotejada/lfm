@@ -1,3 +1,5 @@
+# -*- coding: iso-8859-15 -*-
+
 """files.py
 
 This module defines files utilities for lfm.
@@ -16,21 +18,48 @@ import thread
 
 ########################################################################
 ########################################################################
-def get_rdev(file):
-    """return the size of the directory or file via 'du -sk' command
-    or  via 'ls -la' to get mayor and minor number of devices."""
+# def get_rdev(file):
+#     """return the size of the directory or file via 'du -sk' command
+#     or  via 'ls -la' to get mayor and minor number of devices."""
 
-    # HACK: Python os.stat doesn't have rdev in returned tuple,
-    #       which is a must to calculate major and minor numbers
-    #       for devices
-    # st_rdev = os.lstat(os.path.join(path, filename))[stat.ST_RDEV]
-    try:
-        str = os.popen('ls -la %s' % file).read().split()
-    except:
-        return 0
-    else:
-        return int(str[4][:-1]), int(str[5])
+#     # HACK: Python os.stat doesn't have rdev in returned tuple,
+#     #       which is a must to calculate major and minor numbers
+#     #       for devices
+#     # st_rdev = os.lstat(os.path.join(path, filename))[stat.ST_RDEV]
+#     try:
+#         str = os.popen('ls -la %s' % file).read().split()
+#     except:
+#         return 0
+#     else:
+#         return int(str[4][:-1]), int(str[5])
 
+
+# HACK: checks for st_rdev in stat_result, falling back to
+#       "ls -la %s" hack if Python before 2.2 or without st_rdev
+try:
+    os.stat_result.st_rdev
+    HAS_ST_RDEV = 1
+except:
+    HAS_ST_RDEV = 0
+if HAS_ST_RDEV:
+    def get_rdev(file):
+        r = os.stat(file).st_rdev
+        return r>>8, r&255
+else:
+    def get_rdev(file):
+        """return the size of the directory or file via 'du -sk' command
+        or  via 'ls -la' to get mayor and minor number of devices."""
+        try:
+            str = os.popen('ls -la %s' % file).read().split()
+        except:
+            return 0
+        else:
+            try:
+                return int(str[4][:-1]), int(str[5])
+            except:
+                # HACK: found 0xff.. encoded device numbers, ignore them...
+                return 0,0
+del HAS_ST_RDEV
 
 ########################################################################
 ########################################################################
@@ -153,7 +182,7 @@ def get_fileinfo(file, pardir_flag = 0, show_dirs_size = 0):
             size, st[stat.ST_MTIME])
 
 
-def get_dir(path):
+def get_dir(path, show_dotfiles = 1):
     """return a dict whose elements are formed by file name as key
     and a (filetype, perms, owner, group, size, mtime) tuple as value.
     """
@@ -163,6 +192,8 @@ def get_dir(path):
     if path != os.sep:
         files_dict[os.pardir] = get_fileinfo(os.path.dirname(path), 1)
     files_list = os.listdir(path)
+    if not show_dotfiles:
+        files_list = [f for f in files_list if f[0] != '.']
     for file in files_list:
         files_dict[file] = get_fileinfo(os.path.join(path, file))
     return len(files_dict), files_dict
@@ -258,67 +289,45 @@ def sort_dir(files_dict, sortmode, sort_mix_dirs, sort_mix_cases):
 
 ########################################################################
 ########################################################################
-def get_fileinfostr(path, filename, filevalues):
-    type = filevalues[FT_TYPE]
-    type_chr = FILETYPES[type][0]
-    if len(filename) > 21:
-        fname = filename[:12] + '~' + filename[-8:]
-    else:
-        fname = filename
-    perms = perms2str(filevalues[1])
-    if -15552000 < (time.time() - filevalues[FT_MTIME]) < 15552000:
-        # filedate < 6 months from now, past or future
-        mtime = time.strftime('%a %b %d %H:%M', time.localtime(filevalues[FT_MTIME]))
-    else:
-        mtime = time.strftime('%a  %d %b %Y', time.localtime(filevalues[FT_MTIME]))
-    if type == FTYPE_CDEV or type == FTYPE_BDEV:
+def get_fileinfo_dict(path, filename, filevalues):
+    res = {}
+    res['filename'] = filename
+    typ = filevalues[FT_TYPE]
+    res['type_chr'] = FILETYPES[typ][0]
+    if typ == FTYPE_CDEV or typ == FTYPE_BDEV:
         # HACK: it's too time consuming to calculate all files' rdevs
         #       in a directory, so we just calculate needed ones here
         #       at show time
         maj_rdev, min_rdev = get_rdev(os.path.join(path, filename))
-        buf = '%c%-21s   %3d,%3d %-8s %-8s%11s%18s' % (type_chr, fname,
-                                                       maj_rdev, min_rdev,
-                                                       filevalues[FT_OWNER],
-                                                       filevalues[FT_GROUP],
-                                                       perms, mtime)
-    else:
-        buf = '%c%-21s%10d %-8s %-8s%11s%18s' % (type_chr, fname,
-                                                 filevalues[FT_SIZE],
-                                                 filevalues[FT_OWNER],
-                                                 filevalues[FT_GROUP],
-                                                 perms, mtime)
-    return buf
-
-
-def get_fileinfostr_short(path, filename, filevalues):
-    type = filevalues[FT_TYPE]
-    type_chr = FILETYPES[type][0]
-    if len(filename) > 16:
-        fname = filename[:9] + '~' + filename[-6:]
-    else:
-        fname = filename
-    if -15552000 < (time.time() - filevalues[FT_MTIME]) < 15552000:
-        # filedate < 6 months from now, past or future
-        mtime = time.strftime('%d %b %H:%M', time.localtime(filevalues[FT_MTIME]))
-    else:
-        mtime = time.strftime('%d %b  %Y', time.localtime(filevalues[FT_MTIME]))
-    if type == FTYPE_CDEV or type == FTYPE_BDEV:
-        # HACK: it's too time consuming to calculate all files' rdevs
-        #       in a directory, so we just calculate needed ones here
-        #       at show time
-        maj_rdev, min_rdev = get_rdev(os.path.join(path, filename))
-        buf = '%c%-16s %3d,%3d %12s' % (type_chr, fname,
-                                          maj_rdev, min_rdev, mtime)
+        res['size'] = 0
+        res['maj_rdev'] = maj_rdev
+        res['min_rdev'] = min_rdev
+        res['dev'] = 1
     else:
         size = filevalues[FT_SIZE]
-        if size >= 10000000000L:
+        if size >= 1000000000L:
             size = str(size/(1024*1024)) + 'G'            
         elif size >= 10000000L:
             size = str(size/1024) + 'K'
         else:
             size = str(size)
-        buf = '%c%-16s %7s %12s' % (type_chr, fname, size, mtime)
-    return buf
+        res['size'] = size
+        res['maj_rdev'] = 0
+        res['min_rdev'] = 0
+        res['dev'] = 0
+    res['perms'] = perms2str(filevalues[1])
+    res['owner'] = filevalues[FT_OWNER]
+    res['group'] = filevalues[FT_GROUP]
+    if -15552000 < (time.time() - filevalues[FT_MTIME]) < 15552000:
+        # filedate < 6 months from now, past or future
+        mtime = time.strftime('%a %b %d %H:%M', time.localtime(filevalues[FT_MTIME]))
+        mtime2 = time.strftime('%d %b %H:%M', time.localtime(filevalues[FT_MTIME]))
+    else:
+        mtime = time.strftime('%a  %d %b %Y', time.localtime(filevalues[FT_MTIME]))
+        mtime2 = time.strftime('%d %b  %Y', time.localtime(filevalues[FT_MTIME]))
+    res['mtime'] = mtime
+    res['mtime2'] = mtime2
+    return res
 
 
 def perms2str(p):
@@ -562,14 +571,15 @@ def findgrep(path, files, pattern, find, egrep, ignorecase = 0):
         i, o, e = os.popen3(cmd, 'r')
     except:
         return -1
-    i.close; e.close()
+    i.close(); e.close()
     fs =  [l[:-1] for l in o.readlines()]
     o.close()
     fs = [l for l in fs if not os.path.isdir(l)]
     matches = []
+    pattern = pattern.replace('-', '\-')
     for f in fs:
         try:
-            buf = os.popen('%s -n%s \"%s\" \"%s\"' % (egrep, ign, pattern,
+            buf = os.popen('%s -ns%s \"%s\" \"%s\"' % (egrep, ign, pattern,
                                                       f)).readlines()
         except:
             return -1
@@ -595,7 +605,7 @@ def find(path, files, find):
     except:
         return -1
 
-    i.close; e.close()
+    i.close(); e.close()
     quit = 0
     matches = []
     filename = ''
@@ -739,8 +749,16 @@ def mktemp():
 ########################################################################
 ########################################################################
 # thread execution
-buf = ''
+def exec_cmd2(cmd):
+    i, a = os.popen4(cmd)
+    buf = a.read()
+    i.close(), a.close()
+    if buf.find('which') != -1:
+        buf = ''
+    return buf
 
+
+buf = ''
 def exec_cmd(cmd):
     global buf
 

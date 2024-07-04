@@ -1,5 +1,7 @@
+# -*- coding: iso-8859-15 -*-
+
 """
-Copyright (C) 2001-2, Iñigo Serna <inigoserna@telefonica.net>.
+Copyright (C) 2001-4, Iñigo Serna <inigoserna@telefonica.net>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -13,8 +15,8 @@ application for UNIX console.
 ##################################################
 ##################################################
 AUTHOR = 'Iñigo Serna'
-VERSION = '0.9'
-DATE = '2001-2'
+VERSION = '0.91'
+DATE = '2001-4'
 
 LFM_NAME = 'lfm - Last File Manager'
 PYVIEW_NAME = 'pyview'
@@ -26,25 +28,43 @@ PREFSFILE = '.lfmrc'
 ##### lfm
 app = None
 
-defaultprogs = { 'shell': ('bash', 'ksh', 'tcsh', 'csh', 'sh'),
-                 'pager': ('pyview', 'less', 'more', 'biew'),
-                 'editor': ('mcedit', 'emacs', 'vi', 'joe'),
-                 'find': ('find', ),
-                 'egrep': ('egrep', 'grep'),
-                 'tar': ('tar', ),
-                 'gzip': ('gzip', ),
-                 'bzip2': ('bzip2', ),
-                 'zip': ('zip', ),
-                 'unzip': ('unzip', ),
-                 'web': ('galeon', 'mozilla', 'netscape', 'lynx', 'opera'),
-                 'ogg': ('ogg123', ),
-                 'mp3': ('mpg123', ),
-                 'audio': ('esdplay', 'play', ),
-                 'video': ('mplayer', 'xanim', 'aviplay'),
-                 'graphics': ('ee', 'eog', 'gthumb', 'xv', 'gimp'),
-                 'pdf' :('acroread', 'ggv', 'xpdf'),
-                 'ps': ('ggv', 'gv'),
-                 'tururu': ('tururu', 'sdfdsf', 'just to test') }
+# defaultprogs = { 'shell': ('bash', 'ksh', 'tcsh', 'csh', 'sh'),
+#                  'pager': ('pyview', 'less', 'more', 'biew'),
+#                  'editor': ('mcedit', 'emacs', 'vi', 'joe'),
+#                  'find': ('find', ),
+#                  'egrep': ('egrep', 'grep'),
+#                  'tar': ('tar', ),
+#                  'gzip': ('gzip', ),
+#                  'bzip2': ('bzip2', ),
+#                  'zip': ('zip', ),
+#                  'unzip': ('unzip', ),
+#                  'web': ('galeon', 'mozilla', 'netscape', 'lynx', 'opera'),
+#                  'ogg': ('ogg123', ),
+#                  'mp3': ('mpg123', ),
+#                  'audio': ('esdplay', 'play', ),
+#                  'video': ('mplayer', 'xanim', 'aviplay'),
+#                  'graphics': ('ee', 'eog', 'gthumb', 'xv', 'gimp'),
+#                  'pdf' :('acroread', 'ggv', 'xpdf'),
+#                  'ps': ('ggv', 'gv'),
+#                  'tururu': ('tururu', 'sdfdsf', 'just to test') }
+defaultprogs = { 'shell': 'bash',
+                 'pager': 'pyview',
+                 'editor': 'mcedit',
+                 'find': 'find',
+                 'egrep': 'egrep',
+                 'tar': 'tar',
+                 'gzip': 'gzip',
+                 'bzip2': 'bzip2',
+                 'zip': 'zip',
+                 'unzip': 'unzip',
+                 'web': 'galeon',
+                 'ogg': 'ogg123',
+                 'mp3': 'mpg123',
+                 'audio': 'esdplay',
+                 'video': 'mplayer',
+                 'graphics': 'gthumb',
+                 'pdf': 'gpdf',
+                 'ps': 'ggv' }
 
 filetypes = { 'web': ('html', 'htm'),
               'ogg': ('ogg', ),

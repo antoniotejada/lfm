@@ -1,6 +1,188 @@
+Wed Jun 30 22:24:05 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* setup.py: upgrade to version 0.91
+	* PKG-INFO:
+	* lfm/__init__.py: 
+
+Wed Jun 30 22:21:26 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* README: documentation updated, use reST for easy generation of HTML
+	* README.pyview: 
+	* TODO: 
+	* NEWS: 
+
+Mon Jun 28 00:31:55 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/preferences.py (Preferences.__init__): 
+	new option: show_dotfiles flag
+	* lfm/lfm.py (Panel.init_dir): 
+	* lfm/files.py (get_dir): 
+
+Sun Jun 27 23:41:21 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/preferences.py (Preferences.__init__): 
+	new option: detach_terminal_at_exec flag
+	* lfm/actions.py (do_special_view_file): use detach_terminal_at_exec
+
+Sun Jun 27 20:03:11 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/preferences.py (Preferences.load): apps and file types can
+	be stored in configuration now
+	* lfm/preferences.py (Preferences.save): 
+
+Sun Jun 27 18:45:37 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/pyview.py (PyView): always write debug info to pyview-log.debug
+
+Sun Jun 27 18:27:49 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/__init__.py (defaultprogs): now each app only has one
+	associated program, not a list of programs. 
+	WARNING: this breaks old .lfmrc, but speeds up start
+	* lfm/lfm.py (Lfm.__init__): check for valid programs
+	* lfm/preferences.py (Preferences.__init__): only loads default
+	progs, but don't check them
+	* lfm/preferences.py (Preferences.check_progs): changed function
+	name from 'check_defaultprogs'
+	* lfm/actions.py (do_special_view_file): warn when can't open
+	special file and default to pager view
+
+Sun Jun 27 16:34:11 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/preferences.py (Preferences.load): 
+	BUG FIXED: didn't load sort mode
+
+Sun Jun 27 15:23:19 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/messages.py (ChangePerms.manage_keys): show users and groups
+	sorted alphabetically
+
+Sun Jun 27 14:57:18 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/actions.py (file_menu): add support for uncompress in other panel
+	* lfm/utils.py (uncompress_dir): 
+	* lfm/utils.py (do_uncompress_dir): 
+
+Sun Jun 27 03:10:27 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py: resizing implemented in lfm
+	* lfm/actions.py (keytable): 
+	* lfm/actions.py (resize_window): 
+	* lfm/lfm.py (Lfm.resize): 
+	* lfm/lfm.py (Panel.do_resize): 
+	* lfm/lfm.py (Lfm.__show_bars): 
+	* lfm/lfm.py (Panel.show): 
+	* lfm/lfm.py (Panel.__showbar): 
+	* lfm/lfm.py (Panel.__calculate_columns): new useful functions
+	* lfm/lfm.py (Panel.__calculate_dims): 
+
+Sun Jun 27 02:10:06 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Lfm.__init__): eliminated deleted references to
+	columns positions
+	* lfm/preferences.py (Preferences.__init__): 
+	* lfm/preferences.py (Preferences.load): 
+	* lfm/preferences.py (Preferences.save): 
+
+Sat Jun 26 23:49:49 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* lfm/lfm.py (Panel.show): 
+	  - 1-panel view changed, now filename has more space
+	  - file info formatting has been translated here
+	* lfm/lfm.py (Panel.__showbar): 
+	  file info formatting has been translated here
+	* lfm/lfm.py (Panel.__get_fileinfo_str_long): get file info
+	  formatted string, 1-panel version
+	* lfm/lfm.py (Panel.__get_fileinfo_str_short): get file info
+	  formatted string, 2-panel version
+	* lfm/files.py (get_fileinfo_dict): 
+	  - changed function name from 'get_fileinfo_str'
+	  - now this function only returns info, not a formatted string
+	* lfm/files.py (get_fileinfostr_short): function eliminated, use
+	'get_fileinfo_dict' instead
+
+Sat Jun 26 21:18:00 2004  Iñigo Serna  <inigoserna@telefonica.net>
+        
+	* pyview.py (FileView): 
+	  - resizing implemented in pyview
+	  - amount of info is reduced in function of window size
+	* pyview.py (FileView.show_hex): show as much bytes as window size allows
+
+Sat Jun 26 20:57:56 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* messages.py (get_a_key): ESC now closes dialogs
+	* messages.py (confirm): 
+	* messages.py (confirm_all): 
+	* messages.py (Yes_No_Buttons.manage_keys): 
+	* messages.py (EntryLine.manage_keys): 
+	* messages.py (SelectItem.manage_keys): 
+	* messages.py (FindfilesWin.manage_keys): 
+	* messages.py (MenuWin.manage_keys): 
+	* messages.py (ChangePerms.manage_keys): 
+	* pyview.py (InternalView.run): 
+
+Sat Jun 26 16:27:34 2004  Iñigo Serna  <inigoserna@telefonica.net>
+
+	* utils.py (compress_uncompress_file): 
+	  FIXED BUG: 'app' wasn't passed to 'run_thread'
+	* actions.py (Tree.run): 
+	  FIXED BUG: Ctrl-T Ctrl-T crashes tree view
+
+Thu Dec  4 01:41:28 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* README: add " surrounding $* in bash function to allow lfm
+	start at dirs with space characters in name
+
+Thu Dec  4 00:37:26 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* lfm/files.py (findgrep): fixed bug: grep with '-' char in pattern,
+	it was interpreted as grep option
+
+Tue Dec  2 22:46:19 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* lfm/actions.py (select_bookmark): select bookmark from a menu.
+	Function associated to key Ctrl-D
+
+Tue Dec  2 00:11:07 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* lfm/actions.py (rename): new feature
+
+Tue Dec  2 00:08:57 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* lfm/actions.py (swap_panels): fixed a bug introduced when 
+	lfm.py:panel.init_curses changed
+
+Tue Dec  2 00:04:51 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* lfm/lfm.py: moved keys actions to actions.py file
+	* lfm/actions.py: keys actions
+	* lfm/utils.py: run_thread, un/compress functions
+	* lfm/vfs.py: vfs functions
+
+Sun Apr 27 02:30:46 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* lfm/files.py (get_fileinfostr_short): fixed bug when files > 1Gb size
+
+Sun Apr 27 00:26:09 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* lfm/__init__.py: coltbl is now here
+
+Sun Apr 27 00:20:55 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* lfm/lfm.py (cursor_show): wrappers over curses.curs_set() with
+	* lfm/lfm.py (cursor_hide): try-except protection
+
+Sat Apr 26 23:10:05 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* setup.py (classifiers): added classifiers
+
+Sat Apr 26 23:08:37 2003  Iñigo Serna  <inigo@inigo.katxi.org>
+
+	* *.py: added "# -*- coding: iso-8859-15 -*-" to conform with PEP 0263
+
 Wed Sep  4 01:04:57 2002  Iñigo Serna  <inigo@lethe.infernus.org>
 
-	* lfm/__init__.py (VERSION): release version 0.9
+	* lfm/__init__.py (VERSION): released version 0.9
 	* lfm/setup.py: 
 
 Mon Sep  2 17:24:04 2002  Iñigo Serna  <inigo@lethe.infernus.org>

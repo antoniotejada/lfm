@@ -1,3 +1,4 @@
-global-include *.py
+global-exclude {arch}
 
+include setup.py lfm/*.py
 include lfm/lfm lfm/pyview README README.pyview NEWS COPYING ChangeLog TODO MANIFEST.in

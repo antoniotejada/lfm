@@ -1,3 +1,5 @@
+# -*- coding: iso-8859-15 -*-
+
 """messages.py
 
 This module contains some windows for lfm use.
@@ -225,7 +227,7 @@ def get_a_key(title, question):
     border.keypad(1)
     while 1:
         ch = border.getch()
-        if ch in [0x03]:       # Ctrl-C
+        if ch in [0x03, 0x1B]:       # Ctrl-C, ESC
             return -1
         elif 0x01 <= ch <= 0xFF:
             return ch
@@ -291,7 +293,7 @@ def confirm(title, question, default = 0):
             return 1
         elif ch in ['N', 'n', 0x1B, 0x03]:
             return 0
-        elif ch in [0x03]:          # Ctrl-C
+        elif ch in [0x03, 0x1B]:    # Ctrl-C, ESC
             return -1
         elif ch in [10, 13]:        # enter
             return answer
@@ -376,7 +378,7 @@ def confirm_all(title, question, default = 0):
             return 2
         elif ch in ['N', 'n', 0x1B]:
             return 0
-        elif ch in [0x03]:          # Ctrl-C
+        elif ch in [0x03, 0x1B]:    # Ctrl-C, ESC
             return -1
         elif ch in [10, 13]:        # enter
             return answer
@@ -421,7 +423,7 @@ class Yes_No_Buttons:
         tmp = curses.newpad(1, 1)
         while 1:
             ch = tmp.getch()
-            if ch in [0x03]:            # Ctrl-C
+            if ch in [0x03, 0x1B]:      # Ctrl-C, ESC
                 return -1
             elif ch in [ord('\t')]:
                 return ord('\t')
@@ -490,15 +492,10 @@ class EntryLine:
     def manage_keys(self):
         while 1:
             self.show()
-            chext = 0
             ch = self.entry.getch()            
 #              print 'key: \'%s\' <=> %c <=> 0x%X <=> %d' % \
 #                    (curses.keyname(ch), ch & 255, ch, ch)
-            if ch == 0x1B:                # to avoid extra chars input
-                chext = 1
-                ch = self.entry.getch()
-                ch = self.entry.getch()
-            if ch in [0x03]:            # Ctrl-C
+            if ch in [0x03, 0x1B]:        # Ctrl-C, ESC
                 return -1
             elif ch in [curses.KEY_UP]:
                 if self.with_historic:
@@ -580,11 +577,9 @@ class EntryLine:
                 self.pos = len(self.text)
             elif ch in [curses.KEY_IC]: # insert
                 self.ins = not self.ins
-            elif (ch in [curses.KEY_HOME, 348]) or \
-                 (chext == 1) and (ch == 72):  # home
+            elif (ch in [curses.KEY_HOME, 0x16A]):  # home
                 self.pos = 0
-            elif (ch in [curses.KEY_END, 351]) or \
-                 (chext == 1) and (ch == 70):   # end
+            elif (ch in [curses.KEY_END, 0x181]):   # end
                 self.pos = len(self.text)
             elif ch in [curses.KEY_LEFT] and self.pos > 0:
                 self.pos -= 1
@@ -596,7 +591,7 @@ class EntryLine:
                 self.pos -= 1
             elif ch in [curses.KEY_DC] and self.pos < len(self.text):  # del
                 self.text = self.text[:self.pos] + self.text[self.pos+1:]
-            elif len(self.text) < 255 and 32 <= ch <= 255 and not chext:
+            elif len(self.text) < 255 and 32 <= ch <= 255:
                 if self.ins:
                     self.text = self.text[:self.pos] + chr(ch) + self.text[self.pos:]
                     self.pos += 1
@@ -939,7 +934,7 @@ class SelectItem:
         while 1:
             self.show()
             ch = self.win.getch()
-            if ch in [0x03, ord('q'), ord('Q')]:       # Ctrl-C
+            if ch in [0x03, 0x1B, ord('q'), ord('Q')]:       # Ctrl-C, ESC
                 return -1
             elif ch in [curses.KEY_UP, ord('p'), ord('P')]:
                 if self.entry_i != 0:
@@ -957,9 +952,9 @@ class SelectItem:
                     self.entry_i = len(self.entries) - 1
                 else:
                     self.entry_i += (h - 2)
-            elif ch in [curses.KEY_HOME, 72, 348]:
+            elif ch in [curses.KEY_HOME, 0x16A]:
                 self.entry_i = 0
-            elif ch in [curses.KEY_END, 70, 351]:
+            elif ch in [curses.KEY_END, 0x181]:
                 self.entry_i = len(self.entries) - 1
             elif ch in [0x13]:     # Ctrl-S
                 theentries = self.entries[self.entry_i:]
@@ -1109,7 +1104,7 @@ class FindfilesWin:
         while 1:
             self.show()
             ch = self.win.getch()
-            if ch in [0x03, ord('q'), ord('Q')]:       # Ctrl-C
+            if ch in [0x03, 0x1B, ord('q'), ord('Q')]:       # Ctrl-C, ESC
                 return -1, None
             elif ch in [curses.KEY_UP, ord('p'), ord('P')]:
                 if self.entry_i != 0:
@@ -1231,17 +1226,11 @@ class MenuWin:
 
 
     def manage_keys(self):
-        h, w = self.win.getmaxyx()
         self.show()
         while 1:
             self.show()
-            chext = 0
             ch = self.win.getch()
-            if ch == 0x1B:
-                chext = 1
-                ch = self.win.getch()
-                ch = self.win.getch()
-            if ch in [0x03, ord('q'), ord('Q')]:       # Ctrl-C
+            if ch in [0x03, 0x1B, ord('q'), ord('Q')]:       # Ctrl-C, ESC
                 return -1
             elif ch in [curses.KEY_UP]:
                 if self.entry_i != 0:
@@ -1249,11 +1238,10 @@ class MenuWin:
             elif ch in [curses.KEY_DOWN]:
                 if self.entry_i != len(self.entries) - 1:
                     self.entry_i += 1
-            elif (ch in [curses.KEY_HOME, 348, curses.KEY_PPAGE, 0x08, 0x10,
-                         curses.KEY_BACKSPACE]) or (chext == 1) and (ch == 72):
+            elif (ch in [curses.KEY_HOME, 0x16A, curses.KEY_PPAGE, 0x08, 0x10,
+                         curses.KEY_BACKSPACE]):
                 self.entry_i = 0
-            elif (ch in [curses.KEY_END, 351, curses.KEY_NPAGE, ord(' '), 0x0E]) \
-                 or (chext == 1) and (ch == 70):   # end
+            elif (ch in [curses.KEY_END, 0x181, curses.KEY_NPAGE, ord(' '), 0x0E]):
                 self.entry_i = len(self.entries) - 1
             elif ch in [0x13]:     # Ctrl-S
                 theentries = self.entries[self.entry_i:]
@@ -1309,7 +1297,6 @@ class ChangePerms:
         self.n = n
         self.entry_i = 0
         
-
 
     def show_btns(self):
         h, w = self.win.getmaxyx()
@@ -1402,7 +1389,7 @@ class ChangePerms:
         while 1:
             self.show()
             ch = self.win.getch()
-            if ch in [0x03, ord('c'), ord('C'), ord('q'), ord('Q')]:
+            if ch in [0x03, 0x1B, ord('c'), ord('C'), ord('q'), ord('Q')]:
                 return -1
             elif ch in [ord('\t'), 0x09, curses.KEY_DOWN, curses.KEY_RIGHT]:
                 if self.i:
@@ -1476,6 +1463,7 @@ class ChangePerms:
             elif ch in [10, 13]:
                 if self.entry_i == 3:
                     owners = files.get_owners()
+                    owners.sort()
                     try:
                         owners.index(self.owner)
                     except:
@@ -1486,6 +1474,7 @@ class ChangePerms:
                     self.app.show()
                 elif self.entry_i == 4:
                     groups = files.get_groups()
+                    groups.sort()
                     try:
                         groups.index(self.group)
                     except:

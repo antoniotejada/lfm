@@ -1,9 +1,30 @@
+Version 0.91 ("It rocks... yeah!") - 2004/06/30:
+
+  + quite stable and robust, doesn't crash
+  + faster
+  + new option: show_dotfiles flag
+  + new option: detach_terminal_at_exec flag: useful f.e. if you 
+    want to run elinks as web browser attached to lfm terminal
+  + file associations and applications can be configured in preferences
+  + now each application has only 1 associated program, *breaking old .lfmrc*
+  + perms dialog: users & groups sorted alphabetically
+  + uncompress in other panel
+  + resizing terminal works in lfm, pyview. Be careful with dialogs
+  + columns size eliminated from preferences
+  + 1-panel view redesigned
+  + ESC closes dialogs, not lfm or pyview
+  + Ctrl-D: select bookmark dialog
+  + code reorganized: actions.py, vfs.py
+  + added classifiers to setup.py script
+
+Version 0.90 was never publically released
+
 Version 0.9 ("...and the day arrived") - 2002/09/05:
 
   + ZIP files can be un/compressed now. ZIP vfs works too
   + added 'rebuild vfs' and 'rebuild_vfs' question / option. Configurable.
     There is no need to wait until vfs file is rebuilt
-  + Applied some good patches from Bartosz Oler (liar@furrynet.org):
+  + Applied some good patches from Bartosz Oler (liar AT furrynet DOT org):
     1. colors customization: Now you can customize the colors lfm use in
        the configuration file, 'colors' section. Each color is defined by
        a string with its name. It looks like this:
@@ -19,7 +40,7 @@ Version 0.9 ("...and the day arrived") - 2002/09/05:
   + lfm works now with "from __future__ import division", prepared for Python 3.0
   + set python2 as default interpreter for setup.py, lfm, lfm.py, pyview and
     pyview.py
-  + my email address has changed <inigoserna@telefonica.net>
+  + my email address has changed <inigoserna AT telefonica DOT net>
   + Bugs fixes. See ChangeLog for complete list
       - lfm:
           * create temporary files with mask 0066 and directories with perms

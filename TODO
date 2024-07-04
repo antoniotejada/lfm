@@ -1,14 +1,27 @@
 General:
 ========
-+ mc: Alt-O
-      Alt-T => .
-      Alt-Y/U => < / > historic
+High Priority:
+	+ speed up:
+		- copy, move, delete
+	+ historic navigation: mc: Alt-Y / Alt-U : < / >
+	+ scroll bar indicator when copying, moving or deleting
+	+ complex commands, make it configurable:
+		- show directory under cursor in the other panel: mc: Alt+O
+    + write doc section about preferences in .lfmrc
 
-+ .rpm vfs
+Low Priority (maybe some day):
+	+ make sort mode per panel, not globally
+	+ .rpm vfs
+	+ alt+keys
+	+ i18n
+	+ pyview: tab 4/8 chars
+	+ exclude files (f.e. *.o) to grep
 
-+ handle windows resizing in X (low priority)
-
-+ a gui for configuring colors (very low priority)
+Very Low Priority (never):
+	+ use optparse instead of getopt
+	+ use logging module for debugging
+	+ mouse
+	+ a gui for configuring colors
 
 
 Bugs:
@@ -22,17 +35,14 @@ Bugs:
 + lfm.run_thread: sometimes some processes remain as zombies when stopped 
                   by user or because of an error
 
-+ lfm.Tree, pyview.InternalView: cursor appears after keystroke regards
-  curses.curs_set(0): bug in ncurses?
-
-+ lfm crashes in X when resizing terminal => handle SIGWINCH signal
-
 + keys in Solaris terminal: look at Oleg Broytmann's mail in c.l.p
 on 10 Jul 2001 12:11:39 +0400
 
 
 Hacks:
 ======
++ 'app' global variable is badly carried from function to function
+
 + Python os.stat doesn't have rdev in returned tuple,
   which is needed for devices major and minor numbers
 
@@ -41,11 +51,8 @@ Hacks:
 + The first time Panel.__init_dir is executed, it needs to know prefs,
   so there is a hack to get it working
 
-+ Added a '0x1B' char capture to avoid extra input with HOME and END keys
-  in xterm and gnome-terminal (rxvt worked ok)
-
 + We need to use a shell hack to change the directory after lfm exists
 
 
 ============================================================================
-Last update:	Wednesday September 4th, 2002 - 01:08:14 CEST
+Last update:	Wednesday June 30th, 2004 - 22:19:29 CET

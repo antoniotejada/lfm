@@ -1,21 +1,35 @@
+=================================
 pyview - Last File Manager Viewer
 =================================
 
-(C) 2001-2, Iñigo Serna <inigoserna@telefonica.net>
+:Author: Iñigo Serna, inigoserna AT telefonica DOT net
 
-    pyview is a pager (viewer) written in Python.
-Though it was initially written to be used with 'lfm',
+:Version: 0.91, June 30th.. 2004
+
+:License: \(C\) 2001-4, Iñigo Serna
+
+          This software has been realised under the `GPL License`__, 
+          see the COPYING_ file that comes with this package. 
+          There is NO WARRANTY.
+
+:Last update: Wed Jun 30 22:01:08 2004 CEST
+
+
+.. contents:: Table of Contents
+
+
+Introduction
+============
+**pyview** is a pager (viewer) written in Python_.
+Though it was initially written to be used with **lfm**,
 it can be used standalone too.
 Since version 0.9 it can read from standard input too
-(eg. $ ps efax | pyview)
+(eg. `$ ps efax | pyview`).
 
-This software has been realised under the GPL License, 
-see the COPYING file that comes with this package. 
-There is NO WARRANTY.
 
-Keys:
-=====
-+ Movement
+Keys
+====
++ **Movement**
     - cursor_up, p, P
     - cursor_down, n, N
     - previous page, backspace, Ctrl-P
@@ -25,7 +39,7 @@ Keys:
     - cursor_left
     - cursor_right
 
-+ Actions
++ **Actions**
     - h, H, F1: help
     - w, W, F2: toggle un / wrap (only in text mode)
     - m, M, F4: toggle text / hex mode
@@ -38,17 +52,21 @@ Keys:
     - Ctrl-O: open shell 'sh'. Type 'exit' to return to pyview
     - q, Q, x, X, F3, F10: exit
 
+
 Goto Line / Byte Offset
 =======================
-    Enter the line number / byte offset you want to show.
-If number / byte is preceded by '0x' it is interpreted as hexadecimal.
+Enter the line number / byte offset you want to show.
+If number / byte is preceded by `0x` it is interpreted as hexadecimal.
 You can scroll relative lines from the current position using '+' or '-' 
 character.
 
+
 Find
 ====
-    Type the string to search. It ignores case.
+Type the string to search. It ignores case.
 
 
-============================================================================
-Last update:	Wednesday September 4th, 2002 - 01:08:14 CEST
+.. _python: http://www.python.org
+.. _COPYING: COPYING
+.. _GPL: http://www.gnu.org/licenses/licenses.html#GPL
+__ GPL_
