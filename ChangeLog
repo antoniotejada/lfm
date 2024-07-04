@@ -1,3 +1,266 @@
+Sun Nov 25 19:40:19 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (VERSION): release of version 0.7
+	* lfm/pyview.py (VERSION): upgraded to version 0.3
+
+Sun Nov 25 19:40:19 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (complete): fix complete code. It works ok now
+	* lfm/lfm.py (doEntry): 
+	* lfm/lfm.py (doDoubleEntry): 
+	* lfm/messages.py (EntryLine): 
+	* lfm/messages.py (Entry): 
+	* lfm/messages.py (DoubleEntry): 
+	
+Sun Nov 25 15:48:34 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (do_something_on_file): change to initial behaviour:
+	do_someting_on_file has not to capture output or been executed 
+	inside other thread. Old code remains comented
+
+Sun Nov 25 02:16:54 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (complete): fix a bug when trying to complete something
+	that is not a valid path
+
+Sun Nov 25 01:49:29 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (do_something_on_file): capture output & option to show it
+	* lfm/lfm.py (do_do_something_on_file): new function to be run inside
+	run_thread
+
+Sun Nov 25 01:17:53 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/preferences.py (Preferences.__init__): added new preference:
+	show_output_after_exec, defaults to yes
+
+Sun Nov 25 00:27:18 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (InternalView.__validate_buf): added option not to center
+
+Sat Nov 24 18:37:07 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (do_something_on_file): chdir to file path before 
+	doing something on file
+
+Sat Nov 24 18:24:39 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (do_uncompress_dir): remove tar 'v' flag when 
+	* lfm/lfm.py (do_compress_dir):	  un/compressing tar files
+
+Sun Nov 18 22:15:47 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): fix cursor position after
+	deleting files
+
+Sun Nov 18 18:33:07 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.show_text): fixed other bug in wrapped mode
+
+Sun Nov 18 13:01:23 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.__init__): if file is empty exists gracefully
+
+Sun Nov 18 12:57:09 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.show): fix path printing if it's too big
+
+Thu Nov  1 15:30:06 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): now copy, move, delete can be stopped
+
+Thu Nov  1 13:56:23 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (__get_size): capture errors
+
+Thu Nov  1 13:01:31 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (compress_dir): now compress directories can be stopped
+	* lfm/lfm.py (do_compress_dir): 
+
+Thu Nov  1 12:54:33 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (CommonWindow.__init__): fix a bug: 
+	when len(title) > len(text)
+
+Thu Nov  1 12:26:16 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (uncompress_dir): now uncompress tar files can be stopped
+	* lfm/lfm.py (do_uncompress_dir): 
+
+Thu Nov  1 12:10:14 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (run_thread.thread_quit_handler): added a 0.05 secs
+	sleep to avoid wasting resources silly
+
+Thu Nov  1 11:55:24 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (compress_uncompress_file): now un/compress can be stopped
+	* lfm/lfm.py (do_compress_uncompress_file): 
+
+Mon Oct 29 00:50:03 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (compress_dir): fix bug: tar cvf - dir | gzip >dir.tar.gz
+	when compressing directories did tar processes remain, it seems it was
+	because of the '>' redirection awaiting eternally to completition
+
+Sun Oct 28 12:15:49 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (uncompress_dir): check errors
+	* lfm/lfm.py (compress_dir): 
+
+Sun Oct 28 11:50:24 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (compress_uncompress_file): check errors
+
+Sun Oct 28 11:20:42 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (findgrep): use popen3 instead of popen and forget
+	* lfm/files.py (find):     stderr output
+
+Sun Oct 28 02:29:38 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py: change popen2.popen[34] by os.popen[34] functions
+	* lfm/pyview.py: 
+	* lfm/preferences.py: 
+
+Sat Oct 27 16:24:39 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (VERSION): upgraded to v0.2
+
+Sat Oct 27 16:48:39 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.run): added find and find next / previous
+
+Sat Oct 27 16:23:25 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.__find): new functions
+	* lfm/pyview.py (FileView.__find_next):
+	* lfm/pyview.py (FileView.__find_previous): 
+
+Sat Oct 27 15:45:57 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.__init__): check for 'grep'
+
+Sat Oct 27 15:45:16 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* README.pyview (Keys): added find information
+
+Sat Oct 27 12:35:31 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (PYVIEW_README): update help
+
+Sat Oct 20 23:27:00 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.show_str): don't show '\r' in dos text files
+
+Thu Aug 23 00:59:59 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): added compress directory to
+	* lfm/lfm.py (compress_dir):      .tar.bz2
+
+Thu Aug 23 00:42:43 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): added README.pyview to help
+
+Thu Aug 23 00:34:09 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (InternalView): allow scrolling if buffer
+	doesn't fit in body window
+
+Thu Aug 23 00:22:19 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* README.pyview: new file, documentation for pyview
+
+Wed Aug 22 18:28:34 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.show_info): fixed a small bug when showing info
+	of a file on /
+
+Wed Aug 22 16:52:47 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.__get_file_info): speed up function,
+	before it was very slow on large files
+
+Wed Aug 22 00:22:17 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.do_show_file_info): implemented 'show file info'
+
+Tue Aug 21 21:28:39 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (InternalView.__validate_buf): check for lines not to
+	be wider than screen width
+
+Tue Aug 21 20:53:43 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (get_user_fullname): new function
+
+Tue Aug 21 20:11:30 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py: 'import messages' must be inside a try clause
+	to avoid raising an exception in lfm, I suppose because lfm
+	imports messages module before
+
+Tue Aug 21 19:28:30 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (show_fs_info): new function
+	* lfm/lfm.py (Panel.manage_keys): rewrite 'show filesystems info'
+	to use internal viewer
+
+Tue Aug 21 01:42:15 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (InternalView): new viewer class to use internally
+
+Mon Aug 20 20:32:58 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/preferences.py (Preferences.check_defaultprogs): 
+	fixed a bug
+
+Mon Aug 20 20:31:37 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Lfm.run): default configuration is now saved
+	inmediately
+
+Mon Aug 20 20:25:36 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (defaultprogs): default pager changed to pyview
+	because this is the best one ;-)
+
+Mon Aug 20 20:23:02 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (View.run): implemented 'goto line / byte'
+
+Sun Aug 19 16:19:10 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py: start of the lfm viewer to be used both internally
+	and externally as a standalone program -> 'pyview'
+
+Sun Aug 19 15:12:18 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): change help behaviour to allow
+	to read README, NEWS, TODO, ChangeLog or COPYING files
+
+Sun Aug 19 14:17:19 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (do_special_view_file): new function to show special
+	files: html, graphics, ...
+	* lfm/lfm.py (defaultprogs): defined new programs
+	* lfm/lfm.py (filetypes): defined new file types
+
+Sun Aug 19 12:22:11 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (EntryLine.manage_keys): added Ctrl-D key to
+	delete the whole content of the EntryLine
+
+Sat Aug 18 19:36:50 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (findgrep): fixed a bug around filename with "
+	in grep call
+
+Sat Aug 18 19:31:01 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): implemented help
+
 Tue Aug  7 19:43:40 2001  Iñigo Serna  <inigo@lethe.infernus.org>
 
 	* lfm/lfm.py (VERSION): release of version 0.5
@@ -285,4 +548,3 @@ Thu Jun 28 23:36:58 2001  Iñigo Serna  <inigo@lethe.infernus.org>
 
 	* The day of the first public release is coming, so I must start
 	this ChangeLog file
-

@@ -27,7 +27,7 @@ class CommonWindow:
             if len(l) > length:
                 length = len(l)
         h = min(len(lines) + 4, curses.LINES - 2)
-        w = min(max(length+6, 27+4), curses.COLS - 2)
+        w = min(max(max(length+6, 27+4), len(title) + 6), curses.COLS - 2)
         if len(lines) > 1:  # -1, because len adds newline char
             w -= 1
         try:
@@ -101,28 +101,6 @@ def notyet(title):
                  curses.color_pair(1),
                  curses.color_pair(4),
                  curses.color_pair(4)).run()
-
-
-##################################################
-##################################################
-def show_fs_info(title, fs):
-    """show file systems info"""
-
-    # FIXME: rewrite
-    buf = []
-    buf.append('Filesystem  FS type  Total Mb    Used  Avail.  Use%  Mount point')
-    buf.append('')
-    for l in fs:
-        buf.append('%-10s  %-9s  %6s  %6s  %6s  %4s  %s' % \
-                   (l[0], l[6], l[1], l[2], l[3], l[4], l[5]))
-    buf[1] = '-' * len(max(buf))
-    buf = '\n'.join(buf)
-    CommonWindow(title, buf,
-                 curses.color_pair(1),
-                 curses.color_pair(1),
-                 curses.color_pair(1) | curses.A_BOLD,
-                 curses.color_pair(1)).run()
-
 
 
 ##################################################
@@ -382,8 +360,8 @@ class Yes_No_Buttons:
 class EntryLine:
     """An entry line to enter a dir. or file, a pattern, ..."""
 
-    def __init__(self, w, h, x, y, text, with_historic, with_complete,
-                 basepath, curpath):
+    def __init__(self, w, h, x, y, path, with_historic, with_complete,
+                 panelpath):
         try:
             self.entry = curses.newwin(1, w - 4 + 1, x, y)
         except curses.error:
@@ -393,9 +371,8 @@ class EntryLine:
         self.entry.keypad(1)
 
         self.entry_width = w - 4
-        self.text = text
-        self.basepath = basepath
-        self.curpath = curpath
+        self.text = path
+        self.panelpath = panelpath
         self.pos = len(self.text)
         self.ins = 1
 
@@ -470,8 +447,7 @@ class EntryLine:
                 return 10
             elif ch in [0x14]:           # Ctrl-T
                 if self.with_complete:
-                    entries = files.complete(self.text, self.basepath,
-                                             self.curpath)
+                    entries = files.complete(self.text, self.panelpath)
                     if not entries:
                         curses.beep()
                         continue
@@ -503,6 +479,18 @@ class EntryLine:
                     text = os.path.dirname(text)
                     if text != '' and text != os.sep:
                         text += os.sep
+                # hack to refresh if blank entry
+                self.text = ' ' * self.entry_width
+                self.entry.bkgdset(curses.color_pair(11))
+                self.entry.erase()
+                self.entry.addstr(self.text, curses.color_pair(11) | curses.A_BOLD)
+                self.entry.refresh()
+                self.text = text
+                self.pos = len(self.text)
+            elif ch in [0x04]:          # Ctrl-D
+                if self.text == None or self.text == '':
+                    continue
+                text = ''
                 # hack to refresh if blank entry
                 self.text = ' ' * self.entry_width
                 self.entry.bkgdset(curses.color_pair(11))
@@ -549,7 +537,7 @@ class Entry:
     """An entry window to enter a dir. or file, a pattern, ..."""
 
     def __init__(self, title, help, path = '', with_historic = 1,
-                 with_complete = 1, basepath = '', curpath = ''):
+                 with_complete = 1, panelpath = ''):
         h = 6
         w = min(max(34, len(help)+5), curses.COLS - 2)
         try:
@@ -562,7 +550,7 @@ class Entry:
                                    (curses.LINES-h) / 2 + 2,
                                    (curses.COLS-w+4) / 2,
                                    path, with_historic, with_complete,
-                                   basepath, curpath)
+                                   panelpath)
             self.btns = Yes_No_Buttons(w, h, 0)
         except curses.error:
             print 'Can\'t create window'
@@ -655,11 +643,10 @@ class DoubleEntry:
     """An entry window to enter 2 dirs. or files, patterns, ..."""
 
     def __init__(self, title, help1 = '', path1 = '',
-                 with_historic1 = 1, with_complete1 = 1,
-                 basepath1 = '', curpath1 = '',
+                 with_historic1 = 1, with_complete1 = 1, panelpath1 = '',
                  help2 = '', path2 = '',
-                 with_historic2 = 1, with_complete2 = 1,
-                 basepath2 = '', curpath2 = '', active_entry = 0):
+                 with_historic2 = 1, with_complete2 = 1, panelpath2 = '',
+                 active_entry = 0):
         h = 9
         w = min(max(34, max(len(help1), len(help2)) + 5), curses.COLS - 2)
         try:
@@ -672,12 +659,12 @@ class DoubleEntry:
                                     (curses.LINES-h) / 2 + 1,
                                     (curses.COLS-w+4) / 2,
                                     path1, with_historic1, with_complete1,
-                                    basepath1, curpath1)
+                                    panelpath1)
             self.entry2 = EntryLine(w, h,
                                     (curses.LINES-h) / 2 + 4,
                                     (curses.COLS-w+4) / 2,
                                     path2, with_historic2, with_complete2,
-                                    basepath2, curpath2)
+                                    panelpath2)
             self.btns = Yes_No_Buttons(w, h, 2)
         except curses.error:
             print 'Can\'t create window'

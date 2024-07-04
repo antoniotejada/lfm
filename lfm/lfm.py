@@ -30,20 +30,22 @@ application for UNIX console.
 
 
 import os, os.path
-import sys, popen2
+import sys, time
 import curses
 from glob import glob
 
 from lfm import files
 from lfm import messages
 from lfm import preferences
+from lfm import pyview
 #import files
 #import messages
 #import preferences
+#import pyview
 
 
 PROGNAME = 'lfm - Last File Manager'
-VERSION = '0.5'
+VERSION = '0.7'
 DATE = '2001'
 AUTHOR = 'Iñigo Serna'
 
@@ -54,6 +56,34 @@ DEBUG = 0
 ##################################################
 ##################################################
 app = None
+thread_quit = 0
+
+defaultprogs = { 'shell': ('bash', 'ksh', 'tcsh', 'csh', 'sh'),
+                 'pager': ('pyview', 'less', 'more', 'biew'),
+                 'editor': ('mcedit', 'emacs', 'vi', 'joe'),
+                 'find': ('find', ),
+                 'egrep': ('egrep', 'grep'),
+                 'tar': ('tar', ),
+                 'gzip': ('gzip', ),
+                 'bzip2': ('bzip2', ),
+                 'web': ('galeon', 'mozilla', 'netscape', 'lynx', 'opera'),
+                 'ogg': ('ogg123', ),
+                 'mp3': ('mpg123', ),
+                 'audio': ('esdplay', 'play', ),
+                 'video': ('mplayer', 'xanim', 'aviplay'),
+                 'graphics': ('ee', 'eog', 'gthumb', 'xv', 'gimp'),
+                 'pdf' :('acroread', 'ggv', 'xpdf'),
+                 'ps': ('ggv', 'gv'),
+                 'tururu': ('tururu', 'sdfdsf', 'just to test') }
+
+filetypes = { 'web': ('html', 'htm'),
+              'ogg': ('ogg', ),
+              'mp3': ('mp3', ),
+              'audio': ('wav', 'au', 'midi'),
+              'video': ('mpeg', 'mpg', 'avi', 'asf'),
+              'graphics': ('png', 'jpeg', 'jpg', 'gif', 'tiff', 'tif', 'xpm'),
+              'pdf': ('pdf', ),
+              'ps': ('ps', ) }
 
 
 ##################################################
@@ -70,7 +100,7 @@ class Lfm:
         self.panels = []            # list of panels
         self.panel = 0              # active panel
         # preferences
-        self.prefs = preferences.Preferences(PREFSFILE)
+        self.prefs = preferences.Preferences(PREFSFILE, defaultprogs)
         self.modes = self.prefs.modes
         # panels
         self.init_curses()
@@ -173,10 +203,12 @@ class Lfm:
             messages.error('Load Preferences',
                            '\'%s\' does not exist\nusing default values' %
                            PREFSFILE)
+            self.prefs.save()
         elif ret == -2:
             messages.error('Load Preferences',
                            '\'%s\' seems corrupted\nusing default values' %
                            PREFSFILE)
+            self.prefs.save()
         while 1:
             self.show()
             oldpanel = self.panels[self.panel].manage_keys()
@@ -654,10 +686,13 @@ class Panel:
                 elif self.files[filename][files.FT_TYPE] == files.FTYPE_EXE:
                     do_execute_file(self)
                 elif self.files[filename][files.FT_TYPE] == files.FTYPE_REG:
-                    do_view_file(self)
+                    do_special_view_file(self)
                 else:
                     continue
 
+            # show file info
+            elif ch in [ord('i') or ord('I')]:
+                do_show_file_info(self)
             # do something on file
             elif ch in [ord('@')]:
                 do_something_on_file(self)
@@ -674,7 +709,7 @@ class Panel:
                 if newfile == None or newfile == "":
                     continue                      
                 fullfilename = os.path.join(self.path, newfile)
-                err, a = popen2.popen4('touch \"%s\"' % fullfilename)
+                i, err = os.popen4('touch \"%s\"' % fullfilename)
                 err = err.read().split(':')[-1:][0].strip()
                 if err:
                     app.show()
@@ -708,8 +743,8 @@ class Panel:
                 ans = files.create_link(pointto, fullfilename)
                 if ans:
                     app.show()
-                    messages.error('Edit link', '%s (%s)' % ans,
-                                   self.sorted[self.file_i])
+                    messages.error('Edit link', '%s (%s)' % (ans,
+                                   self.sorted[self.file_i]))
                 self.refresh_panel(self)
                 self.refresh_panel(app.get_otherpanel())
             # edit link
@@ -727,8 +762,8 @@ class Panel:
                     ans = files.modify_link(pointto, fullfilename)
                     if ans:
                         app.show()
-                        messages.error('Edit link', '%s (%s)' % ans,
-                                       self.sorted[self.file_i])
+                        messages.error('Edit link', '%s (%s)' % (ans,
+                                       self.sorted[self.file_i]))
                 self.refresh_panel(self)
                 self.refresh_panel(app.get_otherpanel())
 
@@ -758,7 +793,9 @@ class Panel:
                         for f in self.selections:
                             if not overwrite_all:
                                 if app.prefs.confirmations['overwrite']:
-                                    ans = files.copy(self.path, f, destdir)
+                                    ans = run_thread('Copying \'%s\'' % f,
+                                                     files.copy,
+                                                     self.path, f, destdir)
                                     if type(ans) == type(''):
                                         app.show()
                                         ans2 = messages.confirm_all('Copy', 'Overwrite \'%s\'' % ans, 1)
@@ -767,17 +804,23 @@ class Panel:
                                         elif ans2 == 2:
                                             overwrite_all = 1
                                         if ans2 != 0:
-                                            ans = files.copy(self.path, f,
+                                            ans = run_thread('Copying \'%s\'' % f,
+                                                             files.copy,
+                                                             self.path, f,
                                                              destdir, 0)
                                         else:
                                             continue
                                 else:
-                                    ans = files.copy(self.path, f, destdir, 0)
+                                    ans = run_thread('Copying \'%s\'' % f,
+                                                     files.copy,
+                                                     self.path, f, destdir, 0)
                             else:
-                                ans = files.copy(self.path, f, destdir, 0)
-                            if ans:
-                                app.show()
-                                messages.error('Copy', '%s (%s)' % ans, f)
+                                ans = run_thread('Copying \'%s\'' % f, files.copy,
+                                                 self.path, f, destdir, 0)
+                            if ans and ans != -100:
+                                for panel in app.panels:
+                                    panel.show()
+                                messages.error('Copy \'%s\'' % f, '%s (%s)' % ans)
                         self.selections = []
                     else:
                         continue
@@ -789,22 +832,29 @@ class Panel:
                     destdir = doEntry('Copy', buf, destdir)
                     if destdir:
                         if app.prefs.confirmations['overwrite']:
-                            ans = files.copy(self.path, filename, destdir)
+                            ans = run_thread('Copying \'%s\'' % filename,
+                                             files.copy,
+                                             self.path, filename, destdir)
                             if type(ans) == type(''):
                                 app.show()
                                 ans2 = messages.confirm('Copy',
                                                         'Overwrite \'%s\'' %
                                                         ans, 1)
                                 if ans2 != 0 and ans2 != -1:
-                                    ans = files.copy(self.path, filename,
-                                                     destdir, 0)
+                                    ans = run_thread('Copying \'%s\'' % filename,
+                                                     files.copy,
+                                                     self.path, filename, destdir, 0)
                                 else:
                                     continue
                         else:
-                            ans = files.copy(self.path, filename, destdir, 0)
-                        if ans:
-                            app.show()
-                            messages.error('Copy', '%s (%s)' % ans, filename)
+                            ans = run_thread('Copying \'%s\'' % filename,
+                                             files.copy,
+                                             self.path, filename, destdir, 0)
+                        if ans and ans != -100:
+                            for panel in app.panels:
+                                panel.show()
+                            messages.error('Copy \'%s\'' % filename,
+                                           '%s (%s)' % ans)
                     else:
                         continue
                 self.refresh_panel(self)
@@ -822,7 +872,9 @@ class Panel:
                         for f in self.selections:
                             if not overwrite_all:
                                 if app.prefs.confirmations['overwrite']:
-                                    ans = files.move(self.path, f, destdir)
+                                    ans = run_thread('Moving \'%s\'' % f,
+                                                     files.move,
+                                                     self.path, f, destdir)
                                     if type(ans) == type(''):
                                         app.show()
                                         ans2 = messages.confirm_all('Move', 'Overwrite \'%s\'' % ans, 1)
@@ -831,18 +883,23 @@ class Panel:
                                         elif ans2 == 2:
                                             overwrite_all = 1
                                         if ans2 != 0:
-                                            ans = files.move(self.path, f,
+                                            ans = run_thread('Moving \'%s\'' % f,
+                                                             files.move,
+                                                             self.path, f,
                                                              destdir, 0)
                                         else:
                                             continue
                                 else:
-                                    ans = files.move(self.path, f, destdir, 0)
+                                    ans = run_thread('Moving \'%s\'' % f,
+                                                     files.move,
+                                                     self.path, f, destdir, 0)
                             else:
-                                ans = files.move(self.path, f, destdir, 0)
-                            if ans:
-                                app.show()
-                                messages.error('Move',
-                                               '%s (%s)' % ans, filename)
+                                ans = run_thread('Moving \'%s\'' % f, files.move,
+                                                 self.path, f, destdir, 0)
+                            if ans and ans != -100:
+                                for panel in app.panels:
+                                    panel.show()
+                                messages.error('Move \'%s\'' % f, '%s (%s)' % ans)
                         self.selections = []
                     else:
                         continue
@@ -854,22 +911,30 @@ class Panel:
                     destdir = doEntry('Move', buf, destdir)
                     if destdir:
                         if app.prefs.confirmations['overwrite']:
-                            ans = files.move(self.path, filename, destdir)
+                            ans = run_thread('Moving \'%s\'' % filename,
+                                             files.move,
+                                             self.path, filename, destdir)
                             if type(ans) == type(''):
                                 app.show()
                                 ans2 = messages.confirm('Move',
                                                         'Overwrite \'%s\'' %
                                                         ans, 1)
                                 if ans2 != 0 and ans2 != -1:
-                                    ans = files.move(self.path, filename,
-                                                     destdir, 0)
+                                    ans = run_thread('Moving \'%s\'' % filename,
+                                                     files.move,
+                                                     self.path, filename, destdir, 0)
                                 else:
                                     continue
                         else:
+                            ans = run_thread('Moving \'%s\'' % filename,
+                                             files.move,
+                                             self.path, filename, destdir, 0)
+                        if ans and ans != -100:
+                            for panel in app.panels:
+                                panel.show()
+                            messages.error('Move \'%s\'' % filename,
+                                           '%s (%s)' % ans)
                             ans = files.move(self.path, filename, destdir, 0)
-                        if ans:
-                            app.show()
-                            messages.error('Move', '%s (%s)' % ans, filename)
                     else:
                         continue
                 self.refresh_panel(self)
@@ -882,15 +947,16 @@ class Panel:
                     continue                      
                 ans = files.mkdir(self.path, newdir)
                 if ans:
+                    for panel in app.panels:
+                        panel.show()
                     messages.error('Make directory',
-                                   '%s (%s)' % ans, newdir)
+                                   '%s (%s)' % (ans, newdir))
                     continue
                 self.refresh_panel(self)
                 self.refresh_panel(app.get_otherpanel())
 
             # delete
             elif ch in [ord('d'), ord('D'), curses.KEY_F8, curses.KEY_DC]:
-                file_i_old = self.file_i
                 if len(self.selections):
                     delete_all = 0
                     for f in self.selections:
@@ -904,16 +970,28 @@ class Panel:
                             elif ans2 == 2:
                                 delete_all = 1
                             if ans2 != 0:
-                                ans = files.delete(self.path, f)
+                                ans = run_thread('Deleting \'%s\'' % f,
+                                             files.delete, self.path, f)
                             else:
                                 continue
                         else:
-                            ans = files.delete(self.path, f)
-                        if ans:
-                            app.show()
-                            messages.error('Delete', '%s (%s)' % ans, f)
+                            ans = run_thread('Deleting \'%s\'' % f,
+                                             files.delete, self.path, f)
+                        if ans and ans != -100:
+                            for panel in app.panels:
+                                panel.show()
+                            messages.error('Delete \'%s\'' % f, '%s (%s)' % ans)
                         else:
                             continue
+
+                    file_i_old = self.file_i
+                    file_old = self.sorted[self.file_i]
+                    self.init_dir(self.path)
+                    try:
+                        self.file_i = self.sorted.index(file_old)
+                    except ValueError:
+                        self.file_i = file_i_old
+
                 else:
                     filename = self.sorted[self.file_i]
                     if filename == os.pardir:
@@ -922,35 +1000,67 @@ class Panel:
                         ans2 = messages.confirm('Delete', 'Delete \'%s\'' %
                                                 filename, 1)
                         if ans2 != 0 and ans2 != -1:
-                            ans = files.delete(self.path, filename)
+                            ans = run_thread('Deleting \'%s\'' % filename,
+                                             files.delete, self.path, filename)
                         else:
                             continue
                     else:
-                            ans = files.delete(self.path, filename)
-                    if ans:
-                        app.show()
-                        messages.error('Delete', '%s (%s)' % ans, filename)
-                self.init_dir(self.path)
-                if file_i_old > self.nfiles:
-                    self.file_i = self.nfiles
-                else:
-                    self.file_i = file_i_old
+                        ans = run_thread('Deleting \'%s\'' % filename,
+                                         files.delete, self.path, filename)
+                    if ans and ans != -100:
+                        for panel in app.panels:
+                            panel.show()
+                        messages.error('Delete \'%s\'' % filename, '%s (%s)' % ans)
+
+                    file_i_old = self.file_i
+                    self.init_dir(self.path)
+                    if file_i_old > self.nfiles:
+                        self.file_i = self.nfiles
+                    else:
+                        self.file_i = file_i_old
+
                 self.fix_limits()
                 self.refresh_panel(app.get_otherpanel())
 
             # help
             elif ch in [ord('h'), ord('H'), curses.KEY_F1]:
-                messages.notyet('Help')
+                menu = [ 'r    Readme',
+                         'v    Readme pyview',
+                         'n    News',
+                         't    Todo',
+                         'c    ChangeLog',
+                         'l    License' ]
+                cmd = messages.MenuWin('Help Menu', menu).run()
+                if cmd == -1:
+                    continue
+                cmd = cmd[0]
+                curses.endwin()
+                docdir = os.path.join(sys.exec_prefix, 'share/doc/lfm')
+                if cmd == 'r':
+                    fullfilename = os.path.join(docdir, 'README')
+                elif cmd == 'v':
+                    fullfilename = os.path.join(docdir, 'README.pyview')
+                elif cmd == 'n':
+                    fullfilename = os.path.join(docdir, 'NEWS')
+                elif cmd == 't':
+                    fullfilename = os.path.join(docdir, 'TODO')
+                elif cmd == 'c':
+                    fullfilename = os.path.join(docdir, 'ChangeLog')
+                elif cmd == 'l':
+                    fullfilename = os.path.join(docdir, 'COPYING')
+                os.system('%s \"%s\"' % (app.prefs.progs['pager'], fullfilename))
+                curses.curs_set(0)
 
             # file menu
             elif ch in [ord('f'), ord('F'), curses.KEY_F2]:
                 menu = [ '@    Do something on file(s)',
-                         'i    File Info',
+                         'i    File info',
                          'p    Change file permissions, owner, group',
                          'g    Gzip/gunzip file(s)',
                          'b    Bzip2/bunzip2 file(s)',
                          'x    Uncompress .tar.gz, .tar.bz2, .tar.Z',
-                         'c    Compress directory',
+                         'c    Compress directory to .tar.gz',
+                         'd    Compress directory to .tar.bz2',
                          'y    Encrypt/decrypt file' ]
                 cmd = messages.MenuWin('File Menu', menu).run()
                 if cmd == -1:
@@ -960,8 +1070,7 @@ class Panel:
                     app.show()
                     do_something_on_file(self)
                 elif cmd == 'i':
-                    app.show()
-                    messages.notyet('File info')
+                    do_show_file_info(self)
                 elif cmd == 'p':
                     if self.selections:
                         app.show()
@@ -983,13 +1092,13 @@ class Panel:
                             ans = files.set_perms(filename, ret[0])
                             if ans:
                                 app.show()
-                                messages.error('Chmod', '%s (%s)' % ans,
-                                               filename)
+                                messages.error('Chmod', '%s (%s)' % (ans,
+                                               filename))
                             ans = files.set_owner_group(filename, ret[1], ret[2])
                             if ans:
                                 app.show()
-                                messages.error('Chown', '%s (%s)' % ans,
-                                               filename)
+                                messages.error('Chown', '%s (%s)' % (ans,
+                                               filename))
                         self.selections = []
                     else:
                         file = self.sorted[self.file_i]
@@ -1004,11 +1113,11 @@ class Panel:
                         ans = files.set_perms(filename, ret[0])
                         if ans:
                             app.show()
-                            messages.error('Chmod', '%s (%s)' % ans, filename)
+                            messages.error('Chmod', '%s (%s)' % (ans, filename))
                         ans = files.set_owner_group(filename, ret[1], ret[2])
                         if ans:
                             app.show()
-                            messages.error('Chown', '%s (%s)' % ans, filename)
+                            messages.error('Chown', '%s (%s)' % (ans, filename))
                     self.refresh_panel(self)
                     self.refresh_panel(app.get_otherpanel())
                 elif cmd == 'g':
@@ -1024,7 +1133,15 @@ class Panel:
                     self.refresh_panel(app.get_otherpanel())
                     app.get_otherpanel().file_i = app.get_otherpanel().sorted.index(old_file)
                 elif cmd == 'c':
-                    compress_dir(self)
+                    compress_dir(self, 'gzip')
+                    old_file = self.sorted[self.file_i]
+                    self.refresh_panel(self)
+                    self.file_i = self.sorted.index(old_file)
+                    old_file = app.get_otherpanel().sorted[app.get_otherpanel().file_i]
+                    self.refresh_panel(app.get_otherpanel())
+                    app.get_otherpanel().file_i = app.get_otherpanel().sorted.index(old_file)
+                elif cmd == 'd':
+                    compress_dir(self, 'bzip2')
                     old_file = self.sorted[self.file_i]
                     self.refresh_panel(self)
                     self.file_i = self.sorted.index(old_file)
@@ -1060,13 +1177,7 @@ class Panel:
                 elif cmd == 't':
                     messages.notyet('Tree')
                 elif cmd == 'f':
-                    fs = files.get_fs_info()
-                    if type(fs) != type([]):
-                        app.show()
-                        messages.error('Show filesystems info', fs)
-                        continue
-                    app.show()
-                    messages.show_fs_info('Show filesystems info', fs)
+                    do_show_fs_info()
                 elif cmd == 'o':
                     curses.endwin()
                     os.system('cd \"%s\"; %s' % (self.path,
@@ -1083,6 +1194,8 @@ class Panel:
             # refresh screen
             elif ch in [0x12]:             # Ctrl-r
                 app.show()
+                self.refresh_panel(self)
+                self.refresh_panel(app.get_otherpanel())
 
             # exit
             elif ch in [ord('q'), ord('Q'), curses.KEY_F10]:
@@ -1110,11 +1223,116 @@ class Panel:
 ##################################################
 ##### Actions
 ##################################################
+import signal, tempfile, cPickle
+
+# run thread: return -100 if stopped
+def run_thread(title = 'Doing nothing', func = None, *args):
+    """Run a function in background, so it can be stopped, continued, etc.
+    There is also a graphical ad to show the program still runs and is not
+    crashed. Returns nothing if all was ok, -100 if stoppped by user, or
+    an error message."""
+    
+    global thread_quit
+
+    def thread_quit_handler(signum, frame):
+        global thread_quit
+        thread_quit = 1
+        
+    app.win_status.erase()
+    app.win_status.addstr(0, 1, title[:curses.COLS-22])
+    app.win_status.addstr(0, curses.COLS - 21, 'Press Ctrl-C to stop')
+    app.win_status.refresh()
+    app.win_title.nodelay(1)
+    filename = tempfile.mktemp()
+    thread_quit = 0
+    pid = os.getpid()
+    signal.signal(signal.SIGUSR1, thread_quit_handler)
+    thread_pid = os.fork()
+    # error
+    if thread_pid < 0:
+        messages.error('Run Process', 'Can\'t execute process')
+        return
+    # child
+    elif thread_pid == 0:
+        res = func(*args)
+        file = open(filename, 'w')
+        cPickle.dump(res, file)
+        file.close()
+        os.kill(pid, signal.SIGUSR1)
+        os._exit(0)
+    # parent
+    while not thread_quit:
+        ch = app.win_title.getch()
+        if ch == 0x03:
+            os.kill(thread_pid, signal.SIGSTOP)
+            for panel in app.panels:
+                panel.show()
+            ans = messages.confirm('Stop process',
+                                   'Stop \"%s\"' % title.lower(), 1)
+            if ans:
+                os.kill(thread_pid, signal.SIGKILL)
+                app.win_title.nodelay(0)
+                os.wait()
+                return -100
+            else:
+                app.show()
+                app.win_status.erase()
+                app.win_status.addstr(0, 1, title[:curses.COLS-22])
+                app.win_status.addstr(0, curses.COLS - 21, 'Press Ctrl-C to stop')
+                app.win_status.refresh()
+                os.kill(thread_pid, signal.SIGCONT)
+        app.win_title.addstr(0, curses.COLS-2, '|')
+        app.win_title.refresh()
+        time.sleep(0.05)
+        app.win_title.addstr(0, curses.COLS-2, '/')
+        app.win_title.refresh()
+        time.sleep(0.05)
+        app.win_title.addstr(0, curses.COLS-2, '-')
+        app.win_title.refresh()
+        time.sleep(0.05)
+        app.win_title.addstr(0, curses.COLS-2, '\\')
+        app.win_title.refresh()
+        time.sleep(0.05)
+
+    # return res
+    app.win_title.nodelay(0)
+    os.wait()
+    file = open(filename, 'r')
+    res = cPickle.load(file)
+    file.close()
+    os.unlink(filename)
+    return res
+
+
+# do special view file
+def do_special_view_file(panel):
+    fullfilename = os.path.join(panel.path, panel.sorted[panel.file_i])
+    ext = os.path.splitext(fullfilename)[1].lower()[1:]
+    for type, exts in filetypes.items():
+        if ext in exts:
+            sys.stdout = sys.stderr = '/dev/null'
+            curses.endwin()
+            pid = os.fork()
+            if pid == 0:
+                args = app.prefs.progs[type].split()
+                args.append(fullfilename)
+                os.execvp(args[0], args)
+            else:
+                time.sleep(2)
+                curses.curs_set(0)
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+                break
+    else:
+        do_view_file(panel)
+    panel.refresh_panel(panel)
+    panel.refresh_panel(app.get_otherpanel())
+
 
 # do view file
 def do_view_file(panel):
-    curses.endwin()
     fullfilename = os.path.join(panel.path, panel.sorted[panel.file_i])
+    curses.endwin()
     os.system('%s \"%s\"' % (app.prefs.progs['pager'], fullfilename))
     curses.curs_set(0)
 
@@ -1130,17 +1348,39 @@ def do_edit_file(panel):
 
 
 # do execute file
+def do_do_execute_file(path, cmd):
+    i, a = os.popen4('cd \"%s\"; %s; echo ZZENDZZ' % (path, cmd))
+    output = ''
+    while 1:
+        buf = a.readline()[:-1]
+        if buf == 'ZZENDZZ':
+            break
+        elif buf:
+            output += buf + '\n'
+    i.close(); a.close()
+    return output
+
+
 def do_execute_file(panel):
+    fullfilename = os.path.join(panel.path, panel.sorted[panel.file_i])
     parms = doEntry('Execute file', 'Enter arguments')
     if parms == None:
         return
     elif parms == '':
-        cmd = os.path.join(panel.path, panel.sorted[panel.file_i])
+        cmd = '\"%s\"' % fullfilename
     else:                
-        cmd = '%s \"%s\"' % (os.path.join(panel.path, panel.sorted[panel.file_i]),
-                             parms)
+        cmd = '%s %s' % (fullfilename, parms)
     curses.endwin()
-    os.system(cmd)
+    err = run_thread('Executing \"%s\"' % cmd, do_do_execute_file, panel.path, cmd)
+    if err and err != -100:
+        if app.prefs.options['show_output_after_exec']:
+            curses.curs_set(0)
+            for panel in app.panels:
+                panel.show()
+            if messages.confirm('Executing file(s)', 'Show output'):
+                lst = [(l, 2) for l in err.split('\n')]
+                pyview.InternalView('Output of \"%s\"' % cmd,
+                                    lst, center = 0).run()
     curses.curs_set(0)
     panel.refresh_panel(panel)
     panel.refresh_panel(app.get_otherpanel())
@@ -1148,25 +1388,94 @@ def do_execute_file(panel):
 
 ##### File Menu
 # do something on file
+
+### do_something_on_file does not have to run inside run_thread, either capture
+### the output because it makes not possible to exec commands such as 'less', etc.
+
+# def do_do_something_on_file(panel, cmd, filename):
+#     i, a = os.popen4('cd \"%s\"; %s \"%s\"; echo ZZENDZZ' %
+#                      (panel.path, cmd, filename))
+#     output = ''
+#     while 1:
+#         buf = a.readline()[:-1]
+#         if buf == 'ZZENDZZ':
+#             break
+#         elif buf:
+#             output += buf + '\n'
+#     i.close(); a.close()
+#     return output
+
+
+# def do_something_on_file(panel):
+#     cmd = doEntry('Do something on file(s)', 'Enter command')
+#     if cmd:
+#         curses.endwin()
+#         if len(panel.selections):
+#             for f in panel.selections:
+#                 err = run_thread('Executing \"%s %s\"' % (cmd, f),
+#                                  do_do_something_on_file, panel, cmd, f)
+#                 if err and err != -100:
+#                     if app.prefs.options['show_output_after_exec']:
+#                         curses.curs_set(0)
+#                         for panel in app.panels:
+#                             panel.show()
+#                         if messages.confirm('Do something on file(s)',
+#                                             'Show output'):
+#                             lst = [(l, 2) for l in err.split('\n')]
+#                             pyview.InternalView('Output of \"%s %s\"' %
+#                                                 (cmd, f),
+#                                                 lst, center = 0).run()
+#             panel.selections = []
+#         else:
+#             filename = panel.sorted[panel.file_i]
+#             err = run_thread('Executing \"%s %s\"' % (cmd, filename),
+#                              do_do_something_on_file, panel, cmd, filename)
+#             if err and err != -100:
+#                 if app.prefs.options['show_output_after_exec']:
+#                     curses.curs_set(0)
+#                     for panel in app.panels:
+#                         panel.show()
+#                     if messages.confirm('Do something on file(s)', 'Show output'):
+#                         lst = [(l, 2) for l in err.split('\n')]
+#                         pyview.InternalView('Output of \"%s %s\"' %
+#                                             (cmd, filename),
+#                                             lst, center = 0).run()
+#         curses.curs_set(0)
+#         panel.refresh_panel(panel)
+#         panel.refresh_panel(app.get_otherpanel())
+
+
 def do_something_on_file(panel):
     cmd = doEntry('Do something on file(s)', 'Enter command')
     if cmd:
         curses.endwin()
         if len(panel.selections):
             for f in panel.selections:
-                fullfilename = os.path.join(panel.path, f)
-                os.system('%s \"%s\"' % (cmd, fullfilename))
+                os.system('cd \"%s\"; %s \"%s\"' % (panel.path, cmd, f))
             panel.selections = []
         else:
-            fullfilename = os.path.join(panel.path,
-                                        panel.sorted[panel.file_i])
-            os.system('%s \"%s\"' % (cmd, fullfilename))
+            os.system('cd \"%s\"; %s \"%s\"' %
+                      (panel.path, cmd, panel.sorted[panel.file_i]))
         curses.curs_set(0)
         panel.refresh_panel(panel)
         panel.refresh_panel(app.get_otherpanel())
 
 
 # compress/uncompress file: gzip/gunzip, bzip2/bunzip2
+def do_compress_uncompress_file(comp, prog, file, fullfile):
+    if prog == 'gzip':
+        ext = '.gz'
+    else:
+        ext = '.bz2'
+    if len(file) > len(ext) and file[-len(ext):] == ext:
+        i, a = os.popen4('%s -d %s' % (comp, fullfile))
+    else:
+        i, a = os.popen4('%s %s' % (comp, fullfile))
+    err = a.read()
+    i.close(); a.close()
+    return err
+
+
 def compress_uncompress_file(panel, prog):
     comp = app.prefs.progs[prog]
     if comp == '':
@@ -1180,14 +1489,14 @@ def compress_uncompress_file(panel, prog):
                 app.show()
                 messages.error(comp, '%s: Can\'t un/compress' % file)
                 continue
-            if prog == 'gzip':
-                ext = '.gz'
-            else:
-                ext = '.bz2'
-            if len(file) > len(ext) and file[-len(ext):] == ext:
-                os.system('%s -d %s' % (comp, fullfile))
-            else:
-                os.system('%s %s' % (comp, fullfile))
+            err = run_thread('Un/Compressing \'%s\'' % file,
+                             do_compress_uncompress_file,
+                             comp, prog, file, fullfile)
+            if err and err != -100:
+                for panel in app.panels:
+                    panel.show()
+                messages.error('Error un/compressing \'%s\'' % file, err.strip())
+                continue
         old_file = panel.file_i
         panel.init_dir(panel.path)
         panel.file_i = old_file
@@ -1201,20 +1510,19 @@ def compress_uncompress_file(panel, prog):
             app.show()
             messages.error(comp, '%s: Can\'t un/compress' % file)
             return
-        if prog == 'gzip':
-            ext = '.gz'
-        else:
-            ext = '.bz2'
-        if len(file) > len(ext) and file[-len(ext):] == ext:
-            os.system('%s -d %s' % (comp, fullfile))
-        else:
-            os.system('%s %s' % (comp, fullfile))
+        err = run_thread('Un/Compressing \'%s\'' % file,
+                         do_compress_uncompress_file, comp, prog, file, fullfile)
+        if err and err != -100:
+            for panel in app.panels:
+                panel.show()
+            messages.error('Error un/compressing \'%s\'' % file, err.strip())
         old_file = panel.file_i
         panel.refresh_panel(panel)
         panel.file_i = old_file
         old_file = app.get_otherpanel().file_i
         panel.refresh_panel(app.get_otherpanel())
         app.get_otherpanel().file_i = old_file
+
 
 # uncompress directory
 def check_compressed_tarfile(file):
@@ -1231,6 +1539,20 @@ def check_compressed_tarfile(file):
         return -1
 
 
+def do_uncompress_dir(path, comp, file):
+    i, oe = os.popen4('cd \"%s\"; %s -d %s -c | %s xf -; echo ZZENDZZ' %
+                      (path, comp, file, app.prefs.progs['tar']))
+    while 1:
+        buf = oe.read()[:-1]
+        if buf == 'ZZENDZZ':
+            i.close(); oe.close()
+            return
+        else:
+            i.close(); oe.close()
+            buf = buf.replace('ZZENDZZ', '')
+            return buf
+
+    
 def uncompress_dir(panel):
     """uncompress tarred file to current directory"""
     
@@ -1251,10 +1573,12 @@ def uncompress_dir(panel):
                 messages.error('Uncompress directory',
                                'No uncompress program found in path')
                 return
-            oe, i = popen2.popen4('cd %s; %s -d %s -c | %s xvf -; echo END' %
-                                  (panel.path, comp, file, app.prefs.progs['tar']))
-            while oe.readline() != 'END\n':
-                pass
+            err = run_thread('Uncompressing file \'%s\'' % file, do_uncompress_dir,
+                             panel.path, comp, file)
+            if err and err != -100:
+                for panel in app.panels:
+                    panel.show()
+                messages.error('Error uncompressing \'%s\'' % file, err)
         panel.selections = []
     else:
         file = panel.sorted[panel.file_i]
@@ -1269,52 +1593,139 @@ def uncompress_dir(panel):
             messages.error('Uncompress directory',
                            'No uncompress program found in path')
             return
-        oe, i = popen2.popen4('cd %s; %s -d %s -c | %s xvf -; echo END' %
-                              (panel.path, comp, file, app.prefs.progs['tar']))
-        while oe.readline() != 'END\n':
-            pass
+        err = run_thread('Uncompressing file \'%s\'' % file, do_uncompress_dir,
+                         panel.path, comp, file)
+        if err and err != -100:
+            for panel in app.panels:
+                panel.show()
+            messages.error('Error uncompressing \'%s\'' % file, err)
 
 
-# compress directory
-def compress_dir(panel):
+# compress directory: tar and gzip, bzip2
+def do_compress_dir(path, prog, file, ext):
+    tmpfile = tempfile.mktemp()
+    i, oe = os.popen4('cd \"%s\"; %s cf - %s | %s >%s; echo ZZENDZZ' %
+                      (path, app.prefs.progs['tar'],
+                       file, app.prefs.progs[prog], tmpfile))
+    while 1:
+        buf = oe.read()[:-1]
+        if buf == 'ZZENDZZ':
+            break
+        else:
+            i.close(); oe.close()
+            buf = buf.replace('ZZENDZZ', '')
+            os.unlink(tmpfile)
+            return buf
+    i.close(); oe.close()
+    try:
+        files.do_copy(tmpfile, os.path.join('%s' % path,
+                                            '%s.tar.%s' % (file, ext)))
+    except (IOError, os.error), (errno, strerror):
+        os.unlink(tmpfile)
+        return '%s (%s)' % (strerror, errno)
+    os.unlink(tmpfile)
+
+
+def compress_dir(panel, prog):
     """compress directory to current path"""
 
     if app.prefs.progs['tar'] == '':
         app.show()
         messages.error('Compress directory', 'No tar program found in path')
         return
-    if app.prefs.progs['gzip'] == '':
+    if app.prefs.progs[prog] == '':
         app.show()
-        messages.error('Compress directory', 'No gzip program found in path')
+        messages.error('Compress directory', 'No %s program found in path' % prog)
         return
+    if prog == 'gzip':
+        ext = 'gz'
+    else:
+        ext = 'bz2'
     if panel.selections:
         for file in panel.selections:
-            fullfile = os.path.join(panel.path, file)
-            if not os.path.isdir(fullfile):
+            if not os.path.isdir(os.path.join(panel.path, file)):
                 app.show()
                 messages.error('Compress directory',
                                '%s: is not a directory' % file)
                 continue
-            oe, i = popen2.popen4('cd %s; %s cvf - %s | %s >%s.tar.gz; echo END' %
-                                  (panel.path, app.prefs.progs['tar'], file,
-                                   app.prefs.progs['gzip'], file))
-            while oe.readline() != 'END\n':
-                pass
+
+            err = run_thread('Compressing directory \'%s\'' % file,
+                             do_compress_dir,
+                             panel.path, prog, file, ext)
+            if err and err != -100:
+                for panel in app.panels:
+                    panel.show()
+                messages.error('Error compressing \'%s\'' % file, err)
         panel.selections = []
     else:
         file = panel.sorted[panel.file_i]
-        fullfile = os.path.join(panel.path, file)
-        if not os.path.isdir(fullfile):
+        if not os.path.isdir(os.path.join(panel.path, file)):
             app.show()
             messages.error('Compress directory',
                            '%s: is not a directory' % file)
             return
-        oe, i = popen2.popen4('cd %s; %s cvf - %s | %s >%s.tar.gz; echo END' %
-                              (panel.path, app.prefs.progs['tar'],
-                               file, app.prefs.progs['gzip'], file))
-        while oe.readline() != 'END\n':
-            pass
+        err = run_thread('Compressing directory \'%s\'' % file, do_compress_dir,
+                         panel.path, prog, file, ext)
+        if err and err != -100:
+            for panel in app.panels:
+                panel.show()
+            messages.error('Error compressing \'%s\'' % file, err)
 
+
+# show file info
+def do_show_file_info(panel):
+    def show_info(panel, file):
+        import stat
+        from time import ctime
+
+        fullfilename = os.path.join(panel.path, file)
+        file_data = panel.files[file]
+        file_data2 = os.lstat(fullfilename)
+        buf = []
+        user = os.environ['USER']
+        username = files.get_user_fullname(user)
+        so, host, ver, tmp, arch = os.uname()
+        buf.append(('%s v%s executed by %s' % (PROGNAME, VERSION, username), 5))
+        buf.append(('<%s@%s> on a %s %s [%s]' % (user, host, so, ver, arch), 5))
+        buf.append(('', 2))
+        fileinfo = os.popen('file \"%s\"' % \
+                            fullfilename).read().split(':')[1].strip()
+        buf.append(('%s: %s (%s)' % (files.FILETYPES[file_data[0]][1], file,
+                                     fileinfo), 6))
+        buf.append(('Path: %s' % panel.path[:curses.COLS-8], 6))
+        buf.append(('Size: %s bytes' % file_data[files.FT_SIZE], 6))
+        buf.append(('Mode: %s (%4.4o)' % \
+                    (files.perms2str(file_data[files.FT_PERMS]),
+                     file_data[files.FT_PERMS]), 6))
+        buf.append(('Links: %s' % file_data2[stat.ST_NLINK], 6))
+        buf.append(('User ID: %s (%s) / Group ID: %s (%s)' % \
+                    (file_data[files.FT_OWNER], file_data2[stat.ST_UID],
+                     file_data[files.FT_GROUP], file_data2[stat.ST_GID]), 6))
+        buf.append(('Last access: %s' % ctime(file_data2[stat.ST_ATIME]), 6))
+        buf.append(('Last modification: %s' % ctime(file_data2[stat.ST_MTIME]), 6))
+        buf.append(('Last change: %s' % ctime(file_data2[stat.ST_CTIME]), 6))
+        buf.append(('Location: %d, %d / Inode: #%X (%Xh:%Xh)' % \
+                    ((file_data2[stat.ST_DEV] >> 8) & 0x00FF,
+                    file_data2[stat.ST_DEV] & 0x00FF,
+                    file_data2[stat.ST_INO], file_data2[stat.ST_DEV],
+                    file_data2[stat.ST_INO]), 6))
+        fss = files.get_fs_info()
+        fs = ['/dev', '0', '0', '0', '0%', '/', 'unknown']
+        for e in fss:
+            if fullfilename.find(e[5]) != -1 and (len(e[5]) > len(fs[5]) or e[5] == os.sep):
+                fs = e
+        buf.append(('File system: %s on %s (%s) %d%% free' % \
+                    (fs[0], fs[5], fs[6], 100 - int(fs[4][:-1])), 6))
+        pyview.InternalView('Information about \'%s\'' % file, buf).run()
+
+
+    if panel.selections:
+        for f in panel.selections:
+            show_info(panel, f)
+        panel.selections = []
+    else:
+        show_info(panel, panel.sorted[panel.file_i])
+    
 
 ##### General Menu
 # show directories size
@@ -1325,8 +1736,12 @@ def show_dirs_size(panel):
                panel.files[f][files.FT_TYPE] != files.FTYPE_LNK2DIR:
                 continue
             file = os.path.join(panel.path, f)
-            panel.files[f] = files.get_fileinfo(file,
-                                               show_dirs_size = 1)
+            res = run_thread('Showing Directories Size',
+                             files.get_fileinfo, file, 0, 1)
+            if res == -100:
+                break
+            panel.files[f] = res
+                                               
     else:
         for f in panel.files.keys():
             if f == os.pardir:
@@ -1335,8 +1750,11 @@ def show_dirs_size(panel):
                panel.files[f][files.FT_TYPE] != files.FTYPE_LNK2DIR:
                 continue
             file = os.path.join(panel.path, f)
-            panel.files[f] = files.get_fileinfo(file,
-                                               show_dirs_size = 1)
+            res = run_thread('Showing Directories Size',
+                             files.get_fileinfo, file, 0, 1)
+            if res == -100:
+                break
+            panel.files[f] = res
 
 
 # find and grep
@@ -1352,21 +1770,28 @@ def findgrep(panel):
     if path[0] != os.sep:
         path = os.path.join(panel.path, path)
     if pat:
-        m = files.findgrep(path, fs, pat, app.prefs.progs['find'],
-                           app.prefs.progs['egrep'])
+        m = run_thread('Searching for \'%s\' in \"%s\" files' % (pat, fs),
+                       files.findgrep,
+                       path, fs, pat, app.prefs.progs['find'],
+                       app.prefs.progs['egrep'])
         if not m:
             app.show()
             messages.error('Find/Grep', 'No files found')
+            return
+        elif m == -100:
             return
         elif m == -1:
             app.show()
             messages.error('Find/Grep', 'Error while creating pipe')
             return
     else:
-        m = files.find(path, fs, app.prefs.progs['find'])
+        m = run_thread('Searching for \"%s\" files' % fs, files.find,
+                       path, fs, app.prefs.progs['find'])
         if not m:
             app.show()
-            messages.error('Find/Grep', 'No files found')
+            messages.error('Find', 'No files found')
+            return
+        elif m == -100:
             return
         elif m == -1:
             app.show()
@@ -1476,23 +1901,35 @@ def sort(panel):
     panel.selections = old_selections 
 
 
+# do show filesystems info
+def do_show_fs_info():
+    """Show file systems info"""
+
+    fs = files.get_fs_info()
+    if type(fs) != type([]):
+        app.show()
+        messages.error('Show filesystems info', fs)
+        return
+    app.show()
+    buf = []
+    buf.append(('Filesystem       FS type    Total Mb     Used   Avail.  Use%  Mount point', 6))
+    buf.append('-')
+    for l in fs:
+        buf.append(('%-15s  %-10s  %7s  %7s  %7s  %4s  %s' % \
+                    (l[0], l[6], l[1], l[2], l[3], l[4], l[5]), 2))
+    texts = [l[0] for l in buf]
+    buf[1] = ('-' * len(max(texts)), 6)
+    pyview.InternalView('Show filesystems info', buf).run()
+
+
 ##################################################
 ##### Wrappers
 ##################################################
 def doEntry(title, help, path = '', with_historic = 1, with_complete = 1):
-    curpath = app.panels[app.panel].path
+    panelpath = app.panels[app.panel].path
     while 1:
-        if with_complete:
-            if not path or path == '':
-                basepath = app.panels[app.panel].path
-            elif path[0] == os.sep:
-                basepath = path[:]
-            else:
-                basepath = app.panels[app.panel].path
-        else:
-            basepath = ''
         path = messages.Entry(title, help, path, with_historic, with_complete,
-                              basepath, curpath).run()
+                              panelpath).run()
         if type(path) != type([]):
             return path
         else:
@@ -1503,31 +1940,13 @@ def doEntry(title, help, path = '', with_historic = 1, with_complete = 1):
 def doDoubleEntry(title, help1, path1 = '', with_historic1 = 1, with_complete1 = 1,
                   help2 = '', path2 = '', with_historic2 = 1, with_complete2 = 1):
     active_entry = 0
-    curpath1 = app.panels[app.panel].path
-    curpath2 = app.panels[app.panel].path
+    panelpath1 = app.panels[app.panel].path
+    panelpath2 = app.panels[app.panel].path
     while 1:
-        if with_complete1:
-            if not path1 or path1 == '':
-                basepath1 = app.panels[app.panel].path
-            elif path1[0] == os.sep:
-                basepath1 = path1[:]
-            else:
-                basepath1 = app.panels[app.panel].path
-        else:
-                basepath1 = ''
-        if with_complete2:
-            if not path2 or path2 == '':
-                basepath2 = app.panels[app.panel].path
-            elif path2[0] == os.sep:
-                basepath2 = path2[:]
-            else:
-                basepath2 = app.panels[app.panel].path
-        else:
-            basepath2 = ''
         path = messages.DoubleEntry(title, help1, path1, with_historic1,
-                                    with_complete1, basepath1, curpath1,
+                                    with_complete1, panelpath1,
                                     help2, path2, with_historic2,
-                                    with_complete2, basepath2, curpath2,
+                                    with_complete2, panelpath2,
                                     active_entry).run()
         if type(path) != type([]):
             return path
@@ -1575,7 +1994,7 @@ def main(win, path, npanels):
 
     
 if __name__ == '__main__':
-    import time, getopt
+    import getopt
 
     # defaults
     npanels = 2

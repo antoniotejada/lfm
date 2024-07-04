@@ -1,3 +1,29 @@
+Version 0.7 ("Hello Darling, I'm here") - 2001/11/30:
+
+  + 'pyview', a new pager/viewer for use with lfm or standalone,
+    internally or externally. It is used as default pager too.
+    Some features: Text / Hex view, backwards & forwards search, 
+                   goto line/byte, un/wrap mode, documentation, ...
+  + Rewrite 'show filesystems info' to use internal viewer
+  + New 'run_thread' function in which almost every proccess is executed, 
+    so they can be stopped and there is a working signal too.
+    'do_something_on_file' does not use it
+  + Implemented 'show file info'
+  + Check errors when un/compressing
+  + Support for .bz2
+  + Removed tar 'v' flag in un/compressing
+  + Fixed completition, it should work perfectly now
+  + Added Ctrl-D key to delete the whole content of the EntryLine
+  + Implemented help: README, NEWS, TODO, ChangeLog or COPYING files
+  + Added new function to show special files: html, graphics, ...,
+    so we have defined new programs and file types too
+  + Added new preference: show_output_after_exec, defaults to yes
+  + Fix cursor position after deleting files
+  + Default configuration is now saved inmediately
+  + Many other bugs fixed again (see ChangeLog)
+
+Version 0.6 was never publically released
+
 Version 0.5 ("Last call to London") - 2001/08/07:
 
   + F2 file menu, added many functions

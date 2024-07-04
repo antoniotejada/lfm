@@ -36,12 +36,13 @@ def get_rdev(file):
 def __get_size(file):
     """return the size of the directory or file via 'du -sk' command"""
 
-    try:
-        buf = os.popen('du -sk \"%s\"' % file).read()
-    except:
+    i, o, e = os.popen3('du -sk \"%s\"' % file)
+    buf = o.read(); err = e.read()
+    i.close(); o.close(); e.close()
+    # if an inner dir has problems return current size
+    if not buf:
         return 0
-    else:
-        return int(buf.split()[0]) * 1024
+    return int(buf.split()[0]) * 1024
 
 
 ########################################################################
@@ -68,11 +69,19 @@ def get_linkpath(path, filename):
 
 ########################################################################
 ########################################################################
+def join(directory, file):
+    if not os.path.isdir(directory):
+        directory = os.path.dirname(directory)
+    return os.path.join(directory, file)
+
+
+########################################################################
+########################################################################
 # File Type:    dir, link to directory, link, nlink, char dev,
 #               block dev, fifo, socket, executable, file
-FTYPE_DIR = 0; FTYPE_LNK2DIR = 1; FTYPE_LNK = 2; FTYPE_NLNK = 3
-FTYPE_CDEV = 4; FTYPE_BDEV = 5; FTYPE_FIFO = 6; FTYPE_SOCKET = 7
-FTYPE_EXE = 8; FTYPE_REG = 9
+(FTYPE_DIR, FTYPE_LNK2DIR, FTYPE_LNK, FTYPE_NLNK, FTYPE_CDEV, FTYPE_BDEV,
+ FTYPE_FIFO, FTYPE_SOCKET, FTYPE_EXE, FTYPE_REG) = range(10)
+
 FILETYPES = { FTYPE_DIR: (os.sep, 'Directory'),
               FTYPE_LNK2DIR: ('~', 'Link to Directory'),
               FTYPE_LNK: ('@', 'Link'), FTYPE_NLNK: ('!', 'No Link'),
@@ -111,9 +120,8 @@ def __get_filetype(file):
         return FTYPE_REG       # if no other type, regular file
 
 
-FT_TYPE = 0; FT_PERMS = 1
-FT_OWNER = 2; FT_GROUP = 3
-FT_SIZE = 4; FT_MTIME = 5
+(FT_TYPE, FT_PERMS, FT_OWNER, FT_GROUP, FT_SIZE, FT_MTIME) = range(6)
+
 def get_fileinfo(file, pardir_flag = 0, show_dirs_size = 0):
     """return information about a file in next format:
     (filetype, perms, owner, group, size, mtime).
@@ -162,13 +170,8 @@ def get_dir(path):
 ########################################################################
 ########################################################################
 # Sort Type:    None, byName, bySize, byDate, byType
-SORTTYPE_None = 0
-SORTTYPE_byName = 1
-SORTTYPE_byName_rev = 2
-SORTTYPE_bySize = 3
-SORTTYPE_bySize_rev = 4
-SORTTYPE_byDate = 5
-SORTTYPE_byDate_rev = 6
+(SORTTYPE_None, SORTTYPE_byName, SORTTYPE_byName_rev, SORTTYPE_bySize,
+ SORTTYPE_bySize_rev, SORTTYPE_byDate, SORTTYPE_byDate_rev) = range(7)
 
 def __do_sort(f_dict, sortmode, sort_mix_cases):
     if sortmode == SORTTYPE_None:
@@ -335,18 +338,24 @@ def perms2str(p):
 ########################################################################
 ########################################################################
 # complete
-def complete(path, basepath, curpath):
-    if not path:
-        path = curpath
-    elif path[0] != os.sep:
-        path = os.path.join(basepath, path)
+def complete(entrypath, panelpath):
+    if not entrypath:
+        path = panelpath
+    elif entrypath[0] == os.sep:
+        path = entrypath
+    else:
+        path = os.path.join(panelpath, entrypath)
+
     if os.path.isdir(path):
         basedir = path
         fs = os.listdir(path)
     else:
         basedir = os.path.dirname(path)
         start = os.path.basename(path)
-        entries = os.listdir(basedir)
+        try:
+            entries = os.listdir(basedir)
+        except OSError:
+            entries = []
         fs = []
         for f in entries:
             if f.find(start, 0) == 0:
@@ -365,13 +374,6 @@ def complete(path, basepath, curpath):
     d2.sort()
     d1.extend(d2)
     return d1
-
-
-
-def join(directory, file):
-    if not os.path.isdir(directory):
-        directory = os.path.dirname(directory)
-    return os.path.join(directory, file)
 
 
 ########################################################################
@@ -529,17 +531,20 @@ def findgrep(path, files, pattern, find, egrep, ignorecase = 0):
 #                  matches.append('%d:%s' % (nline, filename))
 #      c.close()
 
+    cmd = '%s %s -name \"%s\" -print' % (find, path, files)
     try:
-        fs =  [l[:-1] for l in os.popen('%s %s -name \"%s\" -print' %
-                                        (find, path, files)).readlines()]
+        i, o, e = os.popen3(cmd, 'r')
     except:
         return -1
+    i.close; e.close()
+    fs =  [l[:-1] for l in o.readlines()]
+    o.close()
     fs = [l for l in fs if not os.path.isdir(l)]
     matches = []
     for f in fs:
         try:
-            buf = os.popen('%s -n%s \"%s\" %s' % (egrep, ign, pattern,
-                                                  f)).readlines()
+            buf = os.popen('%s -n%s \"%s\" \"%s\"' % (egrep, ign, pattern,
+                                                      f)).readlines()
         except:
             return -1
         if not buf:
@@ -560,10 +565,11 @@ def findgrep(path, files, pattern, find, egrep, ignorecase = 0):
 def find(path, files, find):
     cmd = '%s %s -name \"%s\" -print;' % (find, path, files)
     try:
-        c = os.popen(cmd, 'r')
+        i, c, e = os.popen3(cmd, 'r')
     except:
         return -1
 
+    i.close; e.close()
     quit = 0
     matches = []
     filename = ''
@@ -592,6 +598,15 @@ def get_owners():
     return owners
 
 
+def get_user_fullname(user):
+    """return the fullname of an user"""
+
+    try:
+        return pwd.getpwnam(user)[4]
+    except KeyError:
+        return '<unknown user name>'
+    
+    
 def get_groups():
     """get a list with the groups defined in the system"""
     
@@ -662,8 +677,7 @@ def get_fs_info():
             e[2] = str(int(e[2]) / 1024)
             e[3] = str(int(e[3]) / 1024)
             e[4] = e[4]
-            fs.append(e)
-            
+            fs.append(e)          
 
         # get filesystems type
         if sys.platform[:5] == 'linux':
@@ -685,3 +699,6 @@ def get_fs_info():
             else:
                 f.append('unknown')
         return fs
+
+
+

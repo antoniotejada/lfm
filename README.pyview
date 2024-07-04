@@ -1,0 +1,47 @@
+pyview - Last File Manager Viewer
+=================================
+
+(C) 2001, Iñigo Serna <inigoserna@terra.es>
+
+    pyview is a pager (viewer) written in Python.
+Though it was initially written to be used with 'lfm',
+it can be used standalone too.
+
+This software has been realised under the GPL License, 
+see the COPYING file that comes with this package. 
+There is NO WARRANTY.
+
+Keys:
+=====
++ Movement
+    - cursor_up, p, P
+    - cursor_down, n, N
+    - previous page, backspace, Ctrl-P
+    - next page, space, Ctrl-N
+    - home: first line
+    - end: last line
+    - cursor_left
+    - cursor_right
+
++ Actions
+    - h, H, F1: help
+    - w, W, F2: toggle un / wrap (only in text mode)
+    - m, M, F4: toggle text / hex mode
+    - g, G, F5: goto line / byte
+    - /: find
+    - F6: find previous or find
+    - F7: find next or find
+    - q, Q, x, X, F3, F10: exit
+
+Goto Line / Byte
+================
+    Enter the line number / byte offset you want to show.
+If number / byte is preceded by '0x' it is interpreted as hexadecimal.
+You can scroll relative lines from the current position using '+' or '-' char.
+
+Find
+====
+    Type the string to search. It ignores case.
+
+============================================================================
+Last update:	Sunday November 25, 2001 - 20:29:54 CEST

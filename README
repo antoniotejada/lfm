@@ -12,27 +12,37 @@ Introduction:
 'Last File Manager' is (tries to be) a simple 'midnight commander'-type
 application for UNIX console.
 
-It is written in python and uses curses module.
+From version 0.6 and higher lfm package also contains 'pyview', a
+simple python viewer to be used with lfm. Read README.pyview for 
+more info on it.
+
+Lfm and Pyview are written in python and use curses module.
 
 It has been tested on next platforms:
 
-O.S.		PYTHON		Arch
+O.S.           PYTHON     Arch
 -------------------------------------------------
-Linux 2.4.6	2.1		i686
-Solaris 8       2.1		UltraSparc-II (1)
+Linux 2.4.12   2.1.1      i686
+Solaris 8      2.1        UltraSparc-II (1)
 
 (1) I needed to install ncurses and recompile python to use them. 
     It doesn't work with the curses library which comes with Solaris 8.
 
-but I hope it works in other UNIXes as well.
+I hope it works in other UNIXes as well.
+It seems it doesn't work on OpenBSD, perhaps due to the version of ncurses
+library it has.
 
-It needs Python v2.0 or higher, it doesn't work with v1.5.
+It needs Python v2.0 or higher, it won't work with v1.5.
 
-Take a look at TODO file to see bugs and not implemented features.
+Also, take a look at TODO file to see bugs and not implemented features.
 
 Type 'lfm --help' for a complete list of options.
 
 Program preferences are saved in '~/.lfmrc' file.
+When the program starts the first time, it tries to discover the programs
+in your system to configure lfm automatically, but it's not perfect, so
+you should take a look to the configuration (General Menu [F9] -> Edit
+Configuration [c]) and change according to your preferences.
 
 
 Install
@@ -40,27 +50,34 @@ Install
 'lfm' doesn't work unless you install it, but don't worry, it's very easy.
 
 From rpm (RedHat-type linux system):
-type as root:	# rpm -Uvh lfm-version-noarch.rpm
+type as root:   # rpm -Uvh lfm-version-noarch.rpm
 
 From source (any UNIX):
-type:		$ python setup.py build
-and as root:	# python setup.py install	
+uncompress file
+type:           $ python setup.py build
+and as root:    # python setup.py install	
 
 and then just type 'lfm' to run it.
 
-To let lfm to cd to panel's current directory after quiting with
+To let lfm to change to panel's current directory after quiting with
 'q', 'Q' or F10 keys, you must add to /etc/bashrc or to your ~/.bashrc
 next code:
 
   lfm()
   {
-	/usr/bin/lfm $*		# type here full path to executable
+	/usr/bin/lfm $*		# type here full path to lfm executable
 	LFMPATHFILE=/tmp/lfm-$$.path
 	cd `cat $LFMPATHFILE`
 	rm -f $LFMPATHFILE
   }
 
 If you don't use bash or csh shell, above lines must be different.
+
+
+Upgrading
+=========
+If you upgrade from version <= 0.5, please remove ~/.lfmrc to regenerate
+a valid configuration file.
 
 
 Keys:
@@ -104,20 +121,42 @@ Here you have the complete list:
     - m, M, F6: move file/dir/selection
     - F7: make directory
     - d, D, F8, del: delete file/dir/selection
+    - enter: execute file, enter dir or view 'specially' depending on the
+             extension of the regular file. It is executed in a thread 
+             that can be stopped and captures output
+    - i, I: show file info
+
 
 + Other
     - #: show directories size
     - s, S: sort files
     - /: find/grep files
-    - enter: execute file, enter dir or view if regular file
-    - @: do something on file
-    - Ctrl-O: open shell. Type 'exit' to return
-    - x, X, F10: exit changing to current path
-    - q, Q: quit
-    - h, H, F1: help	(NOT YET)
+    - @: do something on file. Output is not captured, it is also not executed
+         in a thread
+    - Ctrl-O: open shell. Type 'exit' to return to lfm
     - f, F, F2: file menu
-    - F9: general menu
+        . @: Do something on file(s)
+        . i: File(s) info
+        . p: Change file permissions, owner, group
+        . g: Gzip/gunzip file(s)
+        . b: Bzip2/bunzip2 file(s)
+        . x: Uncompress .tar.gz, .tar.bz2, .tar.Z
+        . c: Compress directory to .tar.gz
+        . d: Compress directory to .tar.bz2
+        . y: Encrypt/decrypt file
+    - F9: general menu 
+        . /: Find/grep file
+        . #: show directories size
+        . s: sort files
+        . t: tree
+        . f: show filesystems info
+        . o: open shell
+        . c: edit configuration
+        . a: save configuration
     - Ctrl-R: refresh screen
+    - h, H, F1: help
+    - q, Q, F10: exit changing to current path
+    - x, X: quit
 
 * Keys in EntryLine window:
   - Ctrl-C: quit
@@ -125,7 +164,8 @@ Here you have the complete list:
   - enter: return path
   - tab: change to next entry or button
   - Ctrl-T: complete
-  - Ctrl-W: delete
+  - Ctrl-W: delete leftwards until /
+  - Ctrl-D: delete all
   - left, right, home, end, backspace, del, insert, ...
 
 * Keys in SelectItem window:
@@ -144,7 +184,7 @@ History:
 ========
 Some years ago I began to write a program like this in C, but after
 some weeks of coding I never finished it... I'm too lazy, yes.
-Now, once I've seen the light, I am writting 'lfm' to learn python.
+Now, once I've seen the light, I am writing 'lfm' to learn python.
 
 
 Thanks:
@@ -152,7 +192,7 @@ Thanks:
 
 Thanks are obviously due to the whole python community, specially to GvR 
 (of course! ;-) and all the people who answered my questions in c.l.p.
-It's a great pleasure to code in a language as this.
+It's a great pleasure to code in a language like this.
 
 Alexei Gilchrist, for his cfm program from which I took some ideas.
 
@@ -160,4 +200,4 @@ Midnight Commander developers, whose program was the guide.
 
 
 ============================================================================
-Last update:	Sunday 22 July 2001 01:26:14 CEST
+Last update:	Sunday November 25, 2001 - 20:36:04 CEST

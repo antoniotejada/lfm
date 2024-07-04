@@ -1,43 +1,57 @@
-Not Yet Implemented:
-====================
-+ F1, h: help
+General:
+========
++ copy, move, delete (?): walk dirs => bug #1
+
++ Enter: if .tar.gz / .tar.bz2 => vfs
+
++ find/grep: panelize => vfs
 
 + F2, f: file menu
-	i - file info
 	y - encrypt/decrypt file
 
 + F9: Menu
 	t - tree
 
-+ i: file info
-
 + Ctrl-t: show tree
-
-+ Enter: do something with file
-	tar.gz / tar.bz2: enter
-	gr: view graphically
-	...
-
-
-General:
-========
-+ rewrite messages.show_fs_info()
-
-+ capture output when executing file: ENTER, @
-
-+ check errors while un/compressing
-
-+ find/grep: panelize
 
 + preferences: edit, load/save historic
 
-+ if action is time-consuming => threads... => | \ - /
 
-+ internal viewer
+Bugs:
+=====
++ Overwrite dirs when moving or copying => walk dirs
+  f.e.    panel1:   dir/a      panel2:   dir/b
+                       /b                   /c
+  Now when moving dir from panel1 to panel2, the 'dir' destination
+  is overwritten, so 'c'-file is lost. This is not the desired
+  behaviour
 
++ pyview.py: if wrap mode => fix prev/next page & up/down cursor
+
++ if panel2 shows 'a' directory and in panel1 'a' is deleted, lfm crashes
+
++ pyview.py: chars >= 0xA0 are showed in reversed video on Linux
+
++ lfm.run_thread: sometimes some processes remain as zombies when stopped 
+                  by user or because of an error
+
++ pyview.py.InternalView: cursor appears after keystroke regards
+  curses.curs_set(0)
+
++ messages.SelectItem, messages.FindfilesWin, messages.MenuWin,
+  messages.ChangePerms: upperleft corner disappears
+
++ lfm crashes in X when resizing terminal => handle SIGWINCH signal
+
++ keys in Solaris terminal: look at Oleg Broytmann's mail in c.l.p
+on 10 Jul 2001 12:11:39 +0400
+
+
+Some vague future ideas:
+========================
 + look at distutils.file_util, distutils.dir_util, distutil.filelist, ...
 
-+ document functions
++ what happens with integer division???
 
 
 Hacks:
@@ -45,7 +59,7 @@ Hacks:
 + Python os.stat doesn't have rdev in returned tuple,
   which is needed for devices major and minor numbers
 
-+ Idem with 'getmnent' to get filesystem type
++ Idem with 'getmntent' to get filesystem type
 
 + The first time Panel.__init_dir is executed, it needs to know prefs,
   so there is a hack to get it working
@@ -59,18 +73,5 @@ Hacks:
 + We need to use a shell hack to change the directory after lfm exists
 
 
-Bugs:
-=====
-+ messages.SelectItem, messages.FindfilesWin, messages.MenuWin,
-  messages.ChangePerms: upperleft corner disappears
-
-+ lfm crashes in X when resizing terminal => handle SIGWINCH signal
-
-+ if panel2 has dir. 'a' and in panel1 'a' is deleted, lfm crashes
-
-+ keys in Solaris terminal: look at the mail of Oleg Broytmann in c.l.p
-on 10 Jul 2001 12:11:39 +0400
-
-
 ============================================================================
-Last update:	Sunday 5 August 2001 19:04:37 CEST
+Last update:	Sunday November 25, 2001 - 02:26:22 CEST

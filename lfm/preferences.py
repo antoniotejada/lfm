@@ -4,9 +4,7 @@ This module defines the preferences class for lfm.
 """
 
 
-import os.path
-import popen2
-import re
+import os, os.path, re
 import curses
 
 import files
@@ -21,17 +19,17 @@ PROGNAME = 'lfm - Last File Manager'
 class Preferences:
     """Preferences class"""
     
-    def __init__(self, prefsfile):
+    def __init__(self, prefsfile, defaultprogs):
         self.file = os.path.abspath(os.path.expanduser(os.path.join('~',
                                                                     prefsfile)))
         self.file_start = '#' * 10 + ' ' + PROGNAME + ' ' + \
                           'Preferences File' + ' ' + '#' * 10
         self.progs = {}
-        self.check_defaultprogs()
+        self.check_defaultprogs(defaultprogs)
         self.modes = { 'sort': files.SORTTYPE_byName,
                        'sort_mix_dirs': 0, 'sort_mix_cases': 0 }
         self.confirmations = { 'delete': 1, 'overwrite': 1, 'quit': 0 }
-        self.options = { 'save_conf_at_exit': 1 }
+        self.options = { 'save_conf_at_exit': 1, 'show_output_after_exec': 1 }
         self.bookmarks = [ '/',
                            '/home/inigo',
                            '/home/inigo/personal',
@@ -44,23 +42,14 @@ class Preferences:
                            '/dfsdf' ]
 
 
-    def check_defaultprogs(self):
-        progs = { 'shell': ('bash', 'ksh', 'tcsh', 'csh', 'sh'),
-                  'pager': ('less', 'more', 'biew'),
-                  'editor': ('mcedit', 'emacs', 'vi', 'joe'),
-                  'find': ('find', ),
-                  'egrep': ('egrep', 'grep'),
-                  'tar': ('tar', ),
-                  'gzip': ('gzip', ),
-                  'bzip2': ('bzip2', ),
-                  'tururu': ('tururu', 'sdfdsf') }
+    def check_defaultprogs(self, progs):
         for k, vs in progs.items():
             for v in vs:
-                o, i, e = popen2.popen3('which %s' % v)
+                i, o, e = os.popen3('which \"%s\"' % v)
                 r = o.read()
                 o.close(); i.close(); e.close()
                 if r:
-                    self.progs[k] = v
+                    self.progs[k] = r.strip()
                     break
             else:
                 self.progs[k] = ''
@@ -97,7 +86,7 @@ class Preferences:
                 for k in self.progs.keys():
                     if b[0] == k:
                         self.progs[k] = b[1]
-                        print 'Program->%s = %s' % (k, b[1])
+#                          print 'Program->%s = %s' % (k, b[1])
                         break
                 else:
                     print 'Bad program option:', b[0]
@@ -110,7 +99,7 @@ class Preferences:
                     for k in self.modes.keys():
                         if b[0] == k:
                             self.modes[k] = val
-                            print 'Mode->%s = %d' % (k, val)
+#                              print 'Mode->%s = %d' % (k, val)
                             break
                     else:
                         print 'Bad mode option:', b[0]
@@ -125,7 +114,7 @@ class Preferences:
                     for k in self.confirmations.keys():
                         if b[0] == k:
                             self.confirmations[k] = val
-                            print 'Confirmations->%s = %d' % (k, val)
+#                              print 'Confirmations->%s = %d' % (k, val)
                             break
                     else:
                         print 'Bad confirmation option:', b[0]
@@ -140,7 +129,7 @@ class Preferences:
                     for k in self.options.keys():
                         if b[0] == k:
                             self.options[k] = val
-                            print 'Options->%s = %d' % (k, val)
+#                              print 'Options->%s = %d' % (k, val)
                             break
                     else:
                         print 'Bad option option:', b[0]
@@ -154,7 +143,7 @@ class Preferences:
                 if 0 <= n <= 9:
                     if os.path.isdir(b[1]):
                         self.bookmarks[n] = b[1]
-                        print 'Bookmark[%d] = %s' % (n, b[1])
+#                          print 'Bookmark[%d] = %s' % (n, b[1])
                     else:
                         self.bookmarks[n] = ''
                         print 'Bad bookmark[%d]: %s' % (n, b[1])
