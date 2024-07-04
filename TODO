@@ -1,0 +1,84 @@
+Not Yet Implemented:
+====================
++ F1, h: help
+
++ F2, f: file menu
+	p - perms, owner, group
+	i - file info
+	@ - do something with file
+	g - gzip / gunzip
+	b - bzip2 / bunzip2
+	x - uncompress (tar.gz, tar.bz2)
+	c - compress (..)
+	y - encrypt/decrypt file
+
++ F9: Menu
+	/ - find, grep
+	  - df -k
+	  - du -sk
+	t - tree
+	s - shell
+	b - edit bookmarks
+	c - configuration  
+	  - save configuration
+
++ /: find, grep
+
++ i: file info
+
++ Ctrl-t: show tree
+
++ Enter: do something with file
+	tar.gz / tar.bz2: enter
+	gr: view graphically
+	...
+
+
+General:
+========
++ exit to the current directory, look at mc hack
+
++ preferences: load, save, edit
+	- apps: shell, pager, editor
+	- confirmations: overwrite, delete
+	- sort: mode, mix_dirs, mix_cases
+	- historic: ?
+
++ if action is time-consuming => threads... => | \ - /
+
++ check if arg[1] = file, not a dir => view
+
++ look at distutils.file_util, distutils.dir_util, distutil.filelist, ...
+
++ document functions and modules
+
+
+HACKS:
+======
++ Python os.stat doesn't have rdev in returned tuple,
+  which is needed for devices major and minor numbers
+
++ The first time Panel.__init_dir is executed, it needs to know prefs,
+  so there is a hack to get it working
+
++ Added a '0x1B' char capture to avoid extra input with HOME and END keys
+  in xterm and gnome-terminal (rxvt worked ok)
+
++ Completition code is a mess: we need to know panels path, but inside
+  files.py and messages.py files we don't have access to 'app'
+
+
+BUGS:
+=====
++ lfm crashes in X when resizing terminal => handle SIGWINCH signal
+
++ if panel2 has dir. 'a' and in panel1 it is deleted, it crashs
+
++ keys in Solaris terminal: look at the mail of Oleg Broytmann in c.l.p
+on 10 Jul 2001 12:11:39 +0400
+
+
+============================================================================
+Last update:	Thursday 19 July 2001 18:46:54 CEST
+
+

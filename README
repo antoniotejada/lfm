@@ -1,0 +1,145 @@
+lfm - Last File Manager
+=======================
+
+(C) 2001, Iñigo Serna <inigoserna@terra.es>
+
+This software has been realised under the GPL License, see the COPYING
+file that comes with this package. There is NO WARRANTY.
+
+
+Introduction:
+=============
+Last File Manager' is (tries to be) a simple 'midnight commander'-type
+application for UNIX console.
+
+It is written in python and uses curses module.
+
+It has been tested on next platforms:
+
+O.S.		PYTHON		Arch
+-------------------------------------------------
+Linux 2.4.6	2.1		i686
+Solaris 8       2.1		UltraSparc-II (1)
+
+(1) I needed to install ncurses and recompile python to use them. 
+    It doesn't work with the curses library which comes with Solaris 8.
+
+but I hope it works in other UNIXes as well.
+
+It needs Python v2.0 or higher, it doesn't work with v1.5.
+
+Take a look at TODO file to see bugs and not implemented features.
+
+Type 'lfm --help' for a complete list of options.
+
+
+Install
+=======
+'lfm' doesn't work unless you install it, but don't worry, it's very easy.
+
+From rpm (RedHat-type linux system):
+type as root:	# rpm -Uvh lfm-version-noarch.rpm
+
+From source (any UNIX):
+type:		$ python setup.py build
+and as root:	# python setup.py install	
+
+and then just type 'lfm' to run it.
+
+
+Keys:
+=====
+Though most of keys are the same as in mc, some differs.
+Here you have the complete list:
+
++ Movement
+    - cursor_up, p, P
+    - cursor_down, n, N
+    - previous page, backspace, Ctrl-P
+    - next page, space, Ctrl-N
+    - home: first file
+    - end: last file
+    - curses_left: upper dir
+    - curses_right: enter dir
+    - g, G: go to directory
+    - Ctrl-S: go to file
+    - 0..9: go to bookmark #
+    - b: set bookmark #
+    - B: edit bookmarks	(NOT YET)
+
++ Panels
+    - tab: other panel
+    - .: toggle 1/2 panels
+    - ,, Ctrl-U: change panels position (left->right, right->left)
+    - =: show same directory in both panels
+
++ Selections
+    - insert: select item and go to next file
+    - +: select group
+    - -: deselect group
+    - *: invert selection
+
++ Files/dirs operations
+    - t, T: touch file
+    - l, L: create link
+    - Ctrl-L: edit link
+    - v, V, F3: view file
+    - e, E, F4: edit file
+    - c, C, F5: copy file/dir/selection
+    - m, M, F6: move file/dir/selection
+    - F7: make directory
+    - d, D, F8, del: delete file/dir/selection
+
++ Other
+    - #: show directories size
+    - s, S: sort files
+    - enter: execute file, enter dir or view if regular file
+    - @: do something on file
+    - Ctrl-O: open shell. Type 'exit' to return
+    - x, X, q, Q, F10: quit
+    - h, H, F1: help	(NOT YET)
+    - f, F, F2: file menu	(NOT YET)
+    - F9: general menu	(NOT YET)
+	- Ctrl-R: refresh screen
+
+* Keys in EntryLine window:
+  - Ctrl-C: quit
+  - up, down: historic
+  - enter: return path
+  - tab: change to next entry or button
+  - Ctrl-T: complete
+  - Ctrl-W: delete
+  - left, right, home, end, backspace, del, insert, ...
+
+* Keys in SelectItem window:
+  - Ctrl-C, q, Q: quit
+  - up, p, P
+  - down, n, N
+  - next page, space
+  - previous page, backspace
+  - home
+  - end
+  - Ctrl-S: go to file/dir
+  - enter: return path
+
+
+History:
+========
+Some years ago I began to write a program like this in C, but after
+some weeks of coding I never finished it... I'm too lazy, yes.
+Now, once I've seen the light, I am writting 'lfm' to learn python.
+
+Thanks:
+=======
+
+Thanks are obviously due to the whole python community, specially to GvR 
+(of course! ;-) and all the people who answered my questions in c.l.p.
+It's a great pleasure to code in a language as this.
+
+Alexei Gilchrist, for his cfm program from which I took some ideas.
+
+Midnight Commander developers, whose program was the guide.
+
+
+============================================================================
+Last update:	Thursday 19 July 2001 18:46:54 CEST

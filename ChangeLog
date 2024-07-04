@@ -1,0 +1,154 @@
+Thu Jul 19 18:14:00 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (VERSION): version 0.4
+
+Thu Jul 19 18:00:16 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (confirm_all): new function
+	* lfm/lfm.py (Panel.manage_keys): overwrite all implemented in 
+	copy and move
+
+Thu Jul 19 01:33:21 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (complete): completition function. After a couple
+	of days it works ok now
+	* lfm/lfm.py (doEntry): 
+	* lfm/lfm.py (doDoubleEntry): new wrappers to parse paths to feed
+	Entry and DoubleEntry classes with proper values for completition
+	* lfm/messages.py (Entry): 
+	* lfm/messages.py (DoubleEntry): modified to support completition
+
+Tue Jul 17 17:20:43 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.show): scroll bars in panels (not interactive)
+
+Sun Jul 15 03:15:04 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (Yes_no_Buttons): new class
+	* lfm/messages.py (EntryLine): new class to ease entries with
+	many entry lines
+	* lfm/messages.py (Entry): rewrite to use upper classes
+	* lfm/messages.py (DoubleEntry): new class
+
+Sat Jul 14 20:12:55 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): when some dirs are selected
+	 and 'show dirs size', only show size of the selected dirs
+
+Sat Jul 14 12:07:17 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): added 'special regards' ;-)
+
+Wed Jul 11 19:23:15 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): fix a problem with enter key
+
+Tue Jul 10 18:53:29 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): fixed a problem when
+	using files which names contain spaces
+
+Tue Jul 10 01:36:07 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): #: show dirs size
+
+Tue Jul 10 00:49:02 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* setup.py: using distutils
+
+Tue Jul 10 00:47:56 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): create/edit link implemented
+
+Tue Jul 10 00:47:16 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (modify_link): 
+	* lfm/files.py (create_link): added functions
+
+Fri Jul  6 00:30:09 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm.py (app): version 0.3
+
+Thu Jul  5 19:38:17 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* messages.py (Entry): add historic support
+
+Thu Jul  5 18:37:29 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm.py (Panel.manage_keys): do something on file implemented
+
+Tue Jul  3 01:38:47 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* messages.py (Entry): rewrite class using curses.pad
+
+Tue Jul  3 01:07:42 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* messages.py (confirm): rewrite function using curses.pad
+
+Tue Jul  3 01:05:27 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* messages.py (error): 
+	* messages.py (win): 
+	* messages.py (notyet): rewritten to use new CommonWindow class
+
+Tue Jul  3 01:06:31 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* messages.py (CommonWindow): new class
+
+Mon Jul  2 22:25:28 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm.py (Panel.manage_keys): 
+	* files.py (copy): 
+	* files.py (move): added overwrite pref to copy and move
+
+Mon Jul  2 20:14:15 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm.py (Panel.manage_keys): added confirmation pref to delete
+
+Mon Jul  2 19:55:30 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm.py (Panel.manage_keys): touch file implemented
+
+Mon Jul  2 19:20:38 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm.py (Panel.__init_dir): sort info saved in session
+
+Mon Jul  2 18:34:07 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* files.py (__do_sort): fix bug with size and date sorting
+
+Mon Jul  2 00:49:02 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* files.py (__do_sort): implement mix filename cases in sorting;
+	implement reversed name, size and date sorting; fix bug in sorting
+	by size or date when 2 or more files have the same size or date
+
+Mon Jul  2 00:47:56 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* files.py (sort_dir): implement mix files and dirs while sorting
+
+Mon Jul  2 00:46:16 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* messages.py (entry.manage_keys): added Ctrl-C key to quit window
+
+Sat Jun 30 13:57:44 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm.py (Panel.manage_keys): go to file (Ctrl-S) implemented
+
+Sat Jun 30 13:43:11 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm.py (Panel.manage_keys): go to / set bookmarks implemented
+
+Sat Jun 30 13:16:41 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm.py (Preferences.__init__): start preferences support
+
+Fri Jun 29 00:43:19 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm.py (Panel.manage_keys): implemented de/select group functions
+
+Thu Jun 28 23:36:58 2001  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* The day of the first public release is coming, so I must start
+	this ChangeLog file
+
