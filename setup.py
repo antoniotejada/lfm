@@ -1,15 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 from distutils.core import setup
 
 DOC_FILES = ['COPYING', 'README', 'README.pyview', 'NEWS', 'TODO', 'ChangeLog']
 
 setup(name = 'lfm',
-      version = '0.8',
+      version = '0.9',
       licence = 'GPL',	# spelling error in distutils
       description = 'Last File Manager',
       author = 'Iñigo Serna',
-      author_email = 'inigoserna@terra.es',
+      author_email = 'inigoserna@telefonica.net',
       url = 'http://www.terra.es/personal7/inigoserna/lfm',
       py_modules = ['lfm/__init__', 'lfm/lfm', 'lfm/messages', 'lfm/files',
                     'lfm/preferences', 'lfm/pyview'],

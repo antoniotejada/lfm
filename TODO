@@ -1,7 +1,14 @@
 General:
 ========
-+ what happens with integer division / true division after Python 3.0???
-  lfm and pyview crash when 'from __future__ import division'
++ mc: Alt-O
+      Alt-T => .
+      Alt-Y/U => < / > historic
+
++ .rpm vfs
+
++ handle windows resizing in X (low priority)
+
++ a gui for configuring colors (very low priority)
 
 
 Bugs:
@@ -41,4 +48,4 @@ Hacks:
 
 
 ============================================================================
-Last update:	Monday March 4rd, 2002 - 14:14:26 CEST
+Last update:	Wednesday September 4th, 2002 - 01:08:14 CEST

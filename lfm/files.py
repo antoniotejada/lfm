@@ -11,6 +11,7 @@ import stat
 import time
 import pwd
 import grp
+import thread
 
 
 ########################################################################
@@ -646,11 +647,11 @@ def set_perms(file, perms):
     i = 8
     for p in perms:
         if p == 'x':
-            ps += 1 * 8 ** (i / 3)
+            ps += 1 * 8 ** int(i / 3)
         elif p == 'w':
-            ps += 2 * 8 ** (i / 3)
+            ps += 2 * 8 ** int(i / 3)
         elif p == 'r':
-            ps += 4 * 8 ** (i / 3)
+            ps += 4 * 8 ** int(i / 3)
         elif p == 't' and i == 0:
             ps += 1 * 8 ** 3
         elif p == 's' and (i == 6 or i == 3):
@@ -733,3 +734,32 @@ def mktemp():
     from tempfile import mktemp
 
     return mktemp()
+
+
+########################################################################
+########################################################################
+# thread execution
+buf = ''
+
+def exec_cmd(cmd):
+    global buf
+
+    buf = 'ZZZ'
+    def exec_thread(cmd, lck):
+        global buf
+
+        lck.acquire()
+        i, a = os.popen4(cmd)
+        buf = a.read()
+        i.close(), a.close()
+        lck.release()
+
+    lck = thread.allocate_lock()
+    thread.start_new_thread(exec_thread, (cmd, lck))
+    # we need to be sure that the thread has acquired the lock before checking
+    # and time.sleep(1) is too slow
+    while buf == 'ZZZ':
+        pass
+    while lck.locked():
+        pass
+    return buf

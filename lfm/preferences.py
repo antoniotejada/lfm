@@ -28,8 +28,10 @@ class Preferences:
         self.check_defaultprogs(defaultprogs)
         self.modes = { 'sort': files.SORTTYPE_byName,
                        'sort_mix_dirs': 0, 'sort_mix_cases': 0 }
-        self.confirmations = { 'delete': 1, 'overwrite': 1, 'quit': 0 }
-        self.options = { 'save_conf_at_exit': 1, 'show_output_after_exec': 1 }
+        self.confirmations = { 'delete': 1, 'overwrite': 1, 'quit': 0,
+                               'ask_rebuild_vfs': 1}
+        self.options = { 'save_conf_at_exit': 1, 'show_output_after_exec': 1,
+                         'rebuild_vfs': 0}
         self.bookmarks = [ '/',
                            '/home/inigo',
                            '/home/inigo/personal',
@@ -40,20 +42,29 @@ class Preferences:
                            '/etc',
                            '/root',
                            '/dfsdf' ]
+        self.colors = {
+                'title': ('yellow', 'blue'),
+                'files': ('white', 'black'),
+                'current_file': ('blue', 'cyan'),
+                'messages': ('magenta', 'cyan'),
+                'help': ('green', 'black'),
+                'file_info': ('red', 'black'),
+                'error_messages1': ('white', 'red'),
+                'error_messages2': ('black', 'red'),
+                'buttons': ('yellow', 'red'),
+                'selected_file': ('yellow', 'black'),
+                'current_selected_file': ('yellow', 'cyan') }
 
 
     def check_defaultprogs(self, progs):
         for k, vs in progs.items():
             for v in vs:
-                i, a = os.popen4('which \"%s\"' % v)
-                r = a.read()
-                i.close(), a.close()
+                r = files.exec_cmd('which \"%s\"' % v)
                 if r:
                     self.progs[k] = r.strip()
                     break
             else:
                 self.progs[k] = ''
-                pass
                 
 
     def load(self):
@@ -76,10 +87,9 @@ class Preferences:
                 m = None
                 continue
 
-            b = l.split(':')
-            if len(b) != 2:
-                print 'Bad configuration line:', l
-                continue
+            # It's better to split only once, so user can use values
+            # containing colons.
+            b = l.split(':', 1)
             b[0] = b[0].strip()
             b[1] = b[1].strip()
             if section == 'programs':
@@ -99,7 +109,7 @@ class Preferences:
                     for k in self.modes.keys():
                         if b[0] == k:
                             self.modes[k] = val
-#                              print 'Mode->%s = %d' % (k, val)
+#                            print 'Mode->%s = %d' % (k, val)
                             break
                     else:
                         print 'Bad mode option:', b[0]
@@ -114,7 +124,7 @@ class Preferences:
                     for k in self.confirmations.keys():
                         if b[0] == k:
                             self.confirmations[k] = val
-#                              print 'Confirmations->%s = %d' % (k, val)
+#                            print 'Confirmations->%s = %d' % (k, val)
                             break
                     else:
                         print 'Bad confirmation option:', b[0]
@@ -129,7 +139,7 @@ class Preferences:
                     for k in self.options.keys():
                         if b[0] == k:
                             self.options[k] = val
-#                              print 'Options->%s = %d' % (k, val)
+#                            print 'Options->%s = %d' % (k, val)
                             break
                     else:
                         print 'Bad option option:', b[0]
@@ -143,12 +153,22 @@ class Preferences:
                 if 0 <= n <= 9:
                     if os.path.isdir(b[1]):
                         self.bookmarks[n] = b[1]
-#                          print 'Bookmark[%d] = %s' % (n, b[1])
-                    else:
+#                        print 'Bookmark[%d] = %s' % (n, b[1])
+                    elif not b[1]:
+                        # No bookmark defined -- it's not an error. We should
+                        # not be so verbose.
                         self.bookmarks[n] = ''
-                        print 'Bad bookmark[%d]: %s' % (n, b[1])
+                    else:
+                        print 'Incorrect directory in bookmark[%d]: %s' % (n, b[1])
                 else:
                     print 'Bad bookmark number:', b[0]
+            elif section == 'colors':
+                b = [b[0].lower(), b[1].lower()]
+                if not self.colors.has_key(b[0]):
+                    print 'Bad object name:', b[0]
+                else:
+                    (fg, bg) = b[1].split(' ')
+                    self.colors[b[0]] = (str(fg), str(bg))
             else:
                 print 'Bad section'
 
@@ -169,7 +189,6 @@ class Preferences:
         f.write('[ Modes ]\n')
         f.write('# sort:\tNone = 0, byName = 1, byName_rev = 2, bySize = 3,\n')
         f.write('# \tbySize_rev = 4, byDate = 5, byDate_rev = 6\n')
-
         for k, v in self.modes.items():
             f.write('%s: %s\n' % (k, v))
         f.write('\n')
@@ -189,6 +208,12 @@ class Preferences:
         for b in self.bookmarks:
             f.write('%d: %s\n' % (i, b))
             i += 1
+        f.write('\n')
+        # colors
+        f.write('[ Colors ]\n')
+        # FIXME: Keys are written in a random order.
+        for k, v in self.colors.items():
+            f.write('%s: %s %s\n' % (k, v[0], v[1]))
 
         f.close()
 

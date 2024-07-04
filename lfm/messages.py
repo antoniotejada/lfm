@@ -34,17 +34,17 @@ class CommonWindow:
                 w -= 1
         h = len(lines) + 4
         for l in lines:
-            h += (len(l)+1) / (curses.COLS - 2)
+            h += int((len(l)+1) / (curses.COLS - 2))
         if h > curses.LINES - 4:
             h = curses.LINES - 4
             text = ''.join([l+'\n' for l in lines[-5:]])
         try:
             self.border = curses.newwin(h, w, 
-                                        (curses.LINES-h) / 2,
-                                        (curses.COLS-w) / 2)
+                                        int((curses.LINES-h) / 2),
+                                        int((curses.COLS-w) / 2))
             self.body = curses.newwin(h-2, w-4,
-                                      (curses.LINES-h)/2 + 1,
-                                      (curses.COLS-w)/2 + 2)
+                                      int((curses.LINES-h)/2) + 1,
+                                      int((curses.COLS-w)/2) + 2)
         except curses.error:
             print 'Can\'t create window'
             sys.exit(-1)
@@ -57,13 +57,13 @@ class CommonWindow:
         self.border.box(0, 0)
         if len(title) > curses.COLS-14:
             title = title[:curses.COLS-10] + '...' + '\''
-        self.border.addstr(0, (w-len(title)-2)/2, ' ' + title + ' ')
+        self.border.addstr(0, int((w-len(title)-2)/2), ' ' + title + ' ')
         if h == 5:
             self.body.addstr(1, 1, text)
         else:
             self.body.addstr(1, 0, text)
         if self.waitkey:
-            self.border.addstr(h-1, (w-27)/2, ' Press any key to continue ')
+            self.border.addstr(h-1, int((w-27)/2), ' Press any key to continue ')
         self.border.refresh()
         self.body.refresh()
         self.border.keypad(1)
@@ -87,17 +87,17 @@ class FixSizeCommonWindow:
         if len(title) > w - 4:
             title = title[:w-4]
         if len(text) > w - 4:
-            text = text[:w-4]
+            text = text[:w-5]
         if len(downtext) > w - 4:
             downtext = downtext[:w-4]
         h = 5
         try:
             self.border = curses.newwin(h, w, 
-                                        (curses.LINES-h) / 2,
-                                        (curses.COLS-w) / 2)
+                                        int((curses.LINES-h) / 2),
+                                        int((curses.COLS-w) / 2))
             self.body = curses.newwin(h-2, w-4,
-                                      (curses.LINES-h)/2 + 1,
-                                      (curses.COLS-w)/2 + 2)
+                                      int((curses.LINES-h)/2) + 1,
+                                      int((curses.COLS-w)/2) + 2)
         except curses.error:
             print 'Can\'t create window'
             sys.exit(-1)
@@ -110,16 +110,16 @@ class FixSizeCommonWindow:
         self.border.box(0, 0)
         if len(title) > curses.COLS-14:
             title = title[:curses.COLS-10] + '...' + '\''
-        self.border.addstr(0, (w-len(title)-2)/2, ' ' + title + ' ')
+        self.border.addstr(0, int((w-len(title)-2)/2), ' ' + title + ' ')
         if h == 5:
             self.body.addstr(1, 1, text)
         else:
             self.body.addstr(1, 0, text)
         if self.waitkey:
-            self.border.addstr(h-1, (w-27)/2,
+            self.border.addstr(h-1, int((w-27)/2),
                                ' Press any key to continue ', bd_att)
         elif downtext:
-            self.border.addstr(h-1, (w-len(downtext)-2)/2,
+            self.border.addstr(h-1, int((w-len(downtext)-2)/2),
                                ' ' + downtext + ' ', bd_att)
         self.border.refresh()
         self.body.refresh()
@@ -200,10 +200,10 @@ def get_a_key(title, question):
     w = min(length + 4, curses.COLS - 2)
     try:
         border = curses.newwin(h, w, 
-                               (curses.LINES-h) / 2, (curses.COLS-w) / 2)
+                               int((curses.LINES-h)/2), int((curses.COLS-w)/2))
         label = curses.newwin(1, len(title) + 2,
-                              (curses.LINES-h) / 2,
-                              (curses.COLS-len(title)-2) / 2)
+                              int((curses.LINES-h) / 2),
+                              int((curses.COLS-len(title)-2) / 2))
     except curses.error:
         print 'Can\'t create window'
         sys.exit(-1)
@@ -242,10 +242,10 @@ def confirm(title, question, default = 0):
     w = min(max(34, len(question)+5), curses.COLS - 2)
     try:
         border = curses.newwin(h, w, 
-                               (curses.LINES-h) / 2, (curses.COLS-w) / 2)
+                               int((curses.LINES-h)/2), int((curses.COLS-w)/2))
         label = curses.newwin(1, len(title) + 2,
-                              (curses.LINES-h) / 2,
-                              (curses.COLS-len(title)-2) / 2)
+                              int((curses.LINES-h) / 2),
+                              int((curses.COLS-len(title)-2) / 2))
     except curses.error:
         print 'Can\'t create window'
         sys.exit(-1)
@@ -262,10 +262,10 @@ def confirm(title, question, default = 0):
     border.refresh()
     label.refresh()
 
-    row = (curses.LINES - h) / 2 + 3
-    col = (curses.COLS - w) / 2
-    col1 = col + w/5 + 1
-    col2 = col + w*4/5 - 6
+    row = int((curses.LINES - h) / 2) + 3
+    col = int((curses.COLS - w) / 2)
+    col1 = col + int(w/5) + 1
+    col2 = col + int(w*4/5) - 6
 
     border.keypad(1)
     answer = default
@@ -286,10 +286,7 @@ def confirm(title, question, default = 0):
         ch = border.getch()
         if ch in [curses.KEY_UP, curses.KEY_DOWN, curses.KEY_LEFT,
                   curses.KEY_RIGHT, 9]:
-            if answer:
-                answer = 0
-            else:
-                answer = 1
+            answer = not answer
         elif ch in ['Y', 'y']:
             return 1
         elif ch in ['N', 'n', 0x1B, 0x03]:
@@ -313,10 +310,10 @@ def confirm_all(title, question, default = 0):
     w = min(max(34, len(question)+5), curses.COLS - 2)
     try:
         border = curses.newwin(h, w, 
-                               (curses.LINES-h) / 2, (curses.COLS-w) / 2)
+                               int((curses.LINES-h)/2), int((curses.COLS-w)/2))
         label = curses.newwin(1, len(title) + 2,
-                              (curses.LINES-h) / 2,
-                              (curses.COLS-len(title)-2) / 2)
+                              int((curses.LINES-h) / 2),
+                              int((curses.COLS-len(title)-2) / 2))
     except curses.error:
         print 'Can\'t create window'
         sys.exit(-1)
@@ -333,11 +330,11 @@ def confirm_all(title, question, default = 0):
     border.refresh()
     label.refresh()
 
-    row = (curses.LINES - h) / 2 + 3
-    col = (curses.COLS - w) / 2
-    col1 = col + w/5 - 2
-    col2 = curses.COLS/2 - 3
-    col3 = col + w*4/5 - 3
+    row = int((curses.LINES - h) / 2) + 3
+    col = int((curses.COLS - w) / 2)
+    col1 = col + int(w/5) - 2
+    col2 = int(curses.COLS/2) - 3
+    col3 = col + int(w*4/5) - 3
 
     border.keypad(1)
     answer = default
@@ -395,10 +392,10 @@ class Yes_No_Buttons:
     """Yes/No buttons"""
 
     def __init__(self, w, h, d):
-        self.row = (curses.LINES - h) / 2 + 4 + d
-        col = (curses.COLS - w) / 2
-        self.col1 = col + w/5 + 1
-        self.col2 = col + w*4/5 - 6
+        self.row = int((curses.LINES - h) / 2) + 4 + d
+        col = int((curses.COLS - w) / 2)
+        self.col1 = col + int(w/5) + 1
+        self.col2 = col + int(w*4/5) - 6
         self.active = 0
 
 
@@ -480,8 +477,8 @@ class EntryLine:
                 relpos = ew - 1 - (len(text) - pos)
                 textstr = text[len(text)-ew+1:] + ' '
             else:
-                relpos = pos - pos/ew*ew
-                textstr = text[pos/ew*ew:pos/ew*ew+ew]
+                relpos = pos - int(pos/ew)*ew
+                textstr = text[int(pos/ew)*ew:int(pos/ew)*ew+ew]
         self.entry.bkgdset(curses.color_pair(1))
         self.entry.erase()
         self.entry.addstr(textstr, curses.color_pair(11) | curses.A_BOLD)
@@ -582,10 +579,7 @@ class EntryLine:
                 self.text = text
                 self.pos = len(self.text)
             elif ch in [curses.KEY_IC]: # insert
-                if self.ins:
-                    self.ins = 0
-                else:
-                    self.ins = 1                    
+                self.ins = not self.ins
             elif (ch in [curses.KEY_HOME, 348]) or \
                  (chext == 1) and (ch == 72):  # home
                 self.pos = 0
@@ -624,13 +618,13 @@ class Entry:
         w = min(max(34, len(help)+5), curses.COLS - 2)
         try:
             border = curses.newwin(h, w, 
-                                   (curses.LINES-h) / 2, (curses.COLS-w) / 2)
+                                   int((curses.LINES-h)/2), int((curses.COLS-w)/2))
             label = curses.newwin(1, len(title) + 2,
-                                  (curses.LINES-h) / 2,
-                                  (curses.COLS-len(title)-2) / 2)
+                                  int((curses.LINES-h) / 2),
+                                  int((curses.COLS-len(title)-2) / 2))
             self.entry = EntryLine(w, h,
-                                   (curses.LINES-h) / 2 + 2,
-                                   (curses.COLS-w+4) / 2,
+                                   int((curses.LINES-h) / 2)+ 2,
+                                   int((curses.COLS-w+4) / 2),
                                    path, with_historic, with_complete,
                                    panelpath)
             self.btns = Yes_No_Buttons(w, h, 0)
@@ -706,7 +700,8 @@ class Entry:
         if answer:
             # save new historic entries
             if self.with_historic:
-                if self.entry.text != None and self.entry.text != '':
+                if self.entry.text != None and self.entry.text != '' and \
+                       self.entry.text != '*':
                     if len(historic) < 100:
                         historic.append(self.entry.text)
                     else:
@@ -733,18 +728,19 @@ class DoubleEntry:
         w = min(max(34, max(len(help1), len(help2)) + 5), curses.COLS - 2)
         try:
             border = curses.newwin(h, w, 
-                                   (curses.LINES-h)/2-1, (curses.COLS-w) / 2)
+                                   int((curses.LINES-h)/2)-1,
+                                   int((curses.COLS-w) / 2))
             label = curses.newwin(1, len(title) + 2,
-                                  (curses.LINES-h) / 2 - 1,
-                                  (curses.COLS-len(title)-2) / 2)
+                                  int((curses.LINES-h) / 2) - 1,
+                                  int((curses.COLS-len(title)-2) / 2))
             self.entry1 = EntryLine(w, h,
-                                    (curses.LINES-h) / 2 + 1,
-                                    (curses.COLS-w+4) / 2,
+                                    int((curses.LINES-h) / 2) + 1,
+                                    int((curses.COLS-w+4) / 2),
                                     path1, with_historic1, with_complete1,
                                     panelpath1)
             self.entry2 = EntryLine(w, h,
-                                    (curses.LINES-h) / 2 + 4,
-                                    (curses.COLS-w+4) / 2,
+                                    int((curses.LINES-h) / 2) + 4,
+                                    int((curses.COLS-w+4) / 2),
                                     path2, with_historic2, with_complete2,
                                     panelpath2)
             self.btns = Yes_No_Buttons(w, h, 2)
@@ -837,7 +833,7 @@ class DoubleEntry:
             # save new historic entries
             if self.with_historic:
                 for text in self.entry1.text, self.entry2.text:
-                    if text != None and text != '':
+                    if text != None and text != '' and text != '*':
                         if len(historic) < 100:
                             historic.append(text)
                         else:
@@ -857,7 +853,7 @@ class SelectItem:
 
     def __init__(self, entries, y0, x0, entry_i = ''):
         h = (curses.LINES - 1) - (y0 + 1) + 1
-        w = min(max(map(len, entries)), curses.COLS/2) + 4
+        w = min(max(map(len, entries)), int(curses.COLS/2)) + 4
         try:
             self.win = curses.newwin(h, w, y0, x0)
         except curses.error:
@@ -877,13 +873,14 @@ class SelectItem:
 
     def show(self):
         self.win.erase()
+        self.win.refresh()     # to avoid upper-left corner disappear
         self.win.box(0, 0)     # to avoid upper-left corner disappear
         self.win.attrset(curses.color_pair(4))
         self.win.refresh()
         self.win.box(0, 0)
         y, x = self.win.getbegyx()
         h, w = self.win.getmaxyx()
-        entry_a = self.entry_i / (h-2) * (h-2)
+        entry_a = int(self.entry_i / (h-2)) * (h-2)
         for i in range(h-2):
             try:
                 line = self.entries[entry_a + i]
@@ -891,34 +888,34 @@ class SelectItem:
                 line = ''
             if len(line) > w - 3:
                 if (w - 3) % 2 == 0:     # even
-                    line = line[:(w-3)/2] + '~' + line[-(w-3)/2+2:]
+                    line = line[:int((w-3)/2)] + '~' + line[-int((w-3)/2)+2:]
                 else:                    # odd
-                    line = line[:(w-3)/2+1] + '~' + line[-(w-3)/2+2:]
+                    line = line[:int((w-3)/2)+1] + '~' + line[-int((w-3)/2)+2:]
             if line != '':
                 self.win.addstr(i+1, 2, line, curses.color_pair(4))
         self.win.refresh()
         # cursor
-        cursor = curses.newpad(1, w - 2)
+        cursor = curses.newpad(1, w - 1)
         cursor.attrset(curses.color_pair(1) | curses.A_BOLD)
         cursor.bkgdset(curses.color_pair(1))
         cursor.erase()
         line = self.entries[self.entry_i]
         if len(line) > w - 2:
             if (w - 2) % 2 == 0:         # even
-                line = line[:(w-2)/2] + '~' + line[-(w-2)/2+2:]
+                line = line[:int((w-2)/2)] + '~' + line[-int((w-2)/2)+2:]
             else:                        # odd
-                line = line[:(w-2)/2+1] + '~' + line[-(w-2)/2+2:]
+                line = line[:int((w-2)/2)+1] + '~' + line[-int((w-2)/2)+2:]
         cursor.addstr(0, 1, line, curses.color_pair(1) | curses.A_BOLD)
         y += 1; x += 1
         cursor.refresh(0, 0, y + self.entry_i % (h - 2),
                        x, y + self.entry_i % (h - 2), x + w - 3)
         # scrollbar
         if len(self.entries) > h - 2:
-            n = (h-2) * (h-2) / len(self.entries)
+            n = int((h-2) * (h-2) / len(self.entries))
             if n == 0:
                 n = 1
-            a = self.entry_i /(h-2) * (h-2)
-            y0 = a * (h-2) / len(self.entries)
+            a = int(self.entry_i /(h-2)) * (h-2)
+            y0 = int(a * (h-2) / len(self.entries))
             if y0 < 0:
                 y0 = 0
             elif y0 + n > (h-2):
@@ -994,7 +991,7 @@ class FindfilesWin:
         h = (curses.LINES - 1) - (y0 + 1) + 1
         # w = max(map(len, entries)) + 4
         w = 64
-        x0 = (curses.COLS - w) / 2
+        x0 = int((curses.COLS - w) / 2)
         try:
             self.win = curses.newwin(h, w, y0, x0)
         except curses.error:
@@ -1014,13 +1011,14 @@ class FindfilesWin:
 
     def show(self):
         self.win.erase()
+        self.win.refresh()     # to avoid upper-left corner disappear
         self.win.box(0, 0)     # to avoid upper-left corner disappear
         self.win.attrset(curses.color_pair(4))
         self.win.refresh()
         self.win.box(0, 0)
         y, x = self.win.getbegyx()
         h, w = self.win.getmaxyx()
-        entry_a = self.entry_i / (h-4) * (h-4)
+        entry_a = int(self.entry_i / (h-4)) * (h-4)
         for i in range(h-4):
             try:
                 line = self.entries[entry_a + i]
@@ -1028,9 +1026,9 @@ class FindfilesWin:
                 line = ''
             if len(line) >= w - 3:
                 if (w - 3) % 2 == 0:     # even
-                    line = line[:(w-3)/2] + '~' + line[-(w-3)/2+3:]
+                    line = line[:int((w-3)/2)] + '~' + line[-int((w-3)/2)+3:]
                 else:                    # odd
-                    line = line[:(w-3)/2+1] + '~' + line[-(w-3)/2+3:]
+                    line = line[:int((w-3)/2)+1] + '~' + line[-int((w-3)/2)+3:]
             if line != '':
                 self.win.addstr(i+1, 2, line, curses.color_pair(4))
         self.win.refresh()
@@ -1042,20 +1040,20 @@ class FindfilesWin:
         line = self.entries[self.entry_i]
         if len(line) >= w - 3:
             if (w - 2) % 2 == 0:         # even
-                line = line[:(w-2)/2] + '~' + line[-(w-2)/2+3:]
+                line = line[:int((w-2)/2)] + '~' + line[-int((w-2)/2)+3:]
             else:                        # odd
-                line = line[:(w-2)/2+1] + '~' + line[-(w-2)/2+3:]
+                line = line[:int((w-2)/2)+1] + '~' + line[-int((w-2)/2)+3:]
         cursor.addstr(0, 1, line, curses.color_pair(1) | curses.A_BOLD)
         y += 1; x += 1
         cursor.refresh(0, 0, y + self.entry_i % (h - 4),
                        x, y + self.entry_i % (h - 4), x + w - 3)
         # scrollbar
         if len(self.entries) > h - 4:
-            n = (h-4) * (h-4) / len(self.entries)
+            n = (h-4) * int((h-4) / len(self.entries))
             if n == 0:
                 n = 1
-            a = self.entry_i /(h-4) * (h-4)
-            y0 = a * (h-4) / len(self.entries)
+            a = int(self.entry_i /(h-4)) * (h-4)
+            y0 = int(a * (h-4) / len(self.entries))
             if y0 < 0:
                 y0 = 0
             elif y0 + n > (h-4):
@@ -1185,8 +1183,8 @@ class MenuWin:
     def __init__(self, title, entries):
         h = len(entries) + 4
         w = max(map(len, entries)) + 4
-        y0 = (curses.LINES - h) / 2
-        x0 = (curses.COLS - w) / 2
+        y0 = int((curses.LINES - h) / 2)
+        x0 = int((curses.COLS - w) / 2)
         try:
             self.win = curses.newwin(h, w, y0, x0)
         except curses.error:
@@ -1211,7 +1209,7 @@ class MenuWin:
         y, x = self.win.getbegyx()
         h, w = self.win.getmaxyx()
         attr = curses.color_pair(7)
-        self.win.addstr(0, (w-len(self.title)-2)/2, ' %s ' % self.title, attr)
+        self.win.addstr(0, int((w-len(self.title)-2)/2), ' %s ' % self.title, attr)
         for i in range(h-2):
             try:
                 line = self.entries[i]
@@ -1287,8 +1285,8 @@ class ChangePerms:
     def __init__(self, file, fileinfo, app, i = 0, n = 0):
         h = 6 + 4
         w = 55 + 4
-        y0 = (curses.LINES - h) / 2
-        x0 = (curses.COLS - w) / 2
+        y0 = int((curses.LINES - h) / 2)
+        x0 = int((curses.COLS - w) / 2)
         try:
             self.win = curses.newwin(h, w, y0, x0)
         except curses.error:
@@ -1341,7 +1339,7 @@ class ChangePerms:
         self.win.refresh()
         attr = curses.color_pair(1) | curses.A_BOLD
         title = 'Change permissions, owner or group'
-        self.win.addstr(0, (w-len(title)-2)/2, ' %s ' % title, attr)
+        self.win.addstr(0, int((w-len(title)-2)/2), ' %s ' % title, attr)
         self.win.addstr(2, 2, '\'%s\'' % self.file, attr)
         if self.i:
             self.win.addstr(2, w-12-2, '%4d of %-4d' % (self.i, self.n))

@@ -1,7 +1,7 @@
 lfm - Last File Manager
 =======================
 
-(C) 2001-2, Iñigo Serna <inigoserna@terra.es>
+(C) 2001-2, Iñigo Serna <inigoserna@telefonica.net>
 
 This software has been realised under the GPL License, see the COPYING
 file that comes with this package. There is NO WARRANTY.
@@ -22,7 +22,7 @@ It has been tested on next platforms:
 
 O.S.           PYTHON     Arch
 -------------------------------------------------
-Linux 2.4.12   2.2        i686
+Linux 2.4.18   2.2.1      i686
 Solaris 8      2.1        UltraSparc-II (1)
 
 (1) I needed to install ncurses and recompile python to use them. 
@@ -56,8 +56,8 @@ type as root:   # rpm -Uvh lfm-version-noarch.rpm
 
 From source (any UNIX):
 uncompress file
-type:           $ python setup.py build
-and as root:    # python setup.py install	
+type:           $ python2 setup.py build
+and as root:    # python2 setup.py install	
 
 and then just type 'lfm' to run it.
 
@@ -69,7 +69,7 @@ next code:
   {
 	/usr/bin/lfm $*		# type here full path to lfm executable
 	LFMPATHFILE=/tmp/lfm-$$.path
-	cd `cat $LFMPATHFILE`
+	cd "`cat $LFMPATHFILE`"
 	rm -f $LFMPATHFILE
   }
 
@@ -204,9 +204,12 @@ The virtual directory name ('path_to_vfs_file#vfs/dir') is not propagated, so
 tmpdir ('/tmp/@6421.2/dir') is showed in the copy/move/... dialogs or when
 view/edit/... a file, but this is just an estetic issue.
 
-When returning from one of such vfs files, the vfs file is regenerated
-(i.e., it is recompressed, so it could be slow in some machines) to update 
-all modifications, but lfm checks if it can first, to avoid waste of time.
+When returning from one of such vfs files, a question dialog is showed to
+allow you regenerate the vfs file (i.e., it is recompressed, so it could be
+slow in some machines) to update all modifications, but lfm checks if it can
+first, to avoid waste of time. This behaviour (rebuild or not rebuild, ask it
+or not) can be modified in the configuration file. By default the question is
+showed but it's set to 'don't regenerate vfs'.
 In case of 'panelize' vfs type (after find/grep), deleted / moved files
 are not deleted / moved in real path.
 
@@ -231,4 +234,4 @@ Midnight Commander developers, whose program was the guide.
 
 
 ============================================================================
-Last update:	Monday March 4th, 2002 - 17:16:21 CEST
+Last update:	Wednesday September 4th, 2002 - 01:08:14 CEST

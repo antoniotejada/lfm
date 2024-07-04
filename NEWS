@@ -1,3 +1,44 @@
+Version 0.9 ("...and the day arrived") - 2002/09/05:
+
+  + ZIP files can be un/compressed now. ZIP vfs works too
+  + added 'rebuild vfs' and 'rebuild_vfs' question / option. Configurable.
+    There is no need to wait until vfs file is rebuilt
+  + Applied some good patches from Bartosz Oler (liar@furrynet.org):
+    1. colors customization: Now you can customize the colors lfm use in
+       the configuration file, 'colors' section. Each color is defined by
+       a string with its name. It looks like this:
+	      element foreground_color background_color
+    2. Allow preferences values to contain colons in the configuration file.
+    3. Lack of a bookmark's definition shouldn't be an error.
+  + pyview: new features:
+      - read from stdin
+      - go to / set bookmarks
+      - open shell
+  + pyview doesn't show blank screen a the end of the file, now it shows last
+    line
+  + lfm works now with "from __future__ import division", prepared for Python 3.0
+  + set python2 as default interpreter for setup.py, lfm, lfm.py, pyview and
+    pyview.py
+  + my email address has changed <inigoserna@telefonica.net>
+  + Bugs fixes. See ChangeLog for complete list
+      - lfm:
+          * create temporary files with mask 0066 and directories with perms
+            0700, so only owner can read/write them
+          * avoid zombie processes when using 'fork' (now fork twice or threads)
+          * show correct filename when an error occurs while uncompressing file
+          * don't compress '..' directory
+          * when lfm exits after checking command line options, make 'lfm' shell
+            script don't show path error
+          * when un/compressing files cursorbar must remain in the same file
+          * when, at start, lfm can't enter into a dir due to directory permissions
+          * crash if len(line) == width of cursorbar window
+		  * don't append '*' to historic in entries
+		  * fix cursor bar position after sorting
+      - pyview:
+          * when user hasn't permissions to read file, exit gracefully instead
+            of crashing
+          * last char in file is not showed
+
 Version 0.8 ("Close to Paradise") - 2002/03/04:
 
   + Implemented VFS feature to enter into .tar.gz and .tar.bz2 files
@@ -12,7 +53,7 @@ Version 0.8 ("Close to Paradise") - 2002/03/04:
   + In ChangePermissions window, the cursor movement is circular now
   + Change copyright date to years 2001-2
   + I don't need a crypt / uncrypt feature, so eliminated from TODO list
-  + Many bug fixes and functions rewrites. See ChangeLog for complete list
+  + Many bugs fixes and functions rewrites. See ChangeLog for complete list
       - lfm:
           * if panel2 shows 'a' file in panel, and in panel1 'a' is moved or
             deleted, lfm crashes

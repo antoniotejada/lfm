@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2001-2  Iñigo Serna
 #
@@ -18,7 +18,7 @@
 
 
 """
-Copyright (C) 2001-2, Iñigo Serna <inigoserna@terra.es>.
+Copyright (C) 2001-2, Iñigo Serna <inigoserna@telefonica.net>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -29,10 +29,72 @@ file that comes with this package. There is NO WARRANTY.
 
 
 import os, os.path, sys
+import thread
 import curses, curses.ascii
 
 from __init__ import *
 import messages
+
+
+########################################################################
+########################################################################
+# thread execution
+buf = ''
+
+def exec_cmd(cmd):
+    global buf
+
+    buf = 'ZZZ'
+    def exec_thread(cmd, lck):
+        global buf
+
+        lck.acquire()
+        i, a = os.popen4(cmd)
+        buf = a.read()
+        i.close(), a.close()
+        lck.release()
+        thread.exit()
+
+    lck = thread.allocate_lock()
+    thread.start_new_thread(exec_thread, (cmd, lck))
+    # we need to be sure that the thread has acquired the lock before checking
+    # and time.sleep(1) is too slow
+    while buf == 'ZZZ':
+        pass
+    while lck.locked():
+        pass
+    return buf
+
+
+# read from stdin
+def read_stdin():
+    """Read from stdin with 1 sec. timeout. Returns text"""
+    
+    from select import select
+
+    try:
+        fd = select([sys.stdin], [], [], 0.5)[0][0]
+        stdin = ''.join(fd.readlines())
+        # close stdin (pipe) and open terminal for reading
+        os.close(0)
+        sys.stdin = open(os.ttyname(1), 'r')
+    except IndexError:
+        stdin = ''
+    return stdin
+
+
+def create_temp_for_stdin(buf):
+    """Copy stdin in a temporary file. Returns file name"""
+    
+    from tempfile import mktemp
+
+    mask = os.umask(0066)
+    filename = mktemp()
+    f = open(filename, 'w')
+    f.write(buf)
+    f.close()
+    os.umask(mask)
+    return filename
 
 
 ##################################################
@@ -56,17 +118,14 @@ class InternalView:
             self.large = 1
             self.y = 0
         else:
-            self.y0 = ((curses.LINES-2) - self.nlines)/2
+            self.y0 = int(((curses.LINES-2) - self.nlines)/2)
             self.large = 0
         if center:
             col_max = max(map(len, buf2))
-            self.x0 = (curses.COLS - col_max)/2
+            self.x0 = int((curses.COLS - col_max)/2)
         else:
             self.x0 = 1
-            if self.large:
-                self.y0 = 0
-            else:
-                self.y0 = 1
+            self.y0 = not self.large
         self.buf = buf
 
 
@@ -93,12 +152,12 @@ class InternalView:
 
         self.win_title.erase()
         self.win_status.erase()
-        self.win_title.addstr(0, (curses.COLS-len(self.title))/2, self.title)
+        self.win_title.addstr(0, int((curses.COLS-len(self.title))/2), self.title)
         if self.large:
             status = ''
         else:
             status = 'Press a key to continue'
-            self.win_status.addstr(0, (curses.COLS-len(status))/2, status)
+            self.win_status.addstr(0, int((curses.COLS-len(status))/2), status)
 
         self.win_title.refresh()
         self.win_status.refresh()
@@ -160,22 +219,23 @@ class InternalView:
 class FileView:
     """Main application class"""
 
-    def __init__(self, file, line, mode):
+    def __init__(self, file, line, mode, stdin_flag):
         self.file = file
         self.mode = mode
         self.wrap = 0
+        self.stdin_flag = stdin_flag
         self.init_curses()
         self.pos = 0
         self.col = 0
         try:
             self.__get_file_info(file)
-        except OSError:
+        except (IOError, os.error), (errno, strerror):
+            messages.error('%s' % PYVIEW_NAME,
+                           '%s (%s)' % (strerror, errno), file)
             sys.exit(-1)
         if self.nbytes == 0:
             messages.error('View \'%s\'' % file, 'File is empty')
             sys.exit(-1)
-        if line > self.nlines:
-            self.line = self.nlines
         self.fd = open(file)
         self.line = 0
         try:
@@ -190,13 +250,12 @@ class FileView:
             pass
         self.pattern = ''
         self.matches = []
-        i, a = os.popen4('which grep')
-        r = a.read()
-        i.close(); a.close()
+        r = exec_cmd('which grep')
         if r:
             self.grep = r.strip()
         else:
             self.grep = ''
+        self.bookmarks = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
 
 
     def __get_file_info(self, file):
@@ -213,7 +272,7 @@ class FileView:
                 self.lines_pos.append(pos)
                 nlines += 1
             f.close()
-        self.nlines = nlines + 1
+        self.nlines = nlines
 
 
     def init_curses(self):
@@ -253,11 +312,39 @@ class FileView:
 
 
     def __move_lines(self, lines):
-        if lines > 0:
+        if lines >= 0:
             if self.line + lines > self.nlines - 1:
                 self.line = self.nlines - 1
+                self.col = 0
             else:
                 self.line += lines
+#             # Code that don't show blank lines when in last lines of file
+#             if self.wrap:
+#                 if self.line + lines > self.nlines - 1 - (curses.LINES - 2):
+#                     # get last (curses.LINES -2 ) lines
+#                     pos = self.lines_pos[self.nlines - 1 - (curses.LINES - 2)]
+#                     self.fd.seek(pos)
+#                     lines = []
+#                     for i in range(curses.LINES - 2):
+#                         l = self.fd.readline().rstrip().replace('\t', ' ' * 4)
+#                         lines.append(l)
+#                     lines.reverse()
+#                     # calculate lines that fit in screen
+#                     lno = 0
+#                     i= 0
+#                     while lno < curses.LINES - 2:
+#                         lno += int(len(lines[i]) / curses.COLS) + 1
+#                         i += 1
+#                     # calculate horizontal scrolling if needed
+#                     self.col = curses.COLS * (lno - (curses.LINES - 2))
+#                     self.line = self.nlines - 1 - i
+#                 else:
+#                     self.line += lines
+#             else:
+#                 if self.line + lines > self.nlines - 1 - (curses.LINES - 2):
+#                     self.line = self.nlines - 1 - (curses.LINES - 2)
+#                 else:
+#                     self.line += lines
         else:
             if self.line + lines < 0:
                 self.line = 0
@@ -270,7 +357,8 @@ class FileView:
     def __get_lines_text(self):
         lines = []
         for i in range(curses.LINES - 2):
-            lines.append(self.fd.readline()[:-1].replace('\t', ' ' * 4))
+            l = self.fd.readline().rstrip().replace('\t', ' ' * 4)
+            lines.append(l)
         self.fd.seek(self.pos)
         self.col_max = max(map(len, lines))
         return lines
@@ -284,19 +372,19 @@ class FileView:
             if line_i < 0:
                 break
             self.fd.seek(self.lines_pos[line_i])
-            lines.append(self.fd.readline()[:-1].replace('\t', ' ' * 4))
+            lines.append(self.fd.readline().rstrip().replace('\t', ' ' * 4))
         self.fd.seek(self.pos)
         return lines
 
 
     def __get_line_length(self):
-        line = self.fd.readline()[:-1].replace('\t', ' ' * 4)
+        line = self.fd.readline().rstrip().replace('\t', ' ' * 4)
         self.fd.seek(self.pos)
         return len(line)
 
 
     def __get_1line(self):
-        line = self.fd.readline()[:-1].replace('\t', ' ' * 4)
+        line = self.fd.readline().rstrip().replace('\t', ' ' * 4)
         self.fd.seek(self.pos)
         return line
 
@@ -480,18 +568,21 @@ class FileView:
         self.win_status.erase()
 
         # title
-        title = os.path.basename(self.file)
-        if len(title) > curses.COLS-51:
-            title = title[:curses.COLS-57] + '~' + title[-5:]
+        if self.stdin_flag:
+            title = 'STDIN'
+        else:
+            title = os.path.basename(self.file)
+        if len(title) > curses.COLS-52:
+            title = title[:curses.COLS-58] + '~' + title[-5:]
         self.win_title.addstr('File: %s' % title)
         if self.col != 0 or self.wrap:
-            self.win_title.addstr(0, curses.COLS / 2 - 14, 'Col: %d' % self.col)
+            self.win_title.addstr(0, int(curses.COLS/2) - 14, 'Col: %d' % self.col)
         buf = 'Bytes: %d/%d' % (self.pos, self.nbytes)
-        self.win_title.addstr(0, curses.COLS / 2 - 4, buf)
+        self.win_title.addstr(0, int(curses.COLS/2) - 5, buf)
         buf = 'Lines: %d/%d' % (self.line + 1, self.nlines)
-        self.win_title.addstr(0, curses.COLS * 3 / 4 - 4, buf)
+        self.win_title.addstr(0, int(curses.COLS * 3 / 4) - 4, buf)
         self.win_title.addstr(0, curses.COLS - 5,
-                              '%3d%%' % (self.pos * 100 / self.nbytes))
+                              '%3d%%' % (int(self.pos * 100 / self.nbytes)))
 
         # file
         if self.mode == MODE_TEXT:
@@ -503,9 +594,12 @@ class FileView:
             self.show_hex()
 
         # status
-        path = os.path.dirname(self.file)
-        if not path or path[0] != os.sep:
-            path = os.path.join(os.getcwd(), path)
+        if self.stdin_flag:
+            path = 'STDIN'
+        else:
+            path = os.path.dirname(self.file)
+            if not path or path[0] != os.sep:
+                path = os.path.join(os.getcwd(), path)
         if len(path) > curses.COLS - 37:
             path = '~' + path[-(curses.COLS - 38):]
         self.win_status.addstr('Path: %s' % path)
@@ -617,7 +711,7 @@ class FileView:
                         if self.col == 0:
                             if self.line > 0:
                                 self.__move_lines(-1)
-                                self.col = self.__get_line_length() / curses.COLS * curses.COLS
+                                self.col = int(self.__get_line_length() / curses.COLS) * curses.COLS
                         else:
                             self.col -= curses.COLS
                     else:
@@ -629,10 +723,16 @@ class FileView:
             elif ch in [ord('n'), ord('N'), curses.KEY_DOWN]:
                 if self.mode == MODE_TEXT:
                     if self.wrap:
-                        self.col += curses.COLS
-                        if self.col >= self.__get_line_length():
-                            self.col = 0
-                            self.__move_lines(1)
+                        if self.line >= self.nlines - 1 and \
+                               self.__get_line_length() < (curses.COLS * (curses.LINES - 2)):
+                            pass
+                        else:
+                            self.col += curses.COLS
+                            if self.col >= self.__get_line_length():
+                                self.col = 0
+                                self.__move_lines(1)
+                            else:
+                                self.__move_lines(0)
                     else:
                         self.__move_lines(1)
                 else:
@@ -663,7 +763,7 @@ class FileView:
                                 y -= 1
                                 if y < 0:
                                     i += 1
-                                    dy = lenz / curses.COLS + 1 - dy
+                                    dy = int(lenz / curses.COLS) + 1 - dy
                                     exit1 = 1
                                     break
                                 len2 -= curses.COLS
@@ -760,10 +860,8 @@ class FileView:
             elif ch in [ord('w'), ord('W'), curses.KEY_F2]:
                 if self.mode == MODE_HEX:
                     continue
-                if self.wrap:
-                    self.wrap = 0
-                else:
-                    self.wrap = 1
+                self. wrap = not self.wrap
+                self.__move_lines(0)
                 self.col = 0
                 self.show()
 
@@ -785,7 +883,7 @@ class FileView:
                     help = 'Type line number'
                 else:
                     title = 'Goto byte'
-                    help = 'Type byte number'
+                    help = 'Type byte offset'
                 n = messages.Entry(title, help, '', 1, 0).run()
                 if n == None or n == '':
                     self.show()
@@ -833,21 +931,49 @@ class FileView:
             elif ch in [ord('/')]:
                 if self.__find('Find') == -1:
                     continue
-                self.__find_next()
-                
+                self.__find_next()               
             # find previous
             elif ch in [curses.KEY_F6]:
                 if not self.matches:
                     if self.__find('Find Previous') == -1:
                         continue
                 self.__find_previous()
-
             # find next
             elif ch in [curses.KEY_F7]:
                 if not self.matches:
                     if self.__find('Find Next') == -1:
                         continue
                 self.__find_next()
+
+            # go to bookmark
+            elif 0x30 <= ch <= 0x39:
+                bk = self.bookmarks[ch - 0x30]
+                if bk == -1:
+                    continue
+                self.line = bk
+                self.__move_lines(0)
+                self.show()
+            # set bookmark
+            elif ch in [ord('b'), ord('B')]:
+                while 1:
+                    ch = messages.get_a_key('Set bookmark',
+                                            'Press 0-9 to save bookmark, Ctrl-C to quit')
+                    if 0x30 <= ch <= 0x39:
+                        self.bookmarks[ch-0x30] = self.line
+                        break
+                    elif ch == -1:
+                        break
+                self.show()
+
+            # shell
+            elif ch in [0x0F]:          # Ctrl-O
+                curses.endwin()
+                if self.stdin_flag:
+                    os.system('sh')
+                else:
+                    os.system('cd \"%s\"; sh' % os.path.dirname(self.file))
+                curses.curs_set(0)
+                self.show()
 
             #  help
             elif ch in [ord('h'), ord('H'), curses.KEY_F1]:
@@ -895,9 +1021,9 @@ Options:
 """ % (PYVIEW_NAME, VERSION, DATE, AUTHOR, prog)
 
 
-def main(win, file, line, mode):
+def main(win, file, line, mode, stdin_flag):
 
-    app = FileView(file, line, mode)
+    app = FileView(file, line, mode, stdin_flag)
     if app == OSError:
         sys.exit(-1)
     return app.run()
@@ -908,6 +1034,7 @@ def PyView(sysargs):
 
     # defaults
     DEBUG = 0
+    file = ''
     line = 0
     mode = MODE_TEXT
     
@@ -933,42 +1060,42 @@ def PyView(sysargs):
                 usage(sysargs[0], '<%s> is not a valid mode' % a)
                 sys.exit(-1)
 
-    if len(args) == 0:
-        usage(sysargs[0], 'File is missing')
-        sys.exit(-1)
-    elif len(args) == 1:
-        if args[0][0] == '+':
-            usage(sysargs[0], 'File is missing')
-            sys.exit(-1)
-        elif not os.path.isfile(args[0]):
-            usage(sysargs[0], '<%s> is not a valid file' % args[0])
-            sys.exit(-1)
-        file = args[0]
-    elif len(args) == 2:
-        if args[0][0] == '+':
-            line = args[0][1:]
-            file = args[1]
-        elif args[1][0] == '+':
-            line = args[1][1:]
-            file = args[0]
-        else:
-            print 'HERE'
-            usage(sysargs[0], 'Bad argument(s)')
-            sys.exit(-1)
-        try:
-            if line[:2] == '0x':
-                line = int(line, 16)
-            else:
-                line = int(line)
-        except ValueError:
-            usage(sysargs[0], '<%s> is not a valid line number' % line)
-            sys.exit(-1)
-        if not os.path.isfile(file):
-            usage(syssarg[0], '<%s> is not a valid file' % file)            
-            sys.exit(-1)
+    stdin = read_stdin()
+    if stdin == '':
+        stdin_flag = 0
     else:
+        stdin_flag = 1
+        
+    if len(args) > 2:
         usage(sysargs[0], 'Incorrect number of arguments')
         sys.exit(-1)
+    while 1:
+        try:
+            arg = args.pop()
+            if arg[0] == '+':
+                line = arg[1:]
+                try:
+                    if line[:2] == '0x':
+                        line = int(line, 16)
+                    else:
+                        line = int(line)
+                except ValueError:
+                    usage(sysargs[0], '<%s> is not a valid line number' % line)
+                    sys.exit(-1)
+            else:
+                file = arg
+        except IndexError:
+            break
+    if file == '' and not stdin_flag:
+        usage(sysargs[0], 'File is missing')
+        sys.exit(-1)
+    if stdin_flag:
+        file = create_temp_for_stdin(stdin)
+    else:
+        if not os.path.isfile(file):
+            usage(sysargs[0], '<%s> is not a valid file' % file)            
+            sys.exit(-1)
+
 
     DEBUGFILE = "./pyview-log.%d" % os.getpid()
     if DEBUG:
@@ -978,7 +1105,7 @@ def PyView(sysargs):
         sys.stdout = debug
         sys.stderr = debug
 
-    curses.wrapper(main, file, line, mode)
+    curses.wrapper(main, file, line, mode, stdin_flag)
     
     if DEBUG:
         debug.write('********** End:     ')
@@ -987,6 +1114,9 @@ def PyView(sysargs):
 
     sys.stdout = sys.__stdout__
     sys.stdout = sys.__stderr__
+
+    if stdin_flag:
+        os.unlink(file)
 
 
 if __name__ == '__main__':

@@ -1,3 +1,228 @@
+Wed Sep  4 01:04:57 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/__init__.py (VERSION): release version 0.9
+	* lfm/setup.py: 
+
+Mon Sep  2 17:24:04 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (Entry.run): don't append '*' to historic
+	* lfm/messages.py (DoubleEntry.run): 
+
+Mon Sep  2 17:22:55 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (sort): Fix bug: fix cursor bar position after sorting
+
+Tue Aug 20 16:50:57 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (InternalView.__validate_buf): simplify code:
+	if a: a = 0; else: a = 1 => a = not a
+	* lfm/messages.py (confirm): 
+	* lfm/messages.py (EntryLine.manage_keys): 
+	* lfm/lfm.py (Lfm.run): 
+	* lfm/lfm.py (Panel.manage_keys): 
+
+Tue Aug 20 16:37:23 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.__move_lines): now pyview only shows last
+	line at the end of the file. It showed blank screen before. I've 
+	written code which changes this behaviour to show last 'screen' of
+	lines, but it is commented because I don't like it
+
+Tue Aug 20 16:16:04 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.run): new feature: go to / set bookmarks
+	* lfm/pyview.py (FileView.__init__): initialize bookmarks with -1
+	* lfm/pyview.py (FileView.run): new feature: shell
+
+Tue Aug 20 16:13:37 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (PyView): read from stdin implemented
+	* lfm/pyview.py (FileView.__init__): 
+	* lfm/pyview.py (FileView.show): show 'STDIN' as file name and path
+	when reading from stdin
+	* lfm/pyview.py (read_stdin): new function
+	* lfm/pyview.py (create_temp_for_stdin): new function
+
+Tue Aug 20 12:21:14 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.run): cosmetic changes in string
+	* lfm/lfm.py (Panel.manage_keys): 
+
+Tue Aug 20 12:18:38 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.show): move 'bytes' information one char left
+
+Tue Aug 20 12:11:00 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.__get_lines_text): Fix bug: last char in file
+	is not showed. Erasing '\n\r' chars when loading lines with rstrip() 
+	instead of [:-1]
+	* lfm/pyview.py (FileView.__get_prev_lines_text): 
+	* lfm/pyview.py (FileView.__get_line_length): 
+	* lfm/pyview.py (FileView.__get_1line): 
+	* lfm/pyview.py (FileView.__get_file_info): Fix bug: number of lines
+	in file was +1.
+	* lfm/pyview.py (FileView.run): modified cursor down, page next, end
+
+Sat Aug 17 19:33:33 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (run_thread): Fix bug: create temporary files with 
+	mask 0066, i.e. only owner can read/write them
+	* lfm/lfm.py (do_compress_dir): 
+	* lfm/lfm.py (vfs_regenerate_file): 
+
+Sat Aug 17 19:20:39 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (vfs_init): Fix bug: create directories with perms 0700
+	to avoid other people read them
+	* lfm/lfm.py (vfs_copy): 
+	* lfm/lfm.py (vfs_pan_init): 
+	* lfm/lfm.py (vfs_pan_copy): 
+
+Sat Aug 17 17:19:43 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (LfmApp): Fix bug: when lfm exits after checking command
+	line options, make 'lfm' shell script don't show path error
+	* lfm/lfm.py (lfm_exit): new function
+
+Sat Aug 17 15:37:48 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (compress_dir): don't compress '..' directory
+
+Sat Aug 17 15:34:47 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (compress_dir): Fix bug: don't check 'tar' if un/zip
+	* lfm/lfm.py (vfs_init):
+
+Sat Aug 17 14:26:48 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (vfs_init): modified to allow zip-files vfs
+	* lfm/lfm.py (vfs_regenerate_file): 
+
+Sat Aug 17 14:17:41 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (compress_dir): modified to allow compress to zip-files
+	* lfm/lfm.py (do_compress_dir): 
+	* lfm/lfm.py (uncompress_dir): modified to allow uncompress zip-files
+	* lfm/lfm.py (do_uncompress_dir): 
+	* lfm/lfm.py (check_compressed_tarfile):
+	* lfm/__init__.py (defaultprogs): zip and unzip programs added
+	* lfm/lfm.py (Panel.manage_keys): added zip functionalities to file menu
+
+Sat Aug 17 12:32:38 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* setup.py: use python2 as default interpreter
+	* lfm/lfm: 
+	* lfm/pyview: 
+	* lfm/lfm.py: 
+	* lfm/pyview.py: 
+
+Fri Aug 16 13:37:34 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (vfs_init): show correct filename when an error occurs
+	while uncompressing file
+
+Wed Aug 14 18:55:22 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (vfs_exit): added 'rebuild vfs' question / option
+	* lfm/preferences.py (Preferences.__init__): added 'ask_rebuild_vfs'
+	confirmation and 'rebuild_vfs' option flags
+	* README: modified accordingly to new behaviour
+
+Wed Aug 14 18:44:40 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/__init__.py: email address changed: <inigoserna@telefonica.net>
+	* lfm/pyview.py:
+	* lfm/lfm.py:
+	* setup.py:
+	* README: 
+	* README.pyview:: 
+
+Wed Aug 14 18:06:35 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): Fix bug: when un/compressing files
+	cursorbar must remain in the same file
+
+Wed Aug 14 17:11:02 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (do_special_view_file): fork twice to avoid zombie processes
+	* lfm/files.py (exec_cmd): new threaded exec command to avoid zombie
+	processes
+	* lfm/preferences.py (Preferences.check_defaultprogs): 
+	use files.exec_cmd instead of os.popen4
+	* lfm/pyview.py (exec_cmd): idem
+	* lfm/pyview.py (FileView.__init__):
+
+Wed Aug 14 17:10:19 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* setup.py: execute setup with python2
+
+Mon Aug 12 23:00:10 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	Applied some good patches from Bartosz Oler (liar@furrynet.org):
+
+	1. colors customization: Now you can customize the colors lfm use in
+	the configuration file, 'colors' section. Each color is defined by
+	a string with its name. It looks like this:
+	        element foreground_color background_color
+
+	* lfm/lfm.py (Lfm.init_curses): Removed old static colors initialization
+	* lfm/lfm.py (Lfm.run): Preferences loading has been moved from here
+	* lfm/lfm.py (Lfm.__init__): ... to here
+	* lfm/lfm.py (Lfm.set_color): New function that returns curses color 
+	if exists, otherwise return default.
+	* lfm/preferences.py (Preferences.__init__): default colors
+	* lfm/preferences.py (Preferences.load): read colors from configuration
+	file or use default colors
+	* lfm/preferences.py (Preferences.save): save used colors to configuration
+	file
+
+	2. Allow preferences values to contain colons in the configuration file.
+
+	* lfm/preferences.py (Preferences.load): Allow preferences values to
+	contain colons.
+
+	3. Lack of a bookmark's definition shouldn't be an error.
+	
+	* lfm/preferences.py (Preferences.load): "Lack of a bookmark's 
+	definition shouldn't be an error. I.e. I have only few bookmarks
+	and it annoyed me when lfm was printing: 'Bad bookmark blah, blah...'.
+	Now, message is printed only if directory doesn't exist."
+	
+Thu Mar  7 19:24:22 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.init_dir): Fix bug: when, at start, lfm can't enter
+	into a dir due to directory permissions
+
+Thu Mar  7 18:57:31 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.__init__): Fix bug: when user hasn't permissions
+	to read file, exit gracefully instead of crashing
+
+Wed Mar  6 13:57:56 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (FixSizeCommonWindow.__init__): fix len(text) problem
+
+Tue Mar  5 13:43:57 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* README: added " to the 'cd' command in the lfm() shell function to
+	allow changing to dir containing spaces
+
+Tue Mar  5 13:31:13 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (SelectItem.show): Added win refresh to assure window
+	refresh properly
+	* lfm/messages.py (FindfilesWin.show): 
+
+Tue Mar  5 13:20:41 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (SelectItem.show): Fix bug: crash if len(line) ==
+	width of cursorbar window
+
+Tue Mar  5 13:00:26 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (do_execute_file): eliminate extra '"'
+
 Sun Mar  3 22:19:49 2002  Iñigo Serna  <inigo@lethe.infernus.org>
 
 	* lfm/__init__.py (VERSION): release version 0.8

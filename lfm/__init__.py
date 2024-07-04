@@ -1,5 +1,5 @@
 """
-Copyright (C) 2001-2, Iñigo Serna <inigoserna@terra.es>.
+Copyright (C) 2001-2, Iñigo Serna <inigoserna@telefonica.net>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -12,10 +12,9 @@ application for UNIX console.
 
 ##################################################
 ##################################################
-VERSION = '0.8'
-DATE = '2001-2'
 AUTHOR = 'Iñigo Serna'
-VERSION = '0.8'
+VERSION = '0.9'
+DATE = '2001-2'
 
 LFM_NAME = 'lfm - Last File Manager'
 PYVIEW_NAME = 'pyview'
@@ -35,6 +34,8 @@ defaultprogs = { 'shell': ('bash', 'ksh', 'tcsh', 'csh', 'sh'),
                  'tar': ('tar', ),
                  'gzip': ('gzip', ),
                  'bzip2': ('bzip2', ),
+                 'zip': ('zip', ),
+                 'unzip': ('unzip', ),
                  'web': ('galeon', 'mozilla', 'netscape', 'lynx', 'opera'),
                  'ogg': ('ogg123', ),
                  'mp3': ('mpg123', ),
@@ -62,6 +63,8 @@ PYVIEW_README = """
     %s is a pager (viewer) written in Python.
 Though  initially it was written to be used with 'lfm',
 it can be used standalone too.
+Since version 0.9 it can read from standard input too
+(eg. $ ps efax | pyview)
 
 This software has been realised under the GPL License,
 see the COPYING file that comes with this package.
@@ -83,17 +86,21 @@ Keys:
     - h, H, F1: help
     - w, W, F2: toggle un / wrap (only in text mode)
     - m, M, F4: toggle text / hex mode
-    - g, G, F5: goto line / byte
-    - /: find
+    - g, G, F5: goto line / byte offset
+    - /: find (new search)
     - F6: find previous or find
     - F7: find next or find
+    - 0..9: go to bookmark #
+    - b, B: set bookmark #
+    - Ctrl-O: open shell 'sh'. Type 'exit' to return to pyview
     - q, Q, x, X, F3, F10: exit
 
-Goto Line / Byte
-================
+Goto Line / Byte Offset
+=======================
     Enter the line number / byte offset you want to show.
 If number / byte is preceded by '0x' it is interpreted as hexadecimal.
-You can scroll relative lines using '+' or '-' char.
+You can scroll relative lines from the current position using '+' or '-' 
+character.
 
 Find
 ====
