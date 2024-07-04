@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH lfm "1" "May 21, 2011"
+.TH lfm "1" "October 23, 2015" "lfm version 3.0" "Last File Manager"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -19,43 +19,56 @@
 \fBlfm\fR \- a powerful file manager for the UNIX console
 
 .SH SYNOPSIS
-.BI "lfm [ -h | --help ] "
-.br
-.BI "    [ -d | --debug ]"
-.br
-.BI "    [-1 | -2] [pathtodir1 [pathtodir2]]"
+.BI "lfm [-h] [-d] [-w] [--restore-config] [--restore-keys]"
+.BI "[--restore-theme] [--delete-history]"
+.BI "[path1] [path2]"
 .sp
 
 .SH DESCRIPTION
-.B Last File Manager
-is a powerful file manager for the UNIX console.
-It has a curses interface and it's written in Python.
+.B Last File Manager is a powerful file manager for the UNIX console.
+It has a curses interface and it's written in Python v3.4+.
+
 .SH OPTIONS
 .TP
-.B "\-1"
-start in 1-pane mode
-.TP
-.B "\-2"
-start in 2-panes mode (default)
+.B "\-h, \-\-help"
+Show help and exit
 .TP
 .B "\-d, \-\-debug"
-create debug file
+Enable debug level in log file
 .TP
-.B "\-h, \-\-help"
-show help
+.B "\-w, \-\-use\-wide\-chars"
+Enable support for wide chars
 .TP
-.B "pathtodir1"
-directory
+.B "\-\-restore\-config"
+Restore default configuration
 .TP
-.B "pathtodir2"
-directory to show in panel 2
+.B "\-\-restore\-keys"
+Restore default key bindings
+.TP
+.B "\-\-restore\-theme"
+Restore default theme
+.TP
+.B "\-\-delete\-history"
+Delete history
+.TP
+.B "[path1]"
+Path to show in left pane (default: ".", current directory)
+.TP
+.B "[path2]"
+Path to show in right pane (default: ".", current directory)
 
+.SH LICENSE
+This program is distributed under the terms of the GNU General Public
+License version 3 or later as published by the Free Software Foundation.
+See the built\-in help for details on the License and the lack of warranty.
+.SH AVAILABILITY
+The latest version of this program can be found at https://inigo.katxi.org/devel/lfm.
 .SH AUTHOR
 .B lfm
-was written by I�igo Serna  <inigoserna@gmail.com>
+was written by Iñigo Serna  <inigoserna@gmail.com>
 .PP
 This manual page was written by Sebastien Bacher for the Debian GNU/Linux system
-(but may be used by others).
+(but may be used by others). Adapted for lfm v3.0 by Iñigo Serna.
 
 .SH SEE ALSO
 The full documentation which includes the keys descriptions is in

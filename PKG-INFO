@@ -1,22 +1,25 @@
-Metadata-Version: 1.0
+Metadata-Version: 1.1
 Name: lfm
-Version: 2.3
-Summary: Last File Manager is a powerful file manager for the UNIX console.
+Version: 3.0
+Summary: 'Last File Manager' is a powerful file manager for UNIX console.
 Home-page: https://inigo.katxi.org/devel/lfm
-Author: Inigo Serna
+Author: Iñigo Serna
 Author-email: inigoserna@gmail.com
-License: GPL
-Description: UNKNOWN
+License: GPL3+
+Description: 'Last File Manager' is a powerful file manager for UNIX console.
+        It has a curses interface and it's written in Python version 3.4+.
+        Released under GNU Public License, read COPYING file for more details.
+Keywords: file manager shell cli
 Platform: POSIX
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Environment :: Console :: Curses
 Classifier: Intended Audience :: End Users/Desktop
 Classifier: Intended Audience :: System Administrators
-Classifier: License :: OSI Approved :: GNU General Public License (GPL)
+Classifier: License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)
 Classifier: Natural Language :: English
 Classifier: Operating System :: POSIX
 Classifier: Operating System :: Unix
-Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
 Classifier: Topic :: Desktop Environment :: File Managers
 Classifier: Topic :: System :: Filesystems
 Classifier: Topic :: System :: Shells

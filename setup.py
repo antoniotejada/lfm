@@ -1,28 +1,34 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 
-"""Last File Manager is a powerful file manager for the UNIX console.
-Based in a curses interface, it's written in Python."""
+"""lfm v3.0 - (C) 2001-15, by Iñigo Serna <inigoserna@gmail.com>
+
+'Last File Manager' is a powerful file manager for UNIX console.
+It has a curses interface and it's written in Python version 3.4+.
+Released under GNU Public License, read COPYING file for more details.
+"""
 
 
 from distutils.core import setup
-import sys
+from os.path import join
+from sys import argv, exit, prefix, version_info
 
 
-DOC_FILES = ['COPYING', 'README', 'README.pyview', 'NEWS', 'TODO', 'ChangeLog']
-MAN_FILES = ['lfm.1', 'pyview.1']
+DOC_FILES = ['COPYING', 'README', 'NEWS', 'TODO']
+CONFIG_FILES = ['etc/lfm-default.keys', 'etc/lfm-default.theme']
+MAN_FILES = ['lfm.1']
 
 classifiers = """\
 Development Status :: 5 - Production/Stable
 Environment :: Console :: Curses
 Intended Audience :: End Users/Desktop
 Intended Audience :: System Administrators
-License :: OSI Approved :: GNU General Public License (GPL)
+License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)
 Natural Language :: English
 Operating System :: POSIX
 Operating System :: Unix
-Programming Language :: Python
+Programming Language :: Python :: 3
 Topic :: Desktop Environment :: File Managers
 Topic :: System :: Filesystems
 Topic :: System :: Shells
@@ -30,39 +36,33 @@ Topic :: System :: System Shells
 Topic :: Utilities
 """
 
-doclines = __doc__.split("\n")
+print(__doc__)
 
-print doclines
+# check python version
+ver = (version_info.major, version_info.minor)
+if ver < (3, 4):
+    print('ERROR: Python 3.4 or higher is required to run lfm.')
+    exit(-1)
 
-if sys.version_info < (2, 3):
-    _setup = setup
-    def setup(**kwargs):
-        if kwargs.has_key("classifiers"):
-            del kwargs["classifiers"]
-        _setup(**kwargs)
+# to avoid bug in pip 7.x. See https://bitbucket.org/pypa/wheel/issues/92
+if 'bdist_wheel' in argv:
+    raise RuntimeError("This setup.py does not support wheels")
 
-
-setup(name = 'lfm',
-      version = '2.3',
-      license = 'GPL',
-      description = doclines[0],
-      long_description = '\n'.join(doclines[2:]),
-      author = u'Inigo Serna',
-      author_email = 'inigoserna@gmail.com',
-      url = 'https://inigo.katxi.org/devel/lfm',
-      platforms = 'POSIX',
-      classifiers = filter(None, classifiers.split("\n")),
-      py_modules = ['lfm/__init__', 'lfm/lfm', 'lfm/messages', 'lfm/files',
-                    'lfm/actions', 'lfm/compress', 'lfm/utils', 'lfm/vfs',
-                    'lfm/config', 'lfm/pyview'],
-      scripts = ['lfm/lfm', 'lfm/pyview'],
-      data_files = [('share/doc/lfm', DOC_FILES),
-                    ('share/man/man1', MAN_FILES)]
-#      **addargs
-     )
-
-
-#  import os, os.path, sys
-#  from distutils.sysconfig import get_python_lib
-#  os.symlink(os.path.join(get_python_lib(), 'lfm/lfm.py'),
-#             os.path.join(sys.exec_prefix, 'bin/lfm'))
+setup(name='lfm',
+      version='3.0',
+      description=__doc__.split("\n")[2],
+      long_description='\n'.join(__doc__.split("\n")[2:]).strip(),
+      author='Iñigo Serna',
+      author_email='inigoserna@gmail.com',
+      url='https://inigo.katxi.org/devel/lfm',
+      platforms='POSIX',
+      keywords=['file manager shell cli'],
+      classifiers=filter(None, classifiers.split("\n")),
+      license='GPL3+',
+      packages=['lfm'],
+      scripts=['lfm/lfm'],
+      data_files=[(join(prefix, 'share/doc/lfm'), DOC_FILES),
+                  (join(prefix, 'share/doc/lfm/etc'), CONFIG_FILES),
+                  (join(prefix, 'share/man/man1'), MAN_FILES)],
+      # **addargs
+)

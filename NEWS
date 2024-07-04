@@ -1,3 +1,68 @@
+Version 3.0 ("Only you") - 2015/10/23:
+
+  + About the code
+    - almost completely rewritten from scratch
+      . it hasn't been tested as much as lfm v2.x series on non-linux OS
+    - requires Python v3.4+
+    - pyview, the file viewer, has been removed from lfm package
+    - configuration location has changed to a new directory and files:
+      ~/.config/lfm/{lfm.ini, lfm.keys, lfm.theme, lfm.history}
+
+  + New features
+    - fully customizable themes (colors)
+    - fully customizable key bindings
+      . allow Alt-key shorcuts (A-)
+      . only for main window (not for dialogs)
+    - files filters (using globs)
+      . information in pane frame: ".F" => show dotfiles, active filters
+      . filters are a property of a tab, they remain active even when chdir
+      . Ctrl-f: edit current filter
+      . Some examples:
+        . "*.png,*.jpg" => hide all PNG and JPEG files
+        . "*.jpg,!*shot*" => hide all JPEG files except those with 'shot'
+                             in the name
+        . "*,!*py" => hide all except python source files
+    - up to 35 bookmarks (0-9, a-z)
+      . b: go to bookmark, B: set bookmark, C-d: select bookmark
+      . fix: don't delete bookmark at start if path does not exist
+    - nested archive handling (vfs inside vfs) works now
+    - added optional support for filenames with wide chars, f.e. East Asian
+      . to enable, set 'use_wide_chars' flag in configuration or use -w
+        command line flag
+      . it's disabled by default for performance
+      . it's not perfect, but it mostly works
+    - there are 2 different versions of move_file to chose from in the key
+      bindings file:
+      . move_file: old implementation
+      . move_file2: alternative version using shtutil.move instead of
+                    copy & delete. Faster but less control of errors
+    - new action: redraw screen (default key A-r)
+
+  + Changes & improvements (vs v2.x):
+    - chmod & chown/chgrp are 2 different actions now
+    - cursor_goto_file (C-s): find text pattern (no regex or glob) in the whole
+                              file name, not at the beginning as v2.x
+    - cursor_goto_file_1char (A-s): go to file by 1st letter of name
+                                    (old C-s behaviour)
+    - bookmarks have new key bindings:
+      b: go to bookmark, B: set bookmark, C-d: select bookmark
+    - PowerCLI:
+      . ending command with % must be $ now
+      . added new date variables: dm, dc, da, dn
+      . old $d variable is $p now
+    - find/grep: panelize = create vfs with matched files
+      . if rebuild: all files modifications or deletions are translated to
+                    original directory so be careful!
+    - pyview, the file viewer, has been removed from lfm package
+
+  + Fixes in v3.0 (vs v2.x):
+    - nested archive handling (vfs inside vfs) works now
+    - find & grep with spaces in file name
+    - wide chars file names support (f.e. Eastern languages) => lfm -w
+    - sort by size after show dirs size
+    - move_file: not overwritten files in destination are not deleted
+
+
 Version 2.3 ("Wow, less than a year!") - 2011/05/21:
 
   + About the code
@@ -26,7 +91,7 @@ Version 2.3 ("Wow, less than a year!") - 2011/05/21:
   + Minor changes
     - reorganize "un/compress file" and "compress directory xxx" in file_menu
     - config: sort entries when saving
-    - improve load/save handling of new options not present in ~/.lfmrc
+    - improve lad/save handling of new options not present in ~/.lfmrc
     - added new extensions
     - messages.error rewritten to offer better messages
     - added some new key shortcuts messages.SelectItem
