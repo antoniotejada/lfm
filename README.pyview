@@ -1,7 +1,7 @@
 pyview - Last File Manager Viewer
 =================================
 
-(C) 2001, Iñigo Serna <inigoserna@terra.es>
+(C) 2001-2, Iñigo Serna <inigoserna@terra.es>
 
     pyview is a pager (viewer) written in Python.
 Though it was initially written to be used with 'lfm',
@@ -44,4 +44,4 @@ Find
     Type the string to search. It ignores case.
 
 ============================================================================
-Last update:	Sunday November 25, 2001 - 20:29:54 CEST
+Last update:	Thursday February 28th, 2002 - 01:45:21 CEST

@@ -17,19 +17,27 @@ historic = []
 ##################################################
 ##################################################
 class CommonWindow:
-    """A superclass for error and win windows"""
+    """A superclass for 'error' and 'win' windows"""
     
-    def __init__(self, title, text, br_att, br_bg, bd_att, bd_bg):
+    def __init__(self, title, text, br_att, br_bg, bd_att, bd_bg, waitkey = 1):
+        self.waitkey = waitkey
         text = text.replace('\t', ' ' * 4)
         lines = text.split('\n')
-        length = 0
+        length = max(map(len, lines))
+        if self.waitkey:
+            w = min(max(max(length+6, 27+4), len(title) + 6), curses.COLS - 2)
+            if length < 27 + 4 and len(title) <= length:
+                w -= 1
+        else:
+            w = min(max(length+6, len(title)+6), curses.COLS - 2)
+            if len(title) < length:
+                w -= 1
+        h = len(lines) + 4
         for l in lines:
-            if len(l) > length:
-                length = len(l)
-        h = min(len(lines) + 4, curses.LINES - 2)
-        w = min(max(max(length+6, 27+4), len(title) + 6), curses.COLS - 2)
-        if len(lines) > 1:  # -1, because len adds newline char
-            w -= 1
+            h += (len(l)+1) / (curses.COLS - 2)
+        if h > curses.LINES - 4:
+            h = curses.LINES - 4
+            text = ''.join([l+'\n' for l in lines[-5:]])
         try:
             self.border = curses.newwin(h, w, 
                                         (curses.LINES-h) / 2,
@@ -47,19 +55,82 @@ class CommonWindow:
         self.border.erase()
         self.body.erase()
         self.border.box(0, 0)
+        if len(title) > curses.COLS-14:
+            title = title[:curses.COLS-10] + '...' + '\''
         self.border.addstr(0, (w-len(title)-2)/2, ' ' + title + ' ')
         if h == 5:
             self.body.addstr(1, 1, text)
         else:
             self.body.addstr(1, 0, text)
-        self.border.addstr(h-1, (w-27)/2, ' Press any key to continue ')
+        if self.waitkey:
+            self.border.addstr(h-1, (w-27)/2, ' Press any key to continue ')
         self.border.refresh()
         self.body.refresh()
         self.border.keypad(1)
 
     def run(self):
-        while not self.border.getch():
-            pass
+        if self.waitkey:
+            while not self.border.getch():
+                pass
+        else:
+            return
+
+
+class FixSizeCommonWindow:
+    """A superclass for messagess, with fix size"""
+    
+    def __init__(self, title, text, downtext,
+                 br_att, br_bg, bd_att, bd_bg, waitkey = 1):
+        self.waitkey = waitkey
+        text = text.replace('\t', ' ' * 4)
+        w = curses.COLS - 20
+        if len(title) > w - 4:
+            title = title[:w-4]
+        if len(text) > w - 4:
+            text = text[:w-4]
+        if len(downtext) > w - 4:
+            downtext = downtext[:w-4]
+        h = 5
+        try:
+            self.border = curses.newwin(h, w, 
+                                        (curses.LINES-h) / 2,
+                                        (curses.COLS-w) / 2)
+            self.body = curses.newwin(h-2, w-4,
+                                      (curses.LINES-h)/2 + 1,
+                                      (curses.COLS-w)/2 + 2)
+        except curses.error:
+            print 'Can\'t create window'
+            sys.exit(-1)
+        self.border.attrset(br_att)
+        self.border.bkgdset(br_bg)
+        self.body.attrset(bd_att)
+        self.body.bkgdset(bd_bg)
+        self.border.erase()
+        self.body.erase()
+        self.border.box(0, 0)
+        if len(title) > curses.COLS-14:
+            title = title[:curses.COLS-10] + '...' + '\''
+        self.border.addstr(0, (w-len(title)-2)/2, ' ' + title + ' ')
+        if h == 5:
+            self.body.addstr(1, 1, text)
+        else:
+            self.body.addstr(1, 0, text)
+        if self.waitkey:
+            self.border.addstr(h-1, (w-27)/2,
+                               ' Press any key to continue ', bd_att)
+        elif downtext:
+            self.border.addstr(h-1, (w-len(downtext)-2)/2,
+                               ' ' + downtext + ' ', bd_att)
+        self.border.refresh()
+        self.body.refresh()
+        self.border.keypad(1)
+
+    def run(self):
+        if self.waitkey:
+            while not self.border.getch():
+                pass
+        else:
+            return
 
 
 ##################################################
@@ -81,13 +152,24 @@ def error(title, msg = '', file = ''):
 ##################################################
 ##################################################
 def win(title, text):
-    """show a message window"""
+    """show a message window and wait for a ky"""
 
     CommonWindow(title, text,
                  curses.color_pair(1) | curses.A_BOLD,
                  curses.color_pair(1),
                  curses.color_pair(4),
                  curses.color_pair(4)).run()
+
+
+def win_nokey(title, text, downtext = ''):
+    """show a message window, does not wait for a key"""
+
+    FixSizeCommonWindow(title, text, downtext,
+                        curses.color_pair(1) | curses.A_BOLD,
+                        curses.color_pair(1),
+                        curses.color_pair(1),
+                        curses.color_pair(1),
+                        waitkey = 0).run()
 
 
 ##################################################
@@ -795,6 +877,7 @@ class SelectItem:
 
     def show(self):
         self.win.erase()
+        self.win.box(0, 0)     # to avoid upper-left corner disappear
         self.win.attrset(curses.color_pair(4))
         self.win.refresh()
         self.win.box(0, 0)
@@ -931,6 +1014,7 @@ class FindfilesWin:
 
     def show(self):
         self.win.erase()
+        self.win.box(0, 0)     # to avoid upper-left corner disappear
         self.win.attrset(curses.color_pair(4))
         self.win.refresh()
         self.win.box(0, 0)
@@ -1120,6 +1204,7 @@ class MenuWin:
 
     def show(self):
         self.win.erase()
+        self.win.box(0, 0)     # to avoid upper-left corner disappear
         self.win.attrset(curses.color_pair(3))
         self.win.refresh()
         self.win.box(0, 0)
@@ -1250,9 +1335,10 @@ class ChangePerms:
     def show(self):
         h, w = self.win.getmaxyx()
         self.win.erase()
+        self.win.box(0, 0)     # to avoid upper-left corner disappear
         self.win.attrset(curses.color_pair(1))
-        self.win.refresh()
         self.win.box(0, 0)
+        self.win.refresh()
         attr = curses.color_pair(1) | curses.A_BOLD
         title = 'Change permissions, owner or group'
         self.win.addstr(0, (w-len(title)-2)/2, ' %s ' % title, attr)
@@ -1322,7 +1408,11 @@ class ChangePerms:
                 return -1
             elif ch in [ord('\t'), 0x09, curses.KEY_DOWN, curses.KEY_RIGHT]:
                 if self.i:
-                    if self.entry_i == 8:
+                    if self.entry_i == 4:
+                        self.entry_i = 7
+                    elif self.entry_i == 8:
+                        self.entry_i = 5
+                    elif self.entry_i == 6:
                         self.entry_i = 0
                     else:
                         self.entry_i += 1
@@ -1334,7 +1424,11 @@ class ChangePerms:
             elif ch in [curses.KEY_UP, curses.KEY_LEFT]:
                 if self.i:
                     if self.entry_i == 0:
+                        self.entry_i = 6
+                    elif self.entry_i == 5:
                         self.entry_i = 8
+                    elif self.entry_i == 7:
+                        self.entry_i = 4
                     else:
                         self.entry_i -= 1
                 else:

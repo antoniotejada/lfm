@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2001  Iñigo Serna
+# Copyright (C) 2001-2  Iñigo Serna
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 
 
 """
-Copyright (C) 2001, Iñigo Serna <inigoserna@terra.es>.
+Copyright (C) 2001-2, Iñigo Serna <inigoserna@terra.es>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -34,56 +34,11 @@ import sys, time
 import curses
 from glob import glob
 
-from lfm import files
-from lfm import messages
-from lfm import preferences
-from lfm import pyview
-#import files
-#import messages
-#import preferences
-#import pyview
-
-
-PROGNAME = 'lfm - Last File Manager'
-VERSION = '0.7'
-DATE = '2001'
-AUTHOR = 'Iñigo Serna'
-
-PREFSFILE = '.lfmrc'
-DEBUG = 0
-
-
-##################################################
-##################################################
-app = None
-thread_quit = 0
-
-defaultprogs = { 'shell': ('bash', 'ksh', 'tcsh', 'csh', 'sh'),
-                 'pager': ('pyview', 'less', 'more', 'biew'),
-                 'editor': ('mcedit', 'emacs', 'vi', 'joe'),
-                 'find': ('find', ),
-                 'egrep': ('egrep', 'grep'),
-                 'tar': ('tar', ),
-                 'gzip': ('gzip', ),
-                 'bzip2': ('bzip2', ),
-                 'web': ('galeon', 'mozilla', 'netscape', 'lynx', 'opera'),
-                 'ogg': ('ogg123', ),
-                 'mp3': ('mpg123', ),
-                 'audio': ('esdplay', 'play', ),
-                 'video': ('mplayer', 'xanim', 'aviplay'),
-                 'graphics': ('ee', 'eog', 'gthumb', 'xv', 'gimp'),
-                 'pdf' :('acroread', 'ggv', 'xpdf'),
-                 'ps': ('ggv', 'gv'),
-                 'tururu': ('tururu', 'sdfdsf', 'just to test') }
-
-filetypes = { 'web': ('html', 'htm'),
-              'ogg': ('ogg', ),
-              'mp3': ('mp3', ),
-              'audio': ('wav', 'au', 'midi'),
-              'video': ('mpeg', 'mpg', 'avi', 'asf'),
-              'graphics': ('png', 'jpeg', 'jpg', 'gif', 'tiff', 'tif', 'xpm'),
-              'pdf': ('pdf', ),
-              'ps': ('ps', ) }
+from __init__ import *
+import files
+import messages
+import preferences
+import pyview
 
 
 ##################################################
@@ -150,7 +105,7 @@ class Lfm:
         self.win_title.erase()
         self.win_status.erase()
 
-        title = '%s v%s   (c) %s, %s' % (PROGNAME, VERSION, DATE, AUTHOR)
+        title = '%s v%s   (c) %s, %s' % (LFM_NAME, VERSION, DATE, AUTHOR)
         self.win_title.addstr(0, (curses.COLS-len(title))/2, title)
 
         panel = self.panels[self.panel]
@@ -175,8 +130,11 @@ class Lfm:
             self.win_status.addstr('File: %4d of %-4d' % \
                                    (panel.file_i + 1, panel.nfiles))
             filename = panel.sorted[panel.file_i]
-            realpath = files.get_realpath(panel.path, filename,
-                                          panel.files[filename][files.FT_TYPE])
+            if not panel.vfs:
+                realpath = files.get_realpath(panel.path, filename,
+                                              panel.files[filename][files.FT_TYPE])
+            else:
+                realpath = os.path.join(vfs_join(panel), filename)
             if len(realpath) > curses.COLS - 35:
                 path = '~' + realpath[-(curses.COLS-37):]
             else:
@@ -216,8 +174,14 @@ class Lfm:
                 if self.prefs.options['save_conf_at_exit']:
                     self.prefs.save()
                 if oldpanel == -1:
+                    for panel in self.panels:
+                        if panel.vfs:
+                            vfs_exit(panel)
                     return self.panels[self.panel].path
                 else:
+                    for panel in self.panels:
+                        if panel.vfs:
+                            vfs_exit(panel)
                     return
             # change panel active
             if oldpanel == 0:
@@ -284,10 +248,14 @@ class Panel:
             else:
                 self.win_files.attrset(curses.color_pair(2))
                 attr = curses.color_pair(2)
-            if len(self.path) > curses.COLS/2 - 5:
-                title_path = '~' + self.path[-35:]
+            if not self.vfs:
+                path = self.path
             else:
-                title_path = self.path
+                path = vfs_join(self)
+            if len(path) > curses.COLS/2 - 5:
+                title_path = '~' + path[-35:]
+            else:
+                title_path = path
             self.win_files.box()
             self.win_files.addstr(0, 2, title_path, attr)
             self.win_files.addstr(1, 7, 'Name',
@@ -332,7 +300,7 @@ class Panel:
                 n = h * h / self.nfiles
                 if n == 0:
                     n = 1
-                a = self.file_i /h * h
+                a = self.file_i / h * h
                 y0 = a * h / self.nfiles
                 if y0 < 0:
                     y0 = 0
@@ -446,6 +414,11 @@ class Panel:
                            (strerror, errno), path)
             app.show()
             return OSError
+        # vfs variables
+        self.vfs = ''          # vfs? if not -> blank string
+        self.base = ''         # tempdir basename
+        self.vbase = self.path # virtual directory basename
+        
 
 
     def fix_limits(self):
@@ -464,20 +437,37 @@ class Panel:
 
 
     def refresh_panel(self, panel):
-        """this is needed due to panel could be changed"""
+        """this is needed because panel could be changed"""
 
-        filename_old = panel.sorted[panel.file_i]
-        selections_old = panel.selections[:]
-        panel.init_dir(panel.path)
-        try:
-            panel.file_i = panel.sorted.index(filename_old)
-        except ValueError:
+        path = panel.path
+        if path[-1] == os.sep:
+            path = path[:-1]
+        while not os.path.exists(path):
+            path = os.path.dirname(path)
+
+        if path != panel.path:
+            panel.path = path
             panel.file_i = 0
-        panel.fix_limits()
-        panel.selections = selections_old[:]
-        for f in panel.selections:
-            if f not in panel.sorted:
-                panel.selections.remove(f)
+            vfs, base, vbase = panel.vfs, panel.base, panel.vbase
+            panel.init_dir(panel.path)
+            panel.vfs, panel.base, panel.vbase = vfs, base, vbase
+            panel.fix_limits()
+            panel.selections = []
+        else:
+            filename_old = panel.sorted[panel.file_i]
+            selections_old = panel.selections[:]
+            vfs, base, vbase = panel.vfs, panel.base, panel.vbase
+            panel.init_dir(panel.path)
+            panel.vfs, panel.base, panel.vbase = vfs, base, vbase
+            try:
+                panel.file_i = panel.sorted.index(filename_old)
+            except ValueError:
+                panel.file_i = 0
+            panel.fix_limits()
+            panel.selections = selections_old[:]
+            for f in panel.selections:
+                if f not in panel.sorted:
+                    panel.selections.remove(f)
 
 
     # Keys
@@ -533,16 +523,55 @@ class Panel:
             
             # cursor left
             elif ch in [curses.KEY_LEFT]:
-                if self.path != os.sep:
-                    olddir = os.path.basename(self.path)
-                    self.init_dir(os.path.dirname(self.path))
-                    self.file_i = self.sorted.index(olddir)
-                    self.fix_limits()
+                if not self.vfs:
+                    if self.path != os.sep:
+                        olddir = os.path.basename(self.path)
+                        self.init_dir(os.path.dirname(self.path))
+                        self.file_i = self.sorted.index(olddir)
+                        self.fix_limits()
+                else:
+                    if self.path == self.base:
+                        olddir = os.path.basename(self.vbase).replace('#vfs', '')
+                        vfs_exit(self)                          
+                        self.init_dir(os.path.dirname(self.vbase))
+                        self.file_i = self.sorted.index(olddir)
+                        self.fix_limits()
+                    else:
+                        olddir = os.path.basename(self.path)
+                        vfs, base, vbase = self.vfs, self.base, self.vbase
+                        self.init_dir(os.path.dirname(self.path))
+                        self.vfs, self.base, self.vbase = vfs, base, vbase
+                        self.file_i = self.sorted.index(olddir)
+                        self.fix_limits()
             # cursor right
             elif ch in [curses.KEY_RIGHT]:
                 filename = self.sorted[self.file_i]
-                if self.files[filename][files.FT_TYPE] == files.FTYPE_DIR:
-                    self.init_dir(os.path.join(self.path, filename))
+                vfstype = check_compressed_tarfile(filename)
+                if (self.files[filename][files.FT_TYPE] == files.FTYPE_REG or \
+                   self.files[filename][files.FT_TYPE] == files.FTYPE_LNK) and \
+                   vfstype != -1:
+                    vfs_init(self, filename, vfstype)
+                elif self.files[filename][files.FT_TYPE] == files.FTYPE_DIR:
+                    if not self.vfs:
+                        if filename == os.pardir:
+                            olddir = os.path.basename(self.path)
+                            self.init_dir(os.path.dirname(self.path))
+                            self.file_i = self.sorted.index(olddir)
+                            self.fix_limits()
+                        else:
+                            self.init_dir(os.path.join(self.path, filename))
+
+                    else:
+                        if self.path == self.base and filename == os.pardir:
+                            olddir = os.path.basename(self.vbase).replace('#vfs', '')
+                            vfs_exit(self)                          
+                            self.init_dir(os.path.dirname(self.vbase))
+                            self.file_i = self.sorted.index(olddir)
+                            self.fix_limits()
+                        else:
+                            vfs, base, vbase = self.vfs, self.base, self.vbase
+                            self.init_dir(os.path.join(self.path, filename))
+                            self.vfs, self.base, self.vbase = vfs, base, vbase
                 elif self.files[filename][files.FT_TYPE] == files.FTYPE_LNK2DIR:
                     self.init_dir(files.get_linkpath(self.path, filename))
                 else:
@@ -554,6 +583,8 @@ class Panel:
                 if todir == None or todir == "":
                     continue
                 todir = os.path.join(self.path, todir)
+                if self.vfs:
+                    vfs_exit(self)
                 self.init_dir(todir)
                 self.fix_limits()
             # go to file
@@ -570,14 +601,36 @@ class Panel:
                     continue
                 self.file_i = self.sorted.index(f)
                 self.fix_limits()
+            # tree
+            elif ch in [0x14]:             # Ctrl-T
+                if self.vfs:
+                    continue
+                panel_i = app.panel
+                if panel_i == 0:
+                    app.panel = 1
+                elif panel_i == 1:
+                    app.panel = 0
+                self.show()
+                t = Tree(self.path, self.pos)
+                ans = t.run()
+                del(t)
+                app.panel = panel_i
+                if ans != -1:
+                    self.init_dir(ans)
+                    self.fix_limits()
 
             # go to bookmark
             elif 0x30 <= ch <= 0x39:       # 0..9
-                todir = app.prefs.bookmarks[ch - 0x30];
+                todir = app.prefs.bookmarks[ch - 0x30]
+                if self.vfs:
+                    vfs_exit(self)
                 self.init_dir(todir)
                 self.fix_limits()
             # set bookmark
             elif ch in [ord('b'), ord('B')]:
+                if self.vfs:
+                    messages.error('Set bookmark', 'Can\'t bookmark inside vfs')
+                    continue
                 while 1:
                     ch = messages.get_a_key('Set bookmark',
                                             'Press 0-9 to save the bookmark in, Ctrl-C to quit')
@@ -628,9 +681,23 @@ class Panel:
             # show the same directory in two panels
             elif ch in [ord('=')]:
                 otherpanel = app.get_otherpanel()
-                otherpanel.init_dir(self.path)
-                otherpanel.fix_limits()
-                
+                if not self.vfs:
+                    if otherpanel.vfs:
+                        vfs_exit(otherpanel)
+                    otherpanel.init_dir(self.path)
+                    otherpanel.fix_limits()
+                    self.refresh_panel(self)
+                    self.refresh_panel(app.get_otherpanel())
+                else:
+                    if self.vfs == 'pan':
+                        vfs_pan_copy(self, otherpanel)
+                    else:
+                        vfs_copy(self, otherpanel)
+                    vfs, base, vbase = otherpanel.vfs, otherpanel.base, otherpanel.vbase
+                    otherpanel.init_dir(base + self.path.replace(self.base, ''))
+                    otherpanel.fix_limits()
+                    otherpanel.vfs, otherpanel.base, otherpanel.vbase = vfs, base, vbase
+
             # select item
             elif ch in [curses.KEY_IC]:
                 filename = self.sorted[self.file_i]
@@ -673,14 +740,31 @@ class Panel:
             # enter
             elif ch in [10, 13]:
                 filename = self.sorted[self.file_i]
-                if self.files[filename][files.FT_TYPE] == files.FTYPE_DIR:
-                    if filename == os.pardir:
-                        olddir = os.path.basename(self.path)
-                        self.init_dir(os.path.dirname(self.path))
-                        self.file_i = self.sorted.index(olddir)
-                        self.fix_limits()
+                vfstype = check_compressed_tarfile(filename)
+                if (self.files[filename][files.FT_TYPE] == files.FTYPE_REG or \
+                   self.files[filename][files.FT_TYPE] == files.FTYPE_LNK) and \
+                   vfstype != -1:
+                    vfs_init(self, filename, vfstype)
+                elif self.files[filename][files.FT_TYPE] == files.FTYPE_DIR:
+                    if not self.vfs:
+                        if filename == os.pardir:
+                            olddir = os.path.basename(self.path)
+                            self.init_dir(os.path.dirname(self.path))
+                            self.file_i = self.sorted.index(olddir)
+                            self.fix_limits()
+                        else:
+                            self.init_dir(os.path.join(self.path, filename))
                     else:
-                        self.init_dir(os.path.join(self.path, filename))
+                        if self.path == self.base and filename == os.pardir:
+                            olddir = os.path.basename(self.vbase).replace('#vfs', '')
+                            vfs_exit(self)                          
+                            self.init_dir(os.path.dirname(self.vbase))
+                            self.file_i = self.sorted.index(olddir)
+                            self.fix_limits()
+                        else:
+                            vfs, base, vbase = self.vfs, self.base, self.vbase
+                            self.init_dir(os.path.join(self.path, filename))
+                            self.vfs, self.base, self.vbase = vfs, base, vbase
                 elif self.files[filename][files.FT_TYPE] == files.FTYPE_LNK2DIR:
                     self.init_dir(files.get_linkpath(self.path, filename))
                 elif self.files[filename][files.FT_TYPE] == files.FTYPE_EXE:
@@ -699,7 +783,7 @@ class Panel:
             # special regards
             elif ch in [0xF1]:
                 messages.win('Special Regards',
-                             '  Maite zaitut, Montse\n   T\'estimo molt, Montse')
+                             '   Maite zaitut, Montse\n   T\'estimo molt, Montse')
             # find/grep
             elif ch in [ord('/')]:
                 findgrep(self)
@@ -937,6 +1021,17 @@ class Panel:
                             ans = files.move(self.path, filename, destdir, 0)
                     else:
                         continue
+
+                file_i_old = self.file_i
+                vfs, base, vbase = self.vfs, self.base, self.vbase
+                self.init_dir(self.path)
+                self.vfs, self.base, self.vbase = vfs, base, vbase
+                if file_i_old > self.nfiles:
+                    self.file_i = self.nfiles
+                else:
+                    self.file_i = file_i_old
+                self.fix_limits()
+
                 self.refresh_panel(self)
                 self.refresh_panel(otherpanel)
 
@@ -986,7 +1081,9 @@ class Panel:
 
                     file_i_old = self.file_i
                     file_old = self.sorted[self.file_i]
+                    vfs, base, vbase = self.vfs, self.base, self.vbase
                     self.init_dir(self.path)
+                    self.vfs, self.base, self.vbase = vfs, base, vbase
                     try:
                         self.file_i = self.sorted.index(file_old)
                     except ValueError:
@@ -1013,7 +1110,9 @@ class Panel:
                         messages.error('Delete \'%s\'' % filename, '%s (%s)' % ans)
 
                     file_i_old = self.file_i
+                    vfs, base, vbase = self.vfs, self.base, self.vbase
                     self.init_dir(self.path)
+                    self.vfs, self.base, self.vbase = vfs, base, vbase
                     if file_i_old > self.nfiles:
                         self.file_i = self.nfiles
                     else:
@@ -1060,8 +1159,7 @@ class Panel:
                          'b    Bzip2/bunzip2 file(s)',
                          'x    Uncompress .tar.gz, .tar.bz2, .tar.Z',
                          'c    Compress directory to .tar.gz',
-                         'd    Compress directory to .tar.bz2',
-                         'y    Encrypt/decrypt file' ]
+                         'd    Compress directory to .tar.bz2' ]
                 cmd = messages.MenuWin('File Menu', menu).run()
                 if cmd == -1:
                     continue
@@ -1148,9 +1246,6 @@ class Panel:
                     old_file = app.get_otherpanel().sorted[app.get_otherpanel().file_i]
                     self.refresh_panel(app.get_otherpanel())
                     app.get_otherpanel().file_i = app.get_otherpanel().sorted.index(old_file)
-                elif cmd == 'y':
-                    app.show()
-                    messages.notyet('Encrypt/decrypt file')
 
             # general menu
             elif ch in [curses.KEY_F9]:
@@ -1175,7 +1270,21 @@ class Panel:
                     app.show()
                     sort(self)
                 elif cmd == 't':
-                    messages.notyet('Tree')
+                    if self.vfs:
+                        continue
+                    panel_i = app.panel
+                    if panel_i == 0:
+                        app.panel = 1
+                    elif panel_i == 1:
+                        app.panel = 0
+                    self.show()
+                    t = Tree(self.path, self.pos)
+                    ans = t.run()
+                    del(t)
+                    app.panel = panel_i
+                    if ans != -1:
+                        self.init_dir(ans)
+                        self.fix_limits()
                 elif cmd == 'f':
                     do_show_fs_info()
                 elif cmd == 'o':
@@ -1221,9 +1330,340 @@ class Panel:
 
 
 ##################################################
+##### Tree
+##################################################
+class Tree:
+    """Tree class"""
+
+    def __init__(self, path = os.sep, panelpos = 0):
+        if not os.path.exists(path):
+            return None
+        self.__init_curses(panelpos)
+        if path[-1] == os.sep and path != os.sep:
+            path = path[:-1]
+        self.path = path
+        self.tree = self.get_tree()
+        self.pos = self.__get_curpos()
+
+
+    def __get_dirs(self, path):
+        """return a list of dirs in path"""
+        
+        ds = []
+        try:
+            for d in os.listdir(path):
+                if os.path.isdir(os.path.join(path, d)):
+                    ds.append(d)
+        except OSError:
+            pass
+        ds.sort()
+        return ds
+
+
+    def __get_graph(self, path):
+        """return 2 dicts with tree structure"""
+
+        tree_n = {}
+        tree_dir = {}
+        expanded = None
+        while path:
+            if path == os.sep and tree_dir.has_key(os.sep):
+                break
+            tree_dir[path] = (self.__get_dirs(path), expanded)
+            expanded = os.path.basename(path)
+            path = os.path.dirname(path)
+        dir_keys = tree_dir.keys()
+        dir_keys.sort()
+        n = 0
+        for d in dir_keys:
+            tree_n[n] = d
+            n += 1
+        return tree_n, tree_dir
+
+
+    def __get_node(self, i, tn, td, base):
+        """expand branch"""
+
+        lst2 = []
+        node = tn[i]
+        dirs, expanded_node = td[node]
+        if not expanded_node:
+            return []
+        for d in dirs:
+            if d == expanded_node:
+                lst2.append([d, i, os.path.join(base, d)])
+                lst3 = self.__get_node(i+1, tn, td, os.path.join(base, d))
+                if lst3 != None:
+                    lst2.extend(lst3)
+            else:
+                lst2.append([d, i, os.path.join(base, d)])
+        return lst2
+
+
+    def get_tree(self):
+        """return list with tree structure"""
+
+        tn, td = self.__get_graph(self.path)
+        tree = [[os.sep, -1, os.sep]]
+        tree.extend(self.__get_node(0, tn, td, os.sep))
+        return tree
+        
+
+    def __get_curpos(self):
+        """get position of current dir"""
+        
+        for i in range(len(self.tree)):
+            if self.path == self.tree[i][2]:
+                return i
+        else:
+            return -1
+
+
+    def regenerate_tree(self, newpos):
+        """regenerate tree when changing to a new directory"""
+        
+        self.path = self.tree[newpos][2]
+        self.tree = self.get_tree()
+        self.pos = self.__get_curpos()
+
+
+    def show_tree(self, a = 0, z = -1):
+        """show an ascii representation of the tree. Not used in lfm"""
+        
+        if z > len(self.tree) or z == -1:
+            z = len(self.tree)
+        for i in range(a, z):
+            name, depth, fullname = self.tree[i]
+            if fullname == self.path:
+                name += ' <====='
+            if name == os.sep:
+                print ' ' + name
+            else:
+                print ' | ' * depth + ' +- ' + name
+
+
+    # GUI functions
+    def __init_curses(self, pos):
+        """initialize curses stuff"""
+        
+        if pos == 0:      # not visible panel
+            self.dims = (curses.LINES-2, 0, 0, 0)     # h, w, y, x
+            return
+        elif pos == 1:    # left panel -> right
+            self.dims = (curses.LINES-2, curses.COLS/2, 1, curses.COLS/2)
+        elif pos == 2:    # right panel -> left
+            self.dims = (curses.LINES-2, curses.COLS/2, 1, 0)
+        else:             # full panel -> right
+            self.dims = (curses.LINES-2, curses.COLS/2, 1, curses.COLS/2)
+        try:
+            self.win_tree = curses.newwin(self.dims)
+        except curses.error:
+            print 'Can\'t create tree window'
+            sys.exit(-1)
+        self.win_tree.keypad(1)
+        if curses.has_colors():
+            self.win_tree.attrset(curses.color_pair(2))
+            self.win_tree.bkgdset(curses.color_pair(2))
+
+        
+    def show(self):
+        """show tree panel"""
+        
+        self.win_tree.erase()
+        h = curses.LINES - 4
+        n = len(self.tree)
+        # box
+        self.win_tree.attrset(curses.color_pair(5))
+        self.win_tree.box()
+        self.win_tree.addstr(0, 2, ' Tree ', curses.color_pair(6) | curses.A_BOLD)
+        # tree
+        self.win_tree.attrset(curses.color_pair(2))
+        j = 0
+        a, z = self.pos/h * h, (self.pos/h + 1) * h
+        if z > n:
+            z = n
+            a = z - h
+            if a < 0:
+                a = 0
+        for i in range(a, z):
+            j += 1
+            name, depth, fullname = self.tree[i]
+            if name == os.sep:
+                self.win_tree.addstr(j, 1, ' ')
+            else:
+                self.win_tree.move(j, 1)
+                for kk in range(depth):
+                    self.win_tree.addstr(' ')
+                    self.win_tree.addch(curses.ACS_VLINE)
+                    self.win_tree.addstr(' ')
+                self.win_tree.addstr(' ')
+                if i == n - 1:
+                    self.win_tree.addch(curses.ACS_LLCORNER)
+                elif depth > self.tree[i+1][1]:
+                    self.win_tree.addch(curses.ACS_LLCORNER)
+                else:
+                    self.win_tree.addch(curses.ACS_LTEE)
+                self.win_tree.addch(curses.ACS_HLINE)
+                self.win_tree.addstr(' ')
+            w = curses.COLS / 2 - 2
+            wd = 3 * depth + 4
+            if fullname == self.path:
+                self.win_tree.addstr(name[:w-wd-3], curses.color_pair(3))
+                child_dirs = self.__get_dirs(self.path)
+                if len(child_dirs) > 0:
+                    self.win_tree.addstr(' ')
+                    self.win_tree.addch(curses.ACS_HLINE)
+                    self.win_tree.addch(curses.ACS_RARROW)
+            else:
+                self.win_tree.addstr(name[:w-wd])
+        # scrollbar
+        if n > h:
+            nn = h * h / n
+            if nn == 0:
+                nn = 1
+            aa = self.pos / h * h
+            y0 = aa * h / n
+            if y0 < 0:
+                y0 = 0
+            elif y0 + nn > h:
+                y0 = h - nn - 1
+        else:
+            y0 = 0
+            nn = 0
+        self.win_tree.attrset(curses.color_pair(5))
+        self.win_tree.vline(y0 + 2, curses.COLS/2 - 1, curses.ACS_CKBOARD, nn)
+        if a != 0:
+            self.win_tree.vline(1, curses.COLS/2 - 1, '^', 1)
+            if nn == 1 and (y0 + 2 == 2):
+                self.win_tree.vline(3, curses.COLS/2 - 1, curses.ACS_CKBOARD, nn)
+        if n - 1 > a + h - 1:
+            self.win_tree.vline(h, curses.COLS/2 - 1, 'v', 1)
+            if nn == 1 and (y0 + 2 == h + 1):
+                self.win_tree.vline(h, curses.COLS/2 - 1, curses.ACS_CKBOARD, nn)
+        # status
+        app.win_status.erase()
+        wp = curses.COLS - 8
+        if len(self.path) > wp:
+            path = self.path[:wp/2 -1] + '~' + self.path[-wp/2:]
+        else:
+            path = self.path
+        app.win_status.addstr(' Path: %s' % path)
+        app.win_status.refresh()
+
+
+    def run(self):
+        """manage keys"""
+        
+        while 1:
+            self.show()
+            chext = 0
+            ch = self.win_tree.getch()
+
+            # to avoid extra chars input
+            if ch == 0x1B:
+                chext = 1
+                ch = self.win_tree.getch()
+                ch = self.win_tree.getch()
+
+            # cursor up
+            if ch in [ord('p'), ord('P'), curses.KEY_UP]:
+                if self.pos == 0:
+                    continue
+                if self.tree[self.pos][1] != self.tree[self.pos-1][1]:
+                    continue
+                newpos = self.pos - 1
+            # cursor down
+            elif ch in [ord('n'), ord('N'), curses.KEY_DOWN]:
+                if self.pos == len(self.tree) - 1:
+                    continue
+                if self.tree[self.pos][1] != self.tree[self.pos+1][1]:
+                    continue
+                newpos = self.pos + 1
+            # page previous
+            elif ch in [curses.KEY_PPAGE, curses.KEY_BACKSPACE,
+                        0x08, 0x10]:                         # BackSpace, Ctrl-P
+                depth = self.tree[self.pos][1] 
+                if self.pos - (curses.LINES-4) >= 0:
+                    if depth  == self.tree[self.pos - (curses.LINES-4)][1]:
+                        newpos = self.pos - (curses.LINES-4)
+                    else:
+                        newpos = self.pos
+                        while 1:
+                            if newpos - 1 < 0:
+                                break
+                            if self.tree[newpos-1][1] != depth:
+                                break
+                            newpos -= 1
+                else:
+                    newpos = self.pos
+                    while 1:
+                        if newpos - 1 < 0:
+                            break
+                        if self.tree[newpos-1][1] != depth:
+                            break
+                        newpos -= 1
+            # page next
+            elif ch in [curses.KEY_NPAGE, ord(' '), 0x0E]:   # Ctrl-N
+                depth = self.tree[self.pos][1] 
+                if self.pos + (curses.LINES-4) <= len(self.tree) - 1:
+                    if depth  == self.tree[self.pos + (curses.LINES-4)][1]:
+                        newpos = self.pos + (curses.LINES-4)
+                    else:
+                        newpos = self.pos
+                        while 1:
+                            if newpos + 1 == len(self.tree):
+                                break
+                            if self.tree[newpos+1][1] != depth:
+                                break
+                            newpos += 1
+                else:
+                    newpos = self.pos
+                    while 1:
+                        if newpos + 1 == len(self.tree):
+                            break
+                        if self.tree[newpos+1][1] != depth:
+                            break
+                        newpos += 1
+            # home
+            elif (ch in [curses.KEY_HOME, 348]) or \
+                 (chext == 1) and (ch == 72):  # home
+                newpos = 1
+            # end
+            elif (ch in [curses.KEY_END, 351]) or \
+                 (chext == 1) and (ch == 70):   # end
+                newpos = len(self.tree) - 1
+            # cursor left
+            elif ch in [curses.KEY_LEFT]:
+                if self.pos == 0:
+                    continue
+                newdepth = self.tree[self.pos][1] - 1
+                for i in range(self.pos-1, -1, -1):
+                    if self.tree[i][1] == newdepth:
+                        break
+                newpos = i
+            # cursor right
+            elif ch in [curses.KEY_RIGHT]:
+                child_dirs = self.__get_dirs(self.path)
+                if len(child_dirs) > 0:
+                    self.path = os.path.join(self.path, child_dirs[0])
+                    self.tree = self.get_tree()
+                    self.pos = self.__get_curpos()
+                continue                   
+            # enter
+            elif ch in [10, 13]:
+                return self.path
+            # quit
+            elif ch in [ord('q'), ord('Q'), curses.KEY_F10, 0x03]:  # Ctrl-C
+                return -1
+
+            # update
+            self.regenerate_tree(newpos)
+
+
+##################################################
 ##### Actions
 ##################################################
-import signal, tempfile, cPickle
+import signal, cPickle
 
 # run thread: return -100 if stopped
 def run_thread(title = 'Doing nothing', func = None, *args):
@@ -1232,21 +1672,12 @@ def run_thread(title = 'Doing nothing', func = None, *args):
     crashed. Returns nothing if all was ok, -100 if stoppped by user, or
     an error message."""
     
-    global thread_quit
-
-    def thread_quit_handler(signum, frame):
-        global thread_quit
-        thread_quit = 1
-        
-    app.win_status.erase()
-    app.win_status.addstr(0, 1, title[:curses.COLS-22])
-    app.win_status.addstr(0, curses.COLS - 21, 'Press Ctrl-C to stop')
-    app.win_status.refresh()
+    title = title[:curses.COLS-14]
+    app.show()
+    messages.win_nokey(title, title, 'Press Ctrl-C to stop')
     app.win_title.nodelay(1)
-    filename = tempfile.mktemp()
-    thread_quit = 0
+    filename = files.mktemp()
     pid = os.getpid()
-    signal.signal(signal.SIGUSR1, thread_quit_handler)
     thread_pid = os.fork()
     # error
     if thread_pid < 0:
@@ -1258,10 +1689,12 @@ def run_thread(title = 'Doing nothing', func = None, *args):
         file = open(filename, 'w')
         cPickle.dump(res, file)
         file.close()
-        os.kill(pid, signal.SIGUSR1)
         os._exit(0)
     # parent
-    while not thread_quit:
+    while 1:
+        (th_pid, status) = os.waitpid(thread_pid, os.WNOHANG)
+        if th_pid > 0:
+            break
         ch = app.win_title.getch()
         if ch == 0x03:
             os.kill(thread_pid, signal.SIGSTOP)
@@ -1276,10 +1709,7 @@ def run_thread(title = 'Doing nothing', func = None, *args):
                 return -100
             else:
                 app.show()
-                app.win_status.erase()
-                app.win_status.addstr(0, 1, title[:curses.COLS-22])
-                app.win_status.addstr(0, curses.COLS - 21, 'Press Ctrl-C to stop')
-                app.win_status.refresh()
+                messages.win_nokey(title, title + '\n\nPress Ctrl-C to stop')
                 os.kill(thread_pid, signal.SIGCONT)
         app.win_title.addstr(0, curses.COLS-2, '|')
         app.win_title.refresh()
@@ -1296,7 +1726,6 @@ def run_thread(title = 'Doing nothing', func = None, *args):
 
     # return res
     app.win_title.nodelay(0)
-    os.wait()
     file = open(filename, 'r')
     res = cPickle.load(file)
     file.close()
@@ -1304,6 +1733,7 @@ def run_thread(title = 'Doing nothing', func = None, *args):
     return res
 
 
+##### Execute actions
 # do special view file
 def do_special_view_file(panel):
     fullfilename = os.path.join(panel.path, panel.sorted[panel.file_i])
@@ -1461,6 +1891,7 @@ def do_something_on_file(panel):
         panel.refresh_panel(app.get_otherpanel())
 
 
+##### Compress / Uncompress
 # compress/uncompress file: gzip/gunzip, bzip2/bunzip2
 def do_compress_uncompress_file(comp, prog, file, fullfile):
     if prog == 'gzip':
@@ -1468,9 +1899,9 @@ def do_compress_uncompress_file(comp, prog, file, fullfile):
     else:
         ext = '.bz2'
     if len(file) > len(ext) and file[-len(ext):] == ext:
-        i, a = os.popen4('%s -d %s' % (comp, fullfile))
+        i, a = os.popen4('%s -d \"%s\"' % (comp, fullfile))
     else:
-        i, a = os.popen4('%s %s' % (comp, fullfile))
+        i, a = os.popen4('%s \"%s\"' % (comp, fullfile))
     err = a.read()
     i.close(); a.close()
     return err
@@ -1539,9 +1970,12 @@ def check_compressed_tarfile(file):
         return -1
 
 
-def do_uncompress_dir(path, comp, file):
-    i, oe = os.popen4('cd \"%s\"; %s -d %s -c | %s xf -; echo ZZENDZZ' %
-                      (path, comp, file, app.prefs.progs['tar']))
+def do_uncompress_dir(path, comp, file, destdir = '.'):
+    if destdir == '.':
+        destdir = path
+    i, oe = os.popen4('cd \"%s\"; %s -d \"%s\" -c | %s xf -; echo ZZENDZZ' %
+                      (destdir, comp, os.path.join(path, file),
+                       app.prefs.progs['tar']))
     while 1:
         buf = oe.read()[:-1]
         if buf == 'ZZENDZZ':
@@ -1603,8 +2037,8 @@ def uncompress_dir(panel):
 
 # compress directory: tar and gzip, bzip2
 def do_compress_dir(path, prog, file, ext):
-    tmpfile = tempfile.mktemp()
-    i, oe = os.popen4('cd \"%s\"; %s cf - %s | %s >%s; echo ZZENDZZ' %
+    tmpfile = files.mktemp()
+    i, oe = os.popen4('cd \"%s\"; %s cf - \"%s\" | %s >%s; echo ZZENDZZ' %
                       (path, app.prefs.progs['tar'],
                        file, app.prefs.progs[prog], tmpfile))
     while 1:
@@ -1672,6 +2106,7 @@ def compress_dir(panel, prog):
             messages.error('Error compressing \'%s\'' % file, err)
 
 
+##### 
 # show file info
 def do_show_file_info(panel):
     def show_info(panel, file):
@@ -1685,14 +2120,18 @@ def do_show_file_info(panel):
         user = os.environ['USER']
         username = files.get_user_fullname(user)
         so, host, ver, tmp, arch = os.uname()
-        buf.append(('%s v%s executed by %s' % (PROGNAME, VERSION, username), 5))
+        buf.append(('%s v%s executed by %s' % (LFM_NAME, VERSION, username), 5))
         buf.append(('<%s@%s> on a %s %s [%s]' % (user, host, so, ver, arch), 5))
         buf.append(('', 2))
         fileinfo = os.popen('file \"%s\"' % \
                             fullfilename).read().split(':')[1].strip()
         buf.append(('%s: %s (%s)' % (files.FILETYPES[file_data[0]][1], file,
                                      fileinfo), 6))
-        buf.append(('Path: %s' % panel.path[:curses.COLS-8], 6))
+        if not panel.vfs:
+            path = panel.path
+        else:
+            path = vfs_join(panel) + ' [%s]' % panel.base
+        buf.append(('Path: %s' % path[-(curses.COLS-8):], 6))
         buf.append(('Size: %s bytes' % file_data[files.FT_SIZE], 6))
         buf.append(('Mode: %s (%4.4o)' % \
                     (files.perms2str(file_data[files.FT_PERMS]),
@@ -1802,15 +2241,14 @@ def findgrep(panel):
     while not find_quit:
         cmd, par = messages.FindfilesWin(m, par).run()
         if par:
-            par2 = par.split(':')
-            if len(par2) == 2:
+            if pat:
                 try:
-                    line = int(par2[0])
+                    line = int(par.split(':')[0])
                 except ValueError:
                     line = 0
                     f = os.path.join(path, par)
                 else:
-                    f = os.path.join(path, par2[1])
+                    f = os.path.join(path, par[par.find(':')+1:])
             else:
                 line = 0
                 f = os.path.join(path, par)
@@ -1821,13 +2259,26 @@ def findgrep(panel):
                 todir = os.path.dirname(f)
                 tofile = os.path.basename(f)
         if cmd == 0:             # goto file
+            vfs, base, vbase = panel.vfs, panel.base, panel.vbase
             panel.init_dir(todir)
+            panel.vfs, panel.base, panel.vbase = vfs, base, vbase
             if tofile:
                 panel.file_i = panel.sorted.index(tofile)
             panel.fix_limits()
             find_quit = 1
-        elif cmd == 1:
-            messages.notyet('Panelize')
+        elif cmd == 1:           # panelize
+            fs = []
+            for f in m:
+                if pat:
+                    f = f[f.find(':')+1:]
+                try:
+                    fs.index(f)
+                except ValueError:
+                    fs.append(f)
+                else:
+                    continue
+            vfs_pan_init(panel, fs)
+            find_quit = 1
         elif cmd == 2:           # view
             if tofile:
                 curses.curs_set(0)
@@ -1922,6 +2373,220 @@ def do_show_fs_info():
     pyview.InternalView('Show filesystems info', buf).run()
 
 
+##### VFS
+# initialize vfs stuff
+def vfs_init(panel, filename, vfstype):
+    """initiliaze vfs stuff"""
+
+    # create temp. dir
+    tempdir = files.mktemp()
+    try:
+        os.mkdir(tempdir)
+    except (IOError, os.error), (errno, strerror):
+        messages.error('Can\'t create vfs for \'%s\'' % filename,
+                       '%s (%s)' % (strerror, errno))
+        return
+    # uncompress
+    if app.prefs.progs['tar'] == '':
+        messages.error('Uncompress directory', 'No tar program found in path')
+        return
+    err = run_thread('Creating vfs for \'%s\'' % filename, do_uncompress_dir,
+                     panel.path, vfstype, filename, tempdir)
+    if err and err != -100:
+        messages.error('Error uncompressing \'%s\'' % file, err)
+        return
+    # update vfs vars
+    vpath = panel.path
+    panel.init_dir(tempdir)
+    panel.fix_limits()
+    panel.vfs = vfstype
+    panel.base = tempdir
+    panel.vbase = os.path.join(vpath, filename) + '#vfs'
+    # refresh the other panel
+    panel.refresh_panel(app.get_otherpanel())
+
+
+# copy vfs
+def vfs_copy(panel_org, panel_new):
+    """copy vfs"""
+
+    # create temp. dir
+    tempdir = files.mktemp()
+    try:
+        os.mkdir(tempdir)
+    except (IOError, os.error), (errno, strerror):
+        messages.error('Can\'t create vfs for \'%s\'' % filename,
+                       '%s (%s)' % (strerror, errno))
+        return
+    # copy contents
+    dir_src = panel_org.base
+    for f in glob(os.path.join(dir_src, '*')):
+        f = os.path.basename(f)
+        try:
+            files.do_copy(os.path.join(dir_src, f), os.path.join(tempdir, f))
+        except (IOError, os.error), (errno, strerror):
+            app.show()
+            messages.error('Error regenerating vfs file',
+                           '%s (%s)' % (strerror, errno))
+    # init vars
+    panel_new.base = tempdir
+    panel_new.vfs = panel_org.vfs
+    panel_new.vbase = panel_org.vbase
+
+
+# exit from vfs, clean all
+def vfs_exit(panel):
+    """exit from vfs, clean all"""
+
+    err = run_thread('Regenerating vfs file', vfs_regenerate_file,
+                     panel)
+    if err and err != -100:
+        app.show()
+        messages.error('Error regenerating vfs file', err)
+    files.do_delete(panel.base)
+    panel.refresh_panel(app.get_otherpanel())
+    panel.refresh_panel(panel)
+
+
+# regenerate vfs file
+def vfs_regenerate_file(panel):
+    """regenerate vfs file: compress new file"""
+
+    if panel.vfs == 'pan':
+        return vfs_pan_regenerate(panel)
+    # check if can regenerate vfs file
+    vfs_file = panel.vbase.replace('#vfs', '')
+    i, oe = os.popen4('touch ' + vfs_file, 'r')
+    out = oe.read()
+    i.close(), oe.close()
+    if out:
+        return ''.join(out.split(':')[1:])[1:]
+    # compress file
+    prog = os.path.basename(panel.vfs)
+    tmpfile = files.mktemp()
+    i, oe = os.popen4('cd \"%s\"; %s cf - %s | %s >%s; echo ZZENDZZ' %
+                      (panel.base, app.prefs.progs['tar'],
+                       '*', app.prefs.progs[prog], tmpfile))
+    while 1:
+        buf = oe.read()[:-1]
+        if buf == 'ZZENDZZ':
+            break
+        else:
+            i.close(); oe.close()
+            buf = buf.replace('ZZENDZZ', '')
+            return (buf, '')
+        i.close(); oe.close()
+    # copy file
+    if prog == 'gzip':
+        ext = 'gz'
+    else:
+        ext = 'bz2'
+    try:
+        files.do_copy(tmpfile, vfs_file)
+    except (IOError, os.error), (errno, strerror):
+        os.unlink(tmpfile)
+        return '%s (%s)' % (strerror, errno)
+    os.unlink(tmpfile)
+
+
+# vfs path join
+def vfs_join(panel):
+    if panel.base == panel.path:
+        return panel.vbase
+    else:
+        return panel.vbase + panel.path.replace(panel.base, '')
+
+
+# initialize panelize vfs stuff
+def vfs_pan_init(panel, fs):
+    """initiliaze panelize vfs stuff"""
+
+    vfstype = 'pan'
+    # create temp. dir
+    tempdir = files.mktemp()
+    try:
+        os.mkdir(tempdir)
+    except (IOError, os.error), (errno, strerror):
+        messages.error('Can\'t create vfs for \'%s\'' % filename,
+                       '%s (%s)' % (strerror, errno))
+        return
+    # copy files
+    for f in fs:
+        f_orig = os.path.join(panel.path, f)
+        f_dest = os.path.join(tempdir, f)
+        d = os.path.join(tempdir, os.path.dirname(f))
+        try:
+            os.makedirs(d)
+        except (IOError, os.error), (errno, strerror):
+            pass
+        try:
+            if os.path.isfile(f_orig):
+                files.do_copy(f_orig, f_dest)
+            elif os.path.isdir(f_orig):
+                os.mkdir(f_dest)
+        except (IOError, os.error), (errno, strerror):
+            messages.error('Can\'t create vfs for \'%s\'' % f,
+                           '%s (%s)' % (strerror, errno))
+    # update vfs vars
+    vpath = panel.path
+    panel.init_dir(tempdir)
+    panel.fix_limits()
+    panel.vfs = vfstype
+    panel.base = tempdir
+    panel.vbase = vpath + '#vfs'
+    
+
+# copy pan vfs
+def vfs_pan_copy(panel_org, panel_new):
+    """copy vfs"""
+
+    # create temp. dir
+    tempdir = files.mktemp()
+    try:
+        os.mkdir(tempdir)
+    except (IOError, os.error), (errno, strerror):
+        messages.error('Can\'t create vfs for \'%s\'' % filename,
+                       '%s (%s)' % (strerror, errno))
+        return
+    # copy contents
+    dir_src = panel_org.base
+    for f in glob(os.path.join(dir_src, '*')):
+        f = os.path.basename(f)
+        try:
+            files.do_copy(os.path.join(dir_src, f), os.path.join(tempdir, f))
+        except (IOError, os.error), (errno, strerror):
+            app.show()
+            messages.error('Error regenerating vfs file',
+                           '%s (%s)' % (strerror, errno))
+    # init vars
+    panel_new.base = tempdir
+    panel_new.vfs = panel_org.vfs
+    panel_new.vbase = panel_org.vbase
+
+
+# regenerate vfs pan file
+def vfs_pan_regenerate(panel):
+    """regenerate vfs pan file: copy files"""
+
+    dir_src = panel.path
+    dir_dest = panel.vbase.replace('#vfs', '')
+    # check if can copy files
+    i, oe = os.popen4('touch ' + dir_dest, 'r')
+    out = oe.read()
+    i.close(), oe.close()
+    if out:
+        return ''.join(out.split(':')[1:])[1:]
+    # copy files
+    for f in glob(os.path.join(dir_src, '*')):
+        f = os.path.basename(f)
+        try:
+            files.do_copy(os.path.join(dir_src, f), os.path.join(dir_dest, f))
+        except (IOError, os.error), (errno, strerror):
+            app.show()
+            messages.error('Error regenerating vfs file',
+                           '%s (%s)' % (strerror, errno))
+
+
 ##################################################
 ##### Wrappers
 ##################################################
@@ -1981,7 +2646,7 @@ Options:
     pathtodir1\t\tdirectory
     pathtofile\t\tfile to view/edit
     pathtodir2\t\tdirectory to show in panel 2\
-""" % (PROGNAME, VERSION, DATE, AUTHOR, prog)
+""" % (LFM_NAME, VERSION, DATE, AUTHOR, prog)
 
 
 def main(win, path, npanels):
@@ -1993,19 +2658,20 @@ def main(win, path, npanels):
     return app.run()
 
     
-if __name__ == '__main__':
+def LfmApp(sysargs):
     import getopt
 
     # defaults
+    DEBUG = 0
     npanels = 2
     paths = []
    
     # args
     try:
-        opts, args = getopt.getopt(sys.argv[1:], '12dh',
+        opts, args = getopt.getopt(sysargs[1:], '12dh',
                                    ['', '', 'debug', 'help'])
     except getopt.GetoptError:
-        usage(sys.argv[0], 'Bad argument(s)')
+        usage(sysargs[0], 'Bad argument(s)')
         sys.exit(-1)
     for o, a in opts:
         if o == '-1':
@@ -2015,7 +2681,7 @@ if __name__ == '__main__':
         if o in ('-d', '--debug'):
             DEBUG = 1
         if o in ('-h', '--help'):
-            usage(sys.argv[0])
+            usage(sysargs[0])
             sys.exit(2)
 
     if len(args) == 0:
@@ -2028,23 +2694,23 @@ if __name__ == '__main__':
                 # edit/view file
                 pass
             else:
-                usage(sys.argv[0], '<%s> is not a file or directory' % args[0])
+                usage(sysargs[0], '<%s> is not a file or directory' % args[0])
                 sys.exit(-1)
         paths.append(buf)
         paths.append(os.path.abspath('.'))
     elif len(args) == 2:
         buf = os.path.abspath(args[0])
         if not os.path.isdir(buf):
-            usage(sys.argv[0], '<%s> is not a file or directory' % args[0])
+            usage(sysargs[0], '<%s> is not a file or directory' % args[0])
             sys.exit(-1)
         paths.append(buf)
         buf = os.path.abspath(args[1])
         if not os.path.isdir(buf):
-            usage(sys.argv[0], '<%s> is not a file or directory' % args[1])
+            usage(sysargs[0], '<%s> is not a file or directory' % args[1])
             sys.exit(-1)
         paths.append(buf)
     else:
-        usage(sys.argv[0], 'Incorrect number of arguments')
+        usage(sysargs[0], 'Incorrect number of arguments')
         sys.exit(-1)
 
     DEBUGFILE = "./lfm-log.%d" % os.getpid()
@@ -2068,3 +2734,7 @@ if __name__ == '__main__':
         f = open('/tmp/lfm-%s.path' % (os.getppid()), 'w')
         f.write(path)
         f.close()
+
+
+if __name__ == '__main__':
+    LfmApp(sys.argv)

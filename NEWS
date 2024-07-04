@@ -1,3 +1,33 @@
+Version 0.8 ("Close to Paradise") - 2002/03/04:
+
+  + Implemented VFS feature to enter into .tar.gz and .tar.bz2 files
+  + Panelize vfs option in find/grep implemented
+  + Tree panel implemented
+  + 'lfm' and 'pyview' are simple scripts now, not just a copy of the .py files.
+    __init__.py contains global variables now
+  + A new message window is used to show  work in progress, in place of a
+    message in status bar. 'run_thread' function has been cleaned too
+  + Copy / move features now use my own function to walk trees, instead of
+    'shutil.copytree' which originates some problems and bugs
+  + In ChangePermissions window, the cursor movement is circular now
+  + Change copyright date to years 2001-2
+  + I don't need a crypt / uncrypt feature, so eliminated from TODO list
+  + Many bug fixes and functions rewrites. See ChangeLog for complete list
+      - lfm:
+          * if panel2 shows 'a' file in panel, and in panel1 'a' is moved or
+            deleted, lfm crashes
+          * after moving a file cursor goes to next directory as deletion does
+          * catching an exception after not been able to copy => it crashed
+            when trying to delete copied files
+          * "messages.SelectItem, messages.FindfilesWin, messages.MenuWin,
+            messages.ChangePerms: upperleft corner disappears"
+          * findgrep: fix bug: if selected file has a ':' in name
+      - pyview: 
+          * changing 'addch' by 'addstr' shows individual chars >= 0xA0 (meta
+            chars) correctly, neither in reversed video or as 2 chars
+          * "if wrap mode => fix prev/next page & up/down cursor". Now 
+            they move to screen lines, not to physical lines
+
 Version 0.7 ("Hello Darling, I'm here") - 2001/11/30:
 
   + 'pyview', a new pager/viewer for use with lfm or standalone,

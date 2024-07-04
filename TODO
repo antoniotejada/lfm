@@ -1,57 +1,27 @@
 General:
 ========
-+ copy, move, delete (?): walk dirs => bug #1
-
-+ Enter: if .tar.gz / .tar.bz2 => vfs
-
-+ find/grep: panelize => vfs
-
-+ F2, f: file menu
-	y - encrypt/decrypt file
-
-+ F9: Menu
-	t - tree
-
-+ Ctrl-t: show tree
-
-+ preferences: edit, load/save historic
++ what happens with integer division / true division after Python 3.0???
+  lfm and pyview crash when 'from __future__ import division'
 
 
 Bugs:
 =====
-+ Overwrite dirs when moving or copying => walk dirs
-  f.e.    panel1:   dir/a      panel2:   dir/b
-                       /b                   /c
-  Now when moving dir from panel1 to panel2, the 'dir' destination
-  is overwritten, so 'c'-file is lost. This is not the desired
-  behaviour
-
-+ pyview.py: if wrap mode => fix prev/next page & up/down cursor
-
-+ if panel2 shows 'a' directory and in panel1 'a' is deleted, lfm crashes
-
-+ pyview.py: chars >= 0xA0 are showed in reversed video on Linux
++ vfs: - .tar.gz inside a .tar.gz file (vfs in vfs)
+       - in case of 'panelize' vfs type (after find/grep), deleted / moved 
+         files are not deleted / moved in real path
+       - tmpdir are showed in the copy/move/... dialogs or when view/edit/...
+         a file, instead of vfs dir (this is just a estetic issue)
 
 + lfm.run_thread: sometimes some processes remain as zombies when stopped 
                   by user or because of an error
 
-+ pyview.py.InternalView: cursor appears after keystroke regards
-  curses.curs_set(0)
-
-+ messages.SelectItem, messages.FindfilesWin, messages.MenuWin,
-  messages.ChangePerms: upperleft corner disappears
++ lfm.Tree, pyview.InternalView: cursor appears after keystroke regards
+  curses.curs_set(0): bug in ncurses?
 
 + lfm crashes in X when resizing terminal => handle SIGWINCH signal
 
 + keys in Solaris terminal: look at Oleg Broytmann's mail in c.l.p
 on 10 Jul 2001 12:11:39 +0400
-
-
-Some vague future ideas:
-========================
-+ look at distutils.file_util, distutils.dir_util, distutil.filelist, ...
-
-+ what happens with integer division???
 
 
 Hacks:
@@ -67,11 +37,8 @@ Hacks:
 + Added a '0x1B' char capture to avoid extra input with HOME and END keys
   in xterm and gnome-terminal (rxvt worked ok)
 
-+ Completition code is a mess: we need to know panels path, but inside
-  files.py and messages.py files we don't have access to 'app'
-
 + We need to use a shell hack to change the directory after lfm exists
 
 
 ============================================================================
-Last update:	Sunday November 25, 2001 - 02:26:22 CEST
+Last update:	Monday March 4rd, 2002 - 14:14:26 CEST

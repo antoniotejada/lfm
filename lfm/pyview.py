@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2001  Iñigo Serna
+# Copyright (C) 2001-2  Iñigo Serna
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 
 
 """
-Copyright (C) 2001, Iñigo Serna <inigoserna@terra.es>.
+Copyright (C) 2001-2, Iñigo Serna <inigoserna@terra.es>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -31,65 +31,9 @@ file that comes with this package. There is NO WARRANTY.
 import os, os.path, sys
 import curses, curses.ascii
 
-try:
-    from lfm import messages
-    #import messages
-except ImportError:
-    pass
+from __init__ import *
+import messages
 
-
-PROGNAME = 'pyview'
-VERSION = '0.3'
-DATE = '2001'
-AUTHOR = 'Iñigo Serna'
-
-DEBUG = 0
-
-
-##################################################
-##################################################
-(MODE_TEXT, MODE_HEX) = (0, 1)
-PYVIEW_README = """
-    %s is a pager (viewer) written in Python.
-Though  initially it was written to be used with 'lfm',
-it can be used standalone too.
-
-This software has been realised under the GPL License,
-see the COPYING file that comes with this package.
-There is NO WARRANTY.
-
-Keys:
-=====
-+ Movement
-    - cursor_up, p, P
-    - cursor_down, n, N
-    - previous page, backspace, Ctrl-P
-    - next page, space, Ctrl-N
-    - home: first line
-    - end: last line
-    - cursor_left
-    - cursor_right
-
-+ Actions
-    - h, H, F1: help
-    - w, W, F2: toggle un / wrap (only in text mode)
-    - m, M, F4: toggle text / hex mode
-    - g, G, F5: goto line / byte
-    - /: find
-    - F6: find previous or find
-    - F7: find next or find
-    - q, Q, x, X, F3, F10: exit
-
-Goto Line / Byte
-================
-    Enter the line number / byte offset you want to show.
-If number / byte is preceded by '0x' it is interpreted as hexadecimal.
-You can scroll relative lines using '+' or '-' char.
-
-Find
-====
-    Type the string to search. It ignores case.
-""" % PROGNAME
 
 ##################################################
 ##### Internal View
@@ -224,7 +168,7 @@ class FileView:
         self.pos = 0
         self.col = 0
         try:
-            self.__get_file_info(file, mode)
+            self.__get_file_info(file)
         except OSError:
             sys.exit(-1)
         if self.nbytes == 0:
@@ -246,16 +190,16 @@ class FileView:
             pass
         self.pattern = ''
         self.matches = []
-        i, o, e = os.popen3('which grep')
-        r = o.read()
-        o.close(); i.close(); e.close()
+        i, a = os.popen4('which grep')
+        r = a.read()
+        i.close(); a.close()
         if r:
             self.grep = r.strip()
         else:
             self.grep = ''
 
 
-    def __get_file_info(self, file, mode):
+    def __get_file_info(self, file):
         """get size and number of lines of the file"""
         
         self.nbytes = os.path.getsize(file)
@@ -325,13 +269,36 @@ class FileView:
     
     def __get_lines_text(self):
         lines = []
-        i = 0
-        while i < curses.LINES - 2:
+        for i in range(curses.LINES - 2):
             lines.append(self.fd.readline()[:-1].replace('\t', ' ' * 4))
-            i += 1
         self.fd.seek(self.pos)
         self.col_max = max(map(len, lines))
         return lines
+
+
+    def __get_prev_lines_text(self):
+        lines = []
+        i = 0
+        for i in range(curses.LINES - 2):
+            line_i = self.line - 1 - i
+            if line_i < 0:
+                break
+            self.fd.seek(self.lines_pos[line_i])
+            lines.append(self.fd.readline()[:-1].replace('\t', ' ' * 4))
+        self.fd.seek(self.pos)
+        return lines
+
+
+    def __get_line_length(self):
+        line = self.fd.readline()[:-1].replace('\t', ' ' * 4)
+        self.fd.seek(self.pos)
+        return len(line)
+
+
+    def __get_1line(self):
+        line = self.fd.readline()[:-1].replace('\t', ' ' * 4)
+        self.fd.seek(self.pos)
+        return line
 
 
     def show_chr(self, w, c):
@@ -340,7 +307,7 @@ class FileView:
         elif curses.ascii.isascii(c):
             w.addch(curses.ascii.ascii(c))
         elif curses.ascii.ismeta(c):
-            w.addch(curses.ascii.alt(c))
+                w.addstr(c)
         else:
             w.addch(ord('.'))
 
@@ -355,82 +322,86 @@ class FileView:
             elif curses.ascii.isascii(c):
                 w.addch(0, i, curses.ascii.ascii(c))
             elif curses.ascii.ismeta(c):
-                w.addch(0, i, curses.ascii.alt(c))
+                w.addstr(0, i, c)
             else:
                 w.addch(0, i, ord('.'))          
 
 
-    def show_text(self):
+    def show_text_nowrap(self):
         lines = self.__get_lines_text()
         self.win_file.refresh()
-        if not self.wrap:
-            y = 0
-            for l in lines:
+        y = 0
+        for l in lines:
+            lwin = curses.newpad(1, curses.COLS + 1)
+            lwin.erase()
+            l = l[self.col:self.col + curses.COLS]
+            if len(l) == curses.COLS:
+                l = l[:curses.COLS-1]
+                self.show_str(lwin, l)
+                lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS-1)
+                lwin2 = curses.newpad(1, 2)
+                lwin2.erase()
+                attr = curses.color_pair(2) | curses.A_BOLD
+                lwin2.addch('>', attr)
+                lwin2.refresh(0, 0, y + 1, curses.COLS-1, y + 1, curses.COLS-1)
+                del(lwin2)
+            else:
+                self.show_str(lwin, l)
+                lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS)
+            del(lwin)
+            y += 1
+        self.win_file.refresh()
+
+        
+    def show_text_wrap(self):
+        lines = self.__get_lines_text()
+        lines[0] = lines[0][self.col:]   # show remaining chars of 1st line
+        self.win_file.refresh()
+        y = 0
+        for l in lines:
+            if y > curses.LINES - 2:
+                break
+            if len(l) <= curses.COLS:
                 lwin = curses.newpad(1, curses.COLS + 1)
                 lwin.erase()
-                l = l[self.col:self.col + curses.COLS]
-                if len(l) == curses.COLS:
-                    l = l[:curses.COLS-1]
+                if len(l) != curses.COLS:
                     self.show_str(lwin, l)
+                    lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS)
+                else:
+                    self.show_str(lwin, l[:-1])
                     lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS-1)
                     lwin2 = curses.newpad(1, 2)
                     lwin2.erase()
-                    attr = curses.color_pair(2) | curses.A_BOLD
-                    lwin2.addch('>', attr)
-                    lwin2.refresh(0, 0, y + 1, curses.COLS-1, y + 1, curses.COLS-1)
+                    self.show_chr(lwin2, l[-1])
+                    lwin2.refresh(0, 0, y + 1, curses.COLS-1,
+                                  y + 1, curses.COLS-1)
                     del(lwin2)
-                else:
-                    self.show_str(lwin, l)
-                    lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS)
+
                 del(lwin)
                 y += 1
-            self.win_file.refresh()
-        else:
-            y = 0
-            for l in lines:
-                if y > curses.LINES - 2:
-                    break
-                if len(l) <= curses.COLS:
+            else:
+                while len(l) > 0:
                     lwin = curses.newpad(1, curses.COLS + 1)
                     lwin.erase()
-                    if len(l) != curses.COLS:
-                        self.show_str(lwin, l)
-                        lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS)
-                    else:
-                        self.show_str(lwin, l[:-1])
+                    l2 = l[:curses.COLS]
+                    if len(l2) == curses.COLS:
+                        self.show_str(lwin, l2[:-1])
                         lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS-1)
                         lwin2 = curses.newpad(1, 2)
                         lwin2.erase()
-                        self.show_chr(lwin2, l[-1])
+                        self.show_chr(lwin2, l2[-1:])
                         lwin2.refresh(0, 0, y + 1, curses.COLS-1,
                                       y + 1, curses.COLS-1)
                         del(lwin2)
-
+                    else:
+                        self.show_str(lwin, l2)
+                        lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS)
                     del(lwin)
                     y += 1
-                else:
-                    while len(l) > 0:
-                        lwin = curses.newpad(1, curses.COLS + 1)
-                        lwin.erase()
-                        l2 = l[:curses.COLS]
-                        if len(l2) == curses.COLS:
-                            self.show_str(lwin, l2[:-1])
-                            lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS-1)
-                            lwin2 = curses.newpad(1, 2)
-                            lwin2.erase()
-                            self.show_chr(lwin2, l2[-1:])
-                            lwin2.refresh(0, 0, y + 1, curses.COLS-1,
-                                          y + 1, curses.COLS-1)
-                            del(lwin2)
-                        else:
-                            self.show_str(lwin, l2)
-                            lwin.refresh(0, 0, y + 1, 0, y + 1, curses.COLS)
-                        del(lwin)
-                        y += 1
-                        if y > curses.LINES - 2:
-                            break
-                        l = l[curses.COLS:]
-            self.win_file.refresh()
+                    if y > curses.LINES - 2:
+                        break
+                    l = l[curses.COLS:]
+        self.win_file.refresh()
 
 
     def __move_hex(self, lines):
@@ -493,7 +464,7 @@ class FileView:
                 elif curses.ascii.isascii(c):
                     lwin.addch(curses.ascii.ascii(c))
                 elif curses.ascii.ismeta(c):
-                    lwin.addch(curses.ascii.alt(c))
+                     lwin.addstr(c)
                 else:
                     lwin.addch(ord('.'))
 
@@ -509,8 +480,11 @@ class FileView:
         self.win_status.erase()
 
         # title
-        self.win_title.addstr('File: %s' % os.path.basename(self.file))
-        if self.col != 0:
+        title = os.path.basename(self.file)
+        if len(title) > curses.COLS-51:
+            title = title[:curses.COLS-57] + '~' + title[-5:]
+        self.win_title.addstr('File: %s' % title)
+        if self.col != 0 or self.wrap:
             self.win_title.addstr(0, curses.COLS / 2 - 14, 'Col: %d' % self.col)
         buf = 'Bytes: %d/%d' % (self.pos, self.nbytes)
         self.win_title.addstr(0, curses.COLS / 2 - 4, buf)
@@ -521,7 +495,10 @@ class FileView:
 
         # file
         if self.mode == MODE_TEXT:
-            self.show_text()
+            if self.wrap:
+                self.show_text_wrap()
+            else:
+                self.show_text_nowrap()
         else:
             self.show_hex()
 
@@ -636,14 +613,28 @@ class FileView:
             # cursor up
             if ch in [ord('p'), ord('P'), curses.KEY_UP]:
                 if self.mode == MODE_TEXT:
-                    self.__move_lines(-1)
+                    if self.wrap:
+                        if self.col == 0:
+                            if self.line > 0:
+                                self.__move_lines(-1)
+                                self.col = self.__get_line_length() / curses.COLS * curses.COLS
+                        else:
+                            self.col -= curses.COLS
+                    else:
+                        self.__move_lines(-1)
                 else:
                     self.__move_hex(-1)
                 self.show()
             # cursor down
             elif ch in [ord('n'), ord('N'), curses.KEY_DOWN]:
                 if self.mode == MODE_TEXT:
-                    self.__move_lines(1)
+                    if self.wrap:
+                        self.col += curses.COLS
+                        if self.col >= self.__get_line_length():
+                            self.col = 0
+                            self.__move_lines(1)
+                    else:
+                        self.__move_lines(1)
                 else:
                     self.__move_hex(1)
                 self.show()
@@ -651,14 +642,83 @@ class FileView:
             elif ch in [curses.KEY_PPAGE, curses.KEY_BACKSPACE,
                         0x08, 0x10]:                         # BackSpace, Ctrl-P
                 if self.mode == MODE_TEXT:
-                    self.__move_lines(-(curses.LINES-2))
+                    if self.wrap:
+                        lines = self.__get_prev_lines_text()
+                        if self.col:     # if we aren't at 1st char of line
+                            line0 = self.__get_1line()[:self.col]
+                            lines.insert(0, line0)
+                        else:
+                            line0 = ''
+                        y = curses.LINES - 2
+                        for i in range(len(lines)):
+                            y -= 1
+                            dy = 0
+                            if y < 0:
+                                break
+                            exit1 = 0
+                            len2 = len(lines[i])
+                            lenz = len2
+                            while len2 > curses.COLS:
+                                dy += 1
+                                y -= 1
+                                if y < 0:
+                                    i += 1
+                                    dy = lenz / curses.COLS + 1 - dy
+                                    exit1 = 1
+                                    break
+                                len2 -= curses.COLS
+                            if exit1:
+                                break
+                        else:
+                            i += 1
+                        if line0:
+                            i -= 1
+                        if y < 0:
+                            self.__move_lines(-i)
+                            if i == 0:
+                                self.col = (dy - 1) * curses.COLS
+                            else:
+                                self.col = dy * curses.COLS
+                        else:
+                            self.__move_lines(-(curses.LINES-2))
+                            self.col = 0
+                    else:
+                        self.__move_lines(-(curses.LINES-2))
                 else:
                     self.__move_hex(-(curses.LINES-2))
                 self.show()
             # page next
             elif ch in [curses.KEY_NPAGE, ord(' '), 0x0E]:   # Ctrl-N
                 if self.mode == MODE_TEXT:
-                    self.__move_lines(curses.LINES-2)
+                    if self.wrap:
+                        lines = self.__get_lines_text()
+                        lines[0] = lines[0][self.col:]
+                        y = 0
+                        for i in range(len(lines)):
+                            y += 1
+                            dy = 0
+                            if y > curses.LINES - 2:
+                                break
+                            exit1 = 0
+                            len2 = len(lines[i])
+                            while len2 > curses.COLS:
+                                dy += 1
+                                y += 1
+                                if y > curses.LINES - 2:
+                                    exit1 = 1
+                                    break
+                                len2 -= curses.COLS
+                            if exit1:
+                                break
+                        else:
+                            i += 1
+                        self.__move_lines(i)
+                        if i == 0:
+                            self.col += dy * curses.COLS
+                        else:
+                            self.col = dy * curses.COLS
+                    else:
+                        self.__move_lines(curses.LINES-2)
                 else:
                     self.__move_hex(curses.LINES-2)
                 self.show()
@@ -669,6 +729,7 @@ class FileView:
                     self.__move_lines(-self.nlines)
                 else:
                     self.__move_hex(-self.nbytes)                    
+                self.col = 0
                 self.show()
             # end
             elif (ch in [curses.KEY_END, 351]) or \
@@ -677,22 +738,19 @@ class FileView:
                     self.__move_lines(self.nlines)
                 else:
                     self.__move_hex(self.nbytes)
+                self.col = 0
                 self.show()
             
             # cursor left
             elif ch in [curses.KEY_LEFT]:
-                if self.mode == MODE_HEX:
-                    continue
-                if self.wrap:
+                if self.mode == MODE_HEX or self.wrap:
                     continue
                 if self.col > 9:
                     self.col -= 10
                     self.show()
             # cursor right
             elif ch in [curses.KEY_RIGHT]:
-                if self.mode == MODE_HEX:
-                    continue
-                if self.wrap:
+                if self.mode == MODE_HEX or self.wrap:
                     continue
                 if self.col + curses.COLS < self.col_max + 2:
                     self.col += 10
@@ -706,6 +764,7 @@ class FileView:
                     self.wrap = 0
                 else:
                     self.wrap = 1
+                self.col = 0
                 self.show()
 
             # text / hexadecimal mode
@@ -794,11 +853,11 @@ class FileView:
             elif ch in [ord('h'), ord('H'), curses.KEY_F1]:
                 buf = [('', 2)]
                 buf.append(('%s v%s (C) %s, by %s' % \
-                            (PROGNAME, VERSION, DATE, AUTHOR), 5))
+                            (PYVIEW_NAME, VERSION, DATE, AUTHOR), 5))
                 text = PYVIEW_README.split('\n')
                 for l in text:
                     buf.append((l, 6))
-                InternalView('Help for %s' % PROGNAME, buf).run()
+                InternalView('Help for %s' % PYVIEW_NAME, buf).run()
                 self.show()
 
             # quit
@@ -833,7 +892,7 @@ Options:
     +n\t\t\tstart at line (text mode) or byte (hex mode),
     \t\t\tif n starts with '0x' is considered hexadecimal
     pathtofile\t\tfile to view
-""" % (PROGNAME, VERSION, DATE, AUTHOR, prog)
+""" % (PYVIEW_NAME, VERSION, DATE, AUTHOR, prog)
 
 
 def main(win, file, line, mode):
@@ -843,26 +902,27 @@ def main(win, file, line, mode):
         sys.exit(-1)
     return app.run()
 
-    
-if __name__ == '__main__':
+
+def PyView(sysargs):
     import time, getopt
 
     # defaults
+    DEBUG = 0
     line = 0
     mode = MODE_TEXT
     
     # args
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'dhm:',
+        opts, args = getopt.getopt(sysargs[1:], 'dhm:',
                                    ['debug', 'help', 'mode='])
     except getopt.GetoptError:
-        usage(sys.argv[0], 'Bad argument(s)')
+        usage(sysargs[0], 'Bad argument(s)')
         sys.exit(-1)
     for o, a in opts:
         if o in ('-d', '--debug'):
             DEBUG = 1
         elif o in ('-h', '--help'):
-            usage(sys.argv[0])
+            usage(sysargs[0])
             sys.exit(2)
         elif o in ('-m', '--mode'):
             if a == 'text':
@@ -870,18 +930,18 @@ if __name__ == '__main__':
             elif a == 'hex':
                 mode = MODE_HEX
             else:
-                usage(sys.argv[0], '<%s> is not a valid mode' % a)
+                usage(sysargs[0], '<%s> is not a valid mode' % a)
                 sys.exit(-1)
 
     if len(args) == 0:
-        usage(sys.argv[0], 'File is missing')
+        usage(sysargs[0], 'File is missing')
         sys.exit(-1)
     elif len(args) == 1:
         if args[0][0] == '+':
-            usage(sys.argv[0], 'File is missing')
+            usage(sysargs[0], 'File is missing')
             sys.exit(-1)
         elif not os.path.isfile(args[0]):
-            usage(sys.argv[0], '<%s> is not a valid file' % args[0])
+            usage(sysargs[0], '<%s> is not a valid file' % args[0])
             sys.exit(-1)
         file = args[0]
     elif len(args) == 2:
@@ -892,7 +952,8 @@ if __name__ == '__main__':
             line = args[1][1:]
             file = args[0]
         else:
-            usage(sys.argv[0], 'Bad argument(s)')
+            print 'HERE'
+            usage(sysargs[0], 'Bad argument(s)')
             sys.exit(-1)
         try:
             if line[:2] == '0x':
@@ -900,13 +961,13 @@ if __name__ == '__main__':
             else:
                 line = int(line)
         except ValueError:
-            usage(sys.argv[0], '<%s> is not a valid line number' % line)
+            usage(sysargs[0], '<%s> is not a valid line number' % line)
             sys.exit(-1)
         if not os.path.isfile(file):
-            usage(sys.argv[0], '<%s> is not a valid file' % file)            
+            usage(syssarg[0], '<%s> is not a valid file' % file)            
             sys.exit(-1)
     else:
-        usage(sys.argv[0], 'Incorrect number of arguments')
+        usage(sysargs[0], 'Incorrect number of arguments')
         sys.exit(-1)
 
     DEBUGFILE = "./pyview-log.%d" % os.getpid()
@@ -927,3 +988,6 @@ if __name__ == '__main__':
     sys.stdout = sys.__stdout__
     sys.stdout = sys.__stderr__
 
+
+if __name__ == '__main__':
+    PyView(sys.argv)

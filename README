@@ -1,7 +1,7 @@
 lfm - Last File Manager
 =======================
 
-(C) 2001, Iñigo Serna <inigoserna@terra.es>
+(C) 2001-2, Iñigo Serna <inigoserna@terra.es>
 
 This software has been realised under the GPL License, see the COPYING
 file that comes with this package. There is NO WARRANTY.
@@ -13,36 +13,38 @@ Introduction:
 application for UNIX console.
 
 From version 0.6 and higher lfm package also contains 'pyview', a
-simple python viewer to be used with lfm. Read README.pyview for 
-more info on it.
+simple text/hex file viewer to be used with lfm. Read README.pyview 
+for more info on it.
 
-Lfm and Pyview are written in python and use curses module.
+Lfm and Pyview are written in python and need curses module.
 
 It has been tested on next platforms:
 
 O.S.           PYTHON     Arch
 -------------------------------------------------
-Linux 2.4.12   2.1.1      i686
+Linux 2.4.12   2.2        i686
 Solaris 8      2.1        UltraSparc-II (1)
 
 (1) I needed to install ncurses and recompile python to use them. 
     It doesn't work with the curses library which comes with Solaris 8.
 
-I hope it works in other UNIXes as well.
-It seems it doesn't work on OpenBSD, perhaps due to the version of ncurses
-library it has.
+I hope it runs in other UNIXes as well.
+It seems it doesn't work on *BSD Systems, perhaps due to the version of 
+ncurses library they include.
 
 It needs Python v2.0 or higher, it won't work with v1.5.
+Lfm doesn't work without integer division. It will crash with Python 3.0...
 
-Also, take a look at TODO file to see bugs and not implemented features.
+Also, take a look at TODO file to see bugs and 'not-implemented-yet' (tm) 
+features.
 
 Type 'lfm --help' for a complete list of options.
 
 Program preferences are saved in '~/.lfmrc' file.
-When the program starts the first time, it tries to discover the programs
-in your system to configure lfm automatically, but it's not perfect, so
-you should take a look to the configuration (General Menu [F9] -> Edit
-Configuration [c]) and change according to your preferences.
+When the program starts the first time, it tries to discover the location
+of some apps in your system to configure lfm automatically, but it's not 
+perfect, so you should take a look to the configuration (General Menu [F9] 
+-> Edit Configuration [c]) and change it according to your preferences.
 
 
 Install
@@ -92,8 +94,8 @@ Here you have the complete list:
     - next page, space, Ctrl-N
     - home: first file
     - end: last file
-    - curses_left: upper dir
-    - curses_right: enter dir
+    - cursor_left: upper dir
+    - cursor_right: enter dir / vfs
     - g, G: go to directory
     - Ctrl-S: go to file in current panel
     - 0..9: go to bookmark #
@@ -121,11 +123,10 @@ Here you have the complete list:
     - m, M, F6: move file/dir/selection
     - F7: make directory
     - d, D, F8, del: delete file/dir/selection
-    - enter: execute file, enter dir or view 'specially' depending on the
-             extension of the regular file. It is executed in a thread 
+    - enter: execute file, enter dir / vfs or view 'specially' depending on 
+             the extension of the regular file. It is executed in a thread 
              that can be stopped and captures output
     - i, I: show file info
-
 
 + Other
     - #: show directories size
@@ -134,6 +135,7 @@ Here you have the complete list:
     - @: do something on file. Output is not captured, it is also not executed
          in a thread
     - Ctrl-O: open shell. Type 'exit' to return to lfm
+	- Ctrl-T: tree
     - f, F, F2: file menu
         . @: Do something on file(s)
         . i: File(s) info
@@ -143,7 +145,6 @@ Here you have the complete list:
         . x: Uncompress .tar.gz, .tar.bz2, .tar.Z
         . c: Compress directory to .tar.gz
         . d: Compress directory to .tar.bz2
-        . y: Encrypt/decrypt file
     - F9: general menu 
         . /: Find/grep file
         . #: show directories size
@@ -159,7 +160,6 @@ Here you have the complete list:
     - x, X: quit
 
 * Keys in EntryLine window:
-  - Ctrl-C: quit
   - up, down: historic
   - enter: return path
   - tab: change to next entry or button
@@ -167,9 +167,9 @@ Here you have the complete list:
   - Ctrl-W: delete leftwards until /
   - Ctrl-D: delete all
   - left, right, home, end, backspace, del, insert, ...
+  - Ctrl-C: quit
 
 * Keys in SelectItem window:
-  - Ctrl-C, q, Q: quit
   - up, p, P
   - down, n, N
   - next page, space
@@ -178,6 +178,37 @@ Here you have the complete list:
   - end
   - Ctrl-S: go to file/dir
   - enter: return path
+  - Ctrl-C, q, Q: quit
+
+* Keys in Tree panel:
+  - up, p, P: up within current depth, without going out from directory
+  - down, n, N: down within current depth, without going out from directory
+  - previous page, backspace, Ctrl-P: same as up but page-size scroll
+  - next page, space, Ctrl-N: same as down but page-size scroll
+  - home: first directory
+  - end: last directory
+  - left: go out from directory
+  - right: enter in directory
+  - enter: return changing to directory
+  - Ctrl-C, q, Q, F10: quit
+
+
+VFS:
+====
+You can navigate inside some special files (known as vfs files in lfm) just 
+'entering into' them (press 'enter' or 'cursor_right' when the cursor bar is
+over one of these files). By now, supported types are '.tar.gz' and '.tar.bz2'
+files. 
+
+The virtual directory name ('path_to_vfs_file#vfs/dir') is not propagated, so 
+tmpdir ('/tmp/@6421.2/dir') is showed in the copy/move/... dialogs or when
+view/edit/... a file, but this is just an estetic issue.
+
+When returning from one of such vfs files, the vfs file is regenerated
+(i.e., it is recompressed, so it could be slow in some machines) to update 
+all modifications, but lfm checks if it can first, to avoid waste of time.
+In case of 'panelize' vfs type (after find/grep), deleted / moved files
+are not deleted / moved in real path.
 
 
 History:
@@ -200,4 +231,4 @@ Midnight Commander developers, whose program was the guide.
 
 
 ============================================================================
-Last update:	Sunday November 25, 2001 - 20:36:04 CEST
+Last update:	Monday March 4th, 2002 - 17:16:21 CEST

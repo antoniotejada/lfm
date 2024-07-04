@@ -45,9 +45,9 @@ class Preferences:
     def check_defaultprogs(self, progs):
         for k, vs in progs.items():
             for v in vs:
-                i, o, e = os.popen3('which \"%s\"' % v)
-                r = o.read()
-                o.close(); i.close(); e.close()
+                i, a = os.popen4('which \"%s\"' % v)
+                r = a.read()
+                i.close(), a.close()
                 if r:
                     self.progs[k] = r.strip()
                     break

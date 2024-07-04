@@ -1,3 +1,182 @@
+Sun Mar  3 22:19:49 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/__init__.py (VERSION): release version 0.8
+
+Sun Mar  3 22:17:21 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (do_uncompress_dir): well, it seems '-C' is not a valid 
+	option to specify output directory in not gnu tars, so change code
+
+Sun Mar  3 20:30:09 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): eliminate 'y' feature (un/crypt)
+
+Sun Mar  3 00:24:12 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): tree panel implemented
+	* lfm/lfm.py (Tree): new class to implement a tree panel
+
+Sat Mar  2 13:36:17 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.run): fix bug: page up / down don't scroll
+	correctly in wrap mode if line doesn't fix in screen
+
+Thu Feb 28 23:32:36 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm: new scripts
+	* lfm/pyview: 
+	* lfm/lfm.py: 
+	* lfm/pyview.py: 
+	* lfm/__init__.py: contain globals
+
+Thu Feb 28 20:32:31 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (do_copy): restore not to copy directory mode, times, 
+	owner and group attributes, because it fails when copying from not
+	writable fs
+
+Thu Feb 28 19:06:43 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (win_nokey): now uses FixSizeCommonWindow
+
+Thu Feb 28 19:06:32 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (FixSizeCommonWindow): new message window class to 
+	show work in progress
+
+Thu Feb 28 18:25:39 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): fix 'show same dir in two panels' 
+	with vfs
+
+Thu Feb 28 18:21:48 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (vfs_copy): new functions
+	* lfm/lfm.py (vfs_pan_copy): 
+
+Thu Feb 28 18:00:00 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (findgrep): panelize vfs implemented
+	* lfm/lfm.py (vfs_regenerate_file): 
+
+Thu Feb 28 17:59:21 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (vfs_pan_init): new functions
+	* lfm/lfm.py (vfs_pan_regenerate): 
+
+Thu Feb 28 15:36:40 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (findgrep): fix bug: if selected file has a ':' in name
+
+Thu Feb 28 14:32:27 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (vfs_regenerate_file): check if it can regenerate vfs file
+	before doing it
+
+Thu Feb 28 13:42:27 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (move): fix bug: catching an exception after not been 
+	able to copy => it crashed when trying to delete copied files
+
+Thu Feb 28 13:33:25 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (CommonWindow.__init__): fix bug: if #lines of 
+	text > dialog.width
+
+Thu Feb 28 12:22:49 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (run_thread): now message appear in a dialog, clean up
+	function
+
+Thu Feb 28 11:41:17 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (CommonWindow): added option not to wait for a key
+	* lfm/messages.py (win_nokey): new function
+
+Thu Feb 28 01:41:09 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Lfm.run): vfs implemented!!!
+	* lfm/lfm.py (Lfm.show_bars): 
+	* lfm/lfm.py (Panel.show): 
+	* lfm/lfm.py (Panel.init_dir): 
+	* lfm/lfm.py (Panel.refresh_panel): 
+	* lfm/lfm.py (Panel.manage_keys): 
+	* lfm/lfm.py (Panel.show_info): 
+
+Wed Feb 27 17:31:57 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (do_uncompress_dir): added tar '-C' option to specify
+	output directory. Does it work in not gnu tars?
+	* lfm/lfm.py (vfs_init): new functions
+	* lfm/lfm.py (vfs_exit): 
+	* lfm/lfm.py (vfs_regenerate_file): 
+	* lfm/lfm.py (vfs_join): 
+	* lfm/files.py (mktemp): new function, wrapper to tempfile.mktemp
+
+Wed Feb 27 01:26:25 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/files.py (do_copy): change 'shutil.copytree' by own code
+	when walking tree to fix next bug:
+	"Overwrite dirs when moving or copying => walk dirs
+	f.e.    panel1:   dir/a      panel2:   dir/b
+	                     /b                   /c
+	Now when moving dir from panel1 to panel2, the 'dir' destination
+	is overwritten, so 'c'-file is lost. This is not the desired
+	behaviour"
+	
+Tue Feb 26 15:55:13 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (SelectItem.show): fix bug: "messages.SelectItem, 
+	messages.FindfilesWin, messages.MenuWin, messages.ChangePerms:
+	upperleft corner disappears"
+	* lfm/messages.py (FindfilesWin.show): 
+	* lfm/messages.py (MenuWin.show): 
+	* lfm/messages.py (ChangePerms.show): 
+
+Tue Feb 26 14:10:20 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/messages.py (ChangePerms.manage_keys): change cursor movement 
+	behaviour, now it's circular
+
+Tue Feb 26 13:43:17 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.show_chr): changing 'addch' by 'addstr'
+	shows individual chars >= 0xA0 (meta chars) correctly, neither in 
+	reversed video or as 2 chars
+	* lfm/pyview.py (FileView.show_str):
+	* lfm/pyview.py (FileView.show_hex):
+
+Tue Feb 26 13:13:57 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.run): fix bug: "if wrap mode => fix prev/next 
+	page & up/down cursor". Now they move to screen lines, not to physical
+	lines
+	* lfm/pyview.py (FileView.show_text_wrap): new functions
+	* lfm/pyview.py (FileView.show_text_nowrap): 
+	* lfm/pyview.py (FileView.__get_1line): 
+	* lfm/pyview.py (FileView.__get_line_length): 
+	* lfm/pyview.py (FileView.__get_prev_lines_text): 
+
+Mon Feb 25 12:47:32 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.refresh_panel): fix bug: if panel2 shows 'a' 
+	directory and in panel1 'a' is moved or deleted, lfm crashes
+
+Mon Feb 25 12:10:48 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (DATE): change copyright date to years 2001-2
+	* lfm/pyview.py (DATE): 
+
+Mon Feb 25 11:54:15 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/pyview.py (FileView.show): fix bug when filename length is too big
+	* lfm/messages.py (CommonWindow.__init__): 
+
+Sat Feb 23 16:21:46 2002  Iñigo Serna  <inigo@lethe.infernus.org>
+
+	* lfm/lfm.py (Panel.manage_keys): after moving a file cursor goes to next
+	file in panel, as deletion does
+
 Sun Nov 25 19:40:19 2001  Iñigo Serna  <inigo@lethe.infernus.org>
 
 	* lfm/lfm.py (VERSION): release of version 0.7

@@ -406,9 +406,24 @@ def do_copy(source, dest):
 
     if os.path.islink(source):
         dest = os.path.join(os.path.dirname(dest), os.path.basename(source))
-        do_create_link(os.readlink(source), dest)
+        try:
+            do_create_link(os.readlink(source), dest)
+        except (IOError, os.error), (errno, strerror):
+            return (strerror, errno)
     elif os.path.isdir(source):
-        shutil.copytree(source, dest, 1)
+        try:
+            os.mkdir(dest)
+        except (IOError, os.error), (errno, strerror):
+            pass     # don't return if directory exists
+        else:
+#             # copy mode, times, owner and group
+#             st = os.lstat(source)
+#             os.chown(dest, st[stat.ST_UID], st[stat.ST_GID])
+#             shutil.copymode(source, dest)
+#             shutil.copystat(source, dest)
+            pass
+        for f in os.listdir(source):
+            do_copy(os.path.join(source, f), os.path.join(dest, f))
     elif source == dest:
         raise IOError, (0, "Source and destination are the same file")
     else:
@@ -450,11 +465,21 @@ def move(path, file, destdir, check_fileexists = 1):
         if os.path.exists(destdir) and check_fileexists:
             return os.path.basename(destdir)
         fulldestdir = destdir
+    if os.path.dirname(fullpath) == os.path.dirname(fulldestdir):
+        try:
+            os.rename(fullpath, fulldestdir)
+        except (IOError, os.error), (errno, strerror):
+            return (strerror, errno)
+        return
     try:
         do_copy(fullpath, fulldestdir)
     except (IOError, os.error), (errno, strerror):
-        do_delete(fulldestdir)
-        return (strerror, errno)
+        try:
+            do_delete(fulldestdir)
+        except (IOError, os.error), (errno, strerror):
+            return (strerror, errno)
+        else:
+            return (strerror, errno)
     else:
         try:
             do_delete(fullpath)
@@ -701,4 +726,10 @@ def get_fs_info():
         return fs
 
 
+########################################################################
+########################################################################
+# temporal file
+def mktemp():
+    from tempfile import mktemp
 
+    return mktemp()
