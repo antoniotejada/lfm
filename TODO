@@ -1,7 +1,14 @@
 ============================================================================
 TODO for lfm3
-Last update:	Time-stamp: <2015-11-08 14:05:44 inigo>
+Last update:	Time-stamp: <2017-06-25 18:45:55 inigo>
 ============================================================================
+
+. add standalone lfm executable to documentation and web and how to create it
+  Make a standalone lfm executable in your home called "lfm":
+      python3 -m zipapp lfm -m lfm:lfm_start -p /usr/bin/python3 -o ~/lfm
+  but resources (docs, keys, theme) are not stored in .zip.
+. BB issue #2: common.py file conflict with anaconda
+
 
 New features for v3.x
 ---------------------
@@ -18,7 +25,9 @@ Medium Priority:
     - f12 file menu
       . folder comparation
       . folder synchronization
-      . diff and sync dirs: use filecmp.dircmp or rsync
+      . diff and sync dirs:
+        . use filecmp.dircmp or rsync
+	. ui: https://github.com/fourier/ztree/raw/screenshots/screenshots/emacs_diff_xterm.png
 
 Low Priority (maybe some day):
   + ui:
@@ -32,6 +41,8 @@ Low Priority (maybe some day):
         grep --exclude=XXX => NON-POSIX, GNU extension
     - copy_file: copy block-by-block if file is big
   + new features:
+    - Allow configuration of custom file types (by extension) and associated program to open them with
+      [BB issue #3, request by Noteworthy]
     - file encryption/unencryption => gnupg
     - global copy/cut/paste between tabs or panes
     - background processes: copy/move/delete

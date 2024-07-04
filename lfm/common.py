@@ -11,7 +11,7 @@ from string import digits, ascii_lowercase
 ##### General
 AUTHOR = 'Iñigo Serna'
 VERSION = '3.0'
-DATE = '2001-15'
+DATE = '2001-17'
 LFM_NAME = 'lfm - Last File Manager'
 
 CONFIG_DIR = os.path.abspath(os.path.expanduser('~/.config/lfm'))
@@ -27,6 +27,7 @@ log = logging.getLogger('lfm')
 MAX_TABS = 4
 VFS_STRING = '#vfs://'
 BOOKMARKS_KEYS = digits + ascii_lowercase
+MIN_COLUMNS = 66
 
 HISTORY_MAX = 100
 HISTORY_BLANK = {'file': [], 'path': [], 'glob': [], 'find': [], 'grep': [], 'exec': [], 'cli': []}
@@ -39,6 +40,8 @@ SYSPROGS = {'tar': 'tar',
             'rar': 'rar',
             '7z': '7z',
             'xz': 'xz',
+            'lzip': 'lzip',
+            'lz4': 'lz4',
             'grep': 'grep',
             'find': 'find',
             'which': 'which',
@@ -71,6 +74,9 @@ class LFMFileExistsError(Exception):
     pass
 
 class LFMFileSkipped(Exception):
+    pass
+
+class LFMTerminalTooNarrow(Exception):
     pass
 
 

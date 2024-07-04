@@ -1,3 +1,23 @@
+Version 3.1 ("Recovering inertia") - 2017/06/25:
+
+  + New features
+    - support for new compression programs: lzip, lz4
+
+  + Changes & improvements:
+    - Improved resources files (docs, default keys and theme) installation
+      and loading at runtime
+
+  + Fixes:
+    - when installing data files with pip >7.0 & wheel.
+      Thanks to Jean-François Bercher
+    - PowerCLI: error message is always shown when command finishes.
+      Thanks to Jean Terrier for the report
+    - filters: glob when parent dir contains special chars (BB issue #5).
+      Thanks to Viktor Vad for the report
+    - lfm crashes when terminal is too narrow (BB issue #4).
+      Thanks to Wayne Tan for the report
+
+
 Version 3.0 ("Only you") - 2015/10/23:
 
   + About the code

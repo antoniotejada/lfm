@@ -2,7 +2,7 @@
 
 
 import os
-from glob import glob
+from glob import glob, escape
 from operator import attrgetter
 from tempfile import mkdtemp, mkstemp
 from os.path import abspath, basename, dirname, exists, expanduser, isabs, isdir, join, normpath, splitext
@@ -290,11 +290,12 @@ class BaseFolder:
         If glob starts with ! add match to 2nd list"""
         globs = [] if filters=='' else [f.strip() for f in filters.split(',')]
         fs_hide, fs_show = [], []
+        p = escape(self.pdir)
         for g in globs:
             if g.startswith('!'):
-                fs_show.extend(glob(join(self.pdir, g[1:])))
+                fs_show.extend(glob(join(p, g[1:])))
             else:
-                fs_hide.extend(glob(join(self.pdir, g)))
+                fs_hide.extend(glob(join(p, g)))
         return fs_hide, fs_show
 
     @property

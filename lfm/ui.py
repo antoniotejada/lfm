@@ -114,6 +114,8 @@ class UI:
         self.h, self.w = h, w
         if w == 0 or h == 2:
             return
+        if w < MIN_COLUMNS:
+            raise LFMTerminalTooNarrow
         self.win.resize(self.h, self.w)
         if self.pane1.mode == PaneMode.full:
             self.pane1.resize(0, 0, h-1, w)
@@ -711,8 +713,12 @@ def init_config(use_wide_chars):
 def launch_ui(win, path1, path2, use_wide_chars):
     global app
     cfg = init_config(use_wide_chars)
-    app = UI(cfg, win, [path1], [path2])
-    ret = app.run()
+    try:
+        app = UI(cfg, win, [path1], [path2])
+        ret = app.run()
+    except LFMTerminalTooNarrow as e:
+        DialogError('Terminal too narrow to show contents.\nIt should have {} columns at mininum.'.format(MIN_COLUMNS))
+        return None
     if app.cfg.options.save_configuration_at_exit:
         try:
             app.cfg.save()

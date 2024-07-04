@@ -1,8 +1,8 @@
 #!/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2001-15  Iñigo Serna
-# Time-stamp: <2015-03-27 19:00:27 inigo>
+# Copyright (C) 2001-17  Iñigo Serna
+# Time-stamp: <2017-06-25 18:31:04 inigo>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-"""lfm v3.0 - (C) 2001-15, by Iñigo Serna <inigoserna@gmail.com>
+"""lfm v3.0 - (C) 2001-17, by Iñigo Serna <inigoserna@gmail.com>
 
 'Last File Manager' is a powerful file manager for UNIX console.
 It has a curses interface and it's written in Python version 3.4+.

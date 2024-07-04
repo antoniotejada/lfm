@@ -36,15 +36,15 @@ kmap_str2code = dict(tbl_kstr_kcode)
 kmap_code2str = dict([(it[1], it[0]) for it in tbl_kstr_kcode])
 
 # A-up: kUP3, A-S-up: kUP4, C-up: kUP5, C-S-up: kUP6, C-A-up: kUP7 ... C-A-pagedown: kNXT7
-# kUP3: 0x235, kUP4: 0x36 ... kDN3: 0x20c ... kLFT3: 0x220 ... kRIT3: 0x22c ...
+# kUP3: 0x235, kUP4: 0x236 ... kDN3: 0x20c ... kLFT3: 0x220 ... kRIT3: 0x22c ...
 # kDC3: 0x206 ... kIC3: 0x21b ... kPRV: 0x22a ... kNXT: 0x22a
 tbl_mods = {'A-': 3, 'A-S-': 4, 'S-A-': 4, 'C-': 5, 'C-S-': 6, 'S-C-': 6, 'C-A-': 7, 'A-C-': 7}
-tbl_keysspecial = {'up': ('kUP', 0x235), 'down': ('kDN', 0x20c), 'left': ('kLFT', 0x220),
-                   'right': ('kRIT', 0x22f), 'del': ('kDC', 0x206), 'ins': ('kIC', 0x21b),
-                   'pageup': ('kPRV', 0x22a), 'pagedown': ('kNXT', 0x225)}
-#tbl_keysspecial = {'up': ('kUP', 0x236), 'down': ('kDN', 0x20d), 'left': ('kLFT', 0x221),
-#                   'right': ('kRIT', 0x230), 'del': ('kDC', 0x207), 'ins': ('kIC', 0x21c),
-#                   'pageup': ('kPRV', 0x22b), 'pagedown': ('kNXT', 0x226)}
+#tbl_keysspecial = {'up': ('kUP', 0x235), 'down': ('kDN', 0x20c), 'left': ('kLFT', 0x220),
+#                   'right': ('kRIT', 0x22f), 'del': ('kDC', 0x206), 'ins': ('kIC', 0x21b),
+#                   'pageup': ('kPRV', 0x22a), 'pagedown': ('kNXT', 0x225)}
+tbl_keysspecial = {'up': ('kUP', 0x236), 'down': ('kDN', 0x20d), 'left': ('kLFT', 0x221),
+                   'right': ('kRIT', 0x230), 'del': ('kDC', 0x207), 'ins': ('kIC', 0x21c),
+                   'pageup': ('kPRV', 0x22b), 'pagedown': ('kNXT', 0x226)}
 # tbl_keysspecial = {'up': ('kUP', 0x237), 'down': ('kDN', 0x20e), 'left': ('kLFT', 0x222),
 #                    'right': ('kRIT', 0x231), 'del': ('kDC', 0x208), 'ins': ('kIC', 0x21d),
 #                    'pageup': ('kPRV', 0x22c), 'pagedown': ('kNXT', 0x227)}

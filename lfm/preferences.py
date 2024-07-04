@@ -7,7 +7,7 @@ from configparser import ConfigParser
 from collections import OrderedDict
 import pickle
 
-from utils import get_lfm_data_file, ConfigParserWithComments, get_public_actions
+from utils import get_lfm_data_file_contents, ConfigParserWithComments, get_public_actions
 from key_defs import key_str2bin, key_bin2str
 from common import *
 
@@ -51,9 +51,9 @@ DEF_PROGRAMS = {'shell': 'bash',
                 'graphics': 'eog',
                 'pdf': 'evince',
                 'ebook': 'FBReader'}
-FILES_EXT = {'archive': ['gz', 'bz2', 'xz', 'tar', 'tgz', 'tbz2', 'txz', 'Z', 'zip',
-                         'rar', '7z', 'arj', 'cab', 'lzh', 'lha',
-                         'zoo', 'arc', 'ark',
+FILES_EXT = {'archive': ['gz', 'bz2', 'xz', 'lz', 'lz4', 'tar', 'tgz', 'tbz2',
+                         'txz', 'tlz', 'tlz4', 'Z', 'zip', 'rar', '7z', 'arj',
+                         'cab', 'lzh', 'lha', 'zoo', 'arc', 'ark',
                          'rpm', 'deb'],
              'audio': ['au', 'flac', 'mid', 'midi', 'mp2', 'mp3', 'mpg', 'ogg', 'wma', 'xm'],
              'data': ['dta', 'nc', 'dbf', 'mdn', 'db', 'mdb', 'dat',
@@ -281,8 +281,9 @@ def load_colortheme():
 
 def copy_default_colortheme_file():
     try:
-        def_colortheme_file = get_lfm_data_file('lfm-default.theme')
-        copyfile(def_colortheme_file, THEME_FILE)
+        with open(THEME_FILE, 'w') as f:
+            default_colortheme = get_lfm_data_file_contents('lfm-default.theme')
+            f.write(default_colortheme)
     except:
         log.error('Can\'t copy default ColorTheme file: {}'.format(THEME_FILE))
         raise
@@ -331,8 +332,9 @@ def load_keys():
 
 def copy_default_keys_file():
     try:
-        def_keys_file = get_lfm_data_file('lfm-default.keys')
-        copyfile(def_keys_file, KEYS_FILE)
+        with open(KEYS_FILE, 'w') as f:
+            default_keys = get_lfm_data_file_contents('lfm-default.keys')
+            f.write(default_keys)
     except:
         log.error('Can\'t copy default Keys file: {}'.format(KEYS_FILE))
         raise

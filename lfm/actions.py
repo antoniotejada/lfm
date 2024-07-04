@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-import sys
+import pkg_resources
 from glob import glob
 from tempfile import mkdtemp
 from os import sep, readlink, environ, uname
@@ -831,12 +831,12 @@ def compress_dir():
     dirs = [d.pfile for d in app.pane_active.tab_active.selected_or_current] # if d.is_dir
     if len(dirs) == 0:
         return RetCode.nothing, None
-    compress_fmts = {'g': 'tgz', 'b': 'tbz2', 'x': 'txz', 't': 'tar',
-                     'z': 'zip', 'r': 'rar', '7': '7z'}
+    compress_fmts = {'g': 'tgz', 'b': 'tbz2', 'x': 'txz', 'l': 'tlz', '4': 'tlz4',
+                     't': 'tar', 'z': 'zip', 'r': 'rar', '7': '7z'}
     while True:
         ch = DialogGetKey('Compress directory to...',
-                          '.tar.(g)z, .tar.(b)z2, .tar.(x)z, .(t)ar, .(z)ip, .(r)ar, .(7)z\n\n'
-                          '                        Ctrl-C to quit')
+                          '.tar.(g)z, .tar.(b)z2, .tar.(x)z, .tar.(l)z,\n.tar.lz(4), .(t)ar, .(z)ip, .(r)ar, .(7)z\n\n'
+                          '                Ctrl-C to quit')
         if ch == -1: # Ctrl-C
             return RetCode.full_redisplay, None
         elif chr(ch) in compress_fmts.keys():
@@ -858,10 +858,10 @@ def compress_uncompress_file():
     files = [f.pfile for f in app.pane_active.tab_active.selected_or_current] # if f.is_dir
     if len(files) == 0:
         return RetCode.nothing, None
-    compress_fmts = {'g': 'gz', 'b': 'bz2', 'x': 'xz'}
+    compress_fmts = {'g': 'gz', 'b': 'bz2', 'x': 'xz', 'l': 'lz', '4': 'lz4'}
     while True:
         ch = DialogGetKey('Un/Compress file(s)',
-                          '(g)zip, (b)zip2, (x)z\n\n'
+                          '(g)zip, (b)zip2, (x)z, (l)z, lz(4)\n\n'
                           '   Ctrl-C to quit')
         if ch == -1: # Ctrl-C
             return RetCode.full_redisplay, None
@@ -1060,8 +1060,8 @@ def file_menu():
             # 'l    Folder comparation',
             # 'y    Folder synchronization',
             'z    Compress/uncompress file(s)…',
-            'x    Uncompress .tar.gz, .tar.bz2, .tar.xz, .tar, .zip, .rar, .7z',
-            'u    Uncompress .tar.gz, etc in other panel',
+            'x    Uncompress file',
+            'u    Uncompress file in other panel',
             'c    Compress directory to format…']
     ret = SelectItem('File Menu', menu, min_height=True).run()
     if ret != -1:
@@ -1107,11 +1107,15 @@ def help_menu():
             from preferences import dump_keys_to_file
             dump_keys_to_file(app.keys)
             filename = DUMP_KEYS_FILE
+            utils.run_on_current_file(app.cfg.programs['pager'], filename)
         else:
-            docdir = join(sys.prefix, 'share/doc/lfm')
             docfile = {'r': 'README', 'n': 'NEWS', 't': 'TODO', 'l': 'COPYING'}.get(ret[0])
-            filename = join(docdir, docfile)
-        utils.run_on_current_file(app.cfg.programs['pager'], filename)
+            try:
+                filename = pkg_resources.resource_filename('lfm', 'doc/' + docfile)
+                utils.run_on_current_file(app.cfg.programs['pager'], filename)
+            except NotImplementedError:
+                buf = str(pkg_resources.resource_string('lfm', 'doc/' + docfile), 'UTF-8')
+                InternalView(docfile, [(l, 'view_white_on_black') for l in buf.splitlines()], center=False).run()
         return refresh()
     else:
         return RetCode.nothing, None

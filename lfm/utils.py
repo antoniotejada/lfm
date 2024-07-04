@@ -8,6 +8,7 @@ import grp
 import difflib
 import stat
 import errno
+import pkg_resources
 from ctypes import CDLL
 from datetime import datetime
 from collections import OrderedDict
@@ -30,8 +31,8 @@ use_wide_chars = False
 
 ########################################################################
 ###### LFM
-def get_lfm_data_file(filename):
-    return normpath(join(sys.prefix, 'share/doc/lfm/etc', filename))
+def get_lfm_data_file_contents(filename):
+    return str(pkg_resources.resource_string('lfm', 'etc/' + filename), 'UTF-8')
 
 
 ########################################################################
@@ -775,7 +776,7 @@ class ProcessCommand:
         self.cmd = cmd
         self.path = path
         self.proc = None
-        self.status = -1
+        self.status = None
         self.dialog = DialogMessagePanel(self.title, self.subtitle)
         self.animation = CursorAnimation()
 

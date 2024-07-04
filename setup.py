@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-"""lfm v3.0 - (C) 2001-15, by Iñigo Serna <inigoserna@gmail.com>
+"""lfm v3.1 - (C) 2001-17, by Iñigo Serna <inigoserna@gmail.com>
 
 'Last File Manager' is a powerful file manager for UNIX console.
 It has a curses interface and it's written in Python version 3.4+.
@@ -10,6 +10,7 @@ Released under GNU Public License, read COPYING file for more details.
 """
 
 
+import os
 from distutils.core import setup
 from os.path import join
 from sys import argv, exit, prefix, version_info
@@ -48,21 +49,34 @@ if ver < (3, 4):
 if 'bdist_wheel' in argv:
     raise RuntimeError("This setup.py does not support wheels")
 
-setup(name='lfm',
-      version='3.0',
-      description=__doc__.split("\n")[2],
-      long_description='\n'.join(__doc__.split("\n")[2:]).strip(),
-      author='Iñigo Serna',
-      author_email='inigoserna@gmail.com',
-      url='https://inigo.katxi.org/devel/lfm',
-      platforms='POSIX',
-      keywords=['file manager shell cli'],
-      classifiers=filter(None, classifiers.split("\n")),
-      license='GPL3+',
-      packages=['lfm'],
-      scripts=['lfm/lfm'],
-      data_files=[(join(prefix, 'share/doc/lfm'), DOC_FILES),
-                  (join(prefix, 'share/doc/lfm/etc'), CONFIG_FILES),
-                  (join(prefix, 'share/man/man1'), MAN_FILES)],
-      # **addargs
-)
+import shutil
+try:
+    try:
+        os.mkdir('lfm/doc')
+        for f in DOC_FILES:
+            shutil.copy2(f, 'lfm/doc')
+        os.symlink('../etc', 'lfm/etc')
+    except:
+        pass
+    setup(name='lfm',
+          version='3.1',
+          description=__doc__.split("\n")[2],
+          long_description='\n'.join(__doc__.split("\n")[2:]).strip(),
+          author='Iñigo Serna',
+          author_email='inigoserna@gmail.com',
+          url='https://inigo.katxi.org/devel/lfm',
+          platforms='POSIX',
+          keywords=['file manager shell cli'],
+          classifiers=filter(None, classifiers.split("\n")),
+          license='GPL3+',
+          packages=['lfm'],
+          scripts=['lfm/lfm'],
+          data_files=[(join(prefix, 'share/man/man1'), MAN_FILES)],
+          package_data={'': CONFIG_FILES + [join('doc', f) for f in DOC_FILES]},
+    )
+finally:
+    shutil.rmtree('lfm/doc')
+    try:
+        os.unlink('lfm/etc')
+    except IsADirectoryError:
+        pass

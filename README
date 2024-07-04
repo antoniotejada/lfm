@@ -4,11 +4,11 @@ lfm - Last File Manager
 
 :Author: Iñigo Serna, inigoserna AT gmail DOT com
 
-:Version: 3.0, October 23rd. 2015
+:Version: 3.1, June 25th. 2017
 
 :Home page: https://inigo.katxi.org/devel/lfm/
 
-:License: | Copyright © 2001-15, Iñigo Serna
+:License: | Copyright © 2001-17, Iñigo Serna
           | This software has been realised under the `GPL License
             <http://www.gnu.org/licenses/licenses.html#GPL>`_ version 3
             or later, read the `<COPYING>`_ file that comes with this package
@@ -109,6 +109,9 @@ Installation
       * - Version
         - File
         - Date
+      * - 3.1
+        - `<lfm-3.1.tar.gz>`_
+        - 2017/06/25
       * - 3.0
         - `<lfm-3.0.tar.gz>`_
         - 2015/10/23
@@ -158,7 +161,9 @@ Installation
 
   ``# apt-get install lfm   # debian/ubuntu/mint/…``
 
-  **NOTE**: be sure to install *lfm* version 3 or higher, not old version 2.3!
+  **NOTE 1**: be sure to install *lfm* version 3 or higher, not old version 2.3!
+
+  **NOTE 2**: `lfm` is not usually included in main distributions repositories.
 
 * Using pip:
 
@@ -166,9 +171,9 @@ Installation
 
 * To install from sources:
 
-  1. Download `sources <lfm-3.0.tar.gz>`_
+  1. Download `sources <lfm-3.1.tar.gz>`_
   2. Uncompress file:
-     ``$ tar xvfz lfm-3.0.tar.gz``
+     ``$ tar xvfz lfm-3.1.tar.gz``
   3. Enter the directory and build:
      ``$ python setup.py build``
   4. Install, as root:
@@ -303,12 +308,16 @@ Global
            - g: gzip/gunzip
            - b: bzip2/bunzip2
            - x: xz/unxz
-        - x: uncompress .tar.gz, .tar.bz2, .tar.xz, .tar, .zip, .rar, .7z
+           - l: lzip/lunzip
+           - 4: lz4/unlz4
+        - x: uncompress .tar.gz, .tar.bz2, .tar.xz, .tar.lz, .tar.lz4, .tar, .zip, .rar, .7z
         - u: uncompress .tar.gz, etc in other panel
         - c: compress directory to format…
            - g: .tar.gz
            - b: .tar.bz2
            - x: .tar.xz
+           - l: .tar.lz
+           - 4: .tar.lz4
            - t: .tar
            - z: .zip
            - r: .rar
@@ -419,7 +428,7 @@ Type ``lfm --help`` for a complete list of options::
                [--restore-theme] [--delete-history]
                [path1] [path2]
 
-    lfm v3.0 - (C) 2001-15, by Iñigo Serna <inigoserna@gmail.com>
+    lfm v3.1 - (C) 2001-17, by Iñigo Serna <inigoserna@gmail.com>
 
     positional arguments:
       path1                 Path to show in left pane (default: ".")
@@ -1065,6 +1074,13 @@ FAQ
   This can't be made inside the program, but you could get it using
   the shell tip mentioned `Installation`_ section.
 
+**lfm does not start, shows the message "Terminal to narrow to show contents"**
+**lfm shows the message "Terminal to narrow to show contents" and quits when resizing**
+
+  lfm needs a terminal with 66 columns as mininum.
+  If the terminal is narrower or you resize it to fewer columns program will
+  stop inmediately.
+
 **Why doesn't lfm implement remote vfs such as ssh, ftp, smb, webdav, ...?**
 
   One of the design goals for *lfm* is simplicity, we don't want to add
@@ -1232,21 +1248,23 @@ the best program ever coded (well, just after emacs ;-).
 Added 2012/06/19: I've just read Buerg died on Dec. 30, 2009. RIP.
 
 And also to all the people who have contributed with ideas, reporting
-bugs and code over these years: Antoni Aloy, Sebastien Bacher, Grigory Bakunov,
-Greg Bell, Luigi M. Bianchi, Hunter Blanks, Josef Boehm, Witold Bołt,
-Fabian Braennstroem, Jason Buberel, Ondrej Certik, Kevin Coyner, Tim Daneliuk,
-Mike Dean, Arnå DG, Maximilian Dietrich, Christian Eichert, Steve Emms,
-Murat Erten, Daniel Echeverry, Luca Falavigna, Stephen R. Figgins, f1ufx,
-Roy Fullmer, Francisco Gama, Vlad Glagolev, Ana Beatriz Guerrero Lopez,
-Kelly Hopkins, Laurent Humblet, Tjabo Kloppenburg, Zoran Kolic,
-Shantanu Kulkarni, Max Kutny, Karol M. Langner, Yu-Jie Lin, Martin Lüethi,
-Thomas Marsaleix, Mateusz Matejuk, Maurício, James Mills, Oliver Mueller,
-Bartosz Oler, Piotr Ozarowski, Mikhail A. Pokidko, Jerome Prudent,
-Mikhail Ramendik, Rod, Daniel T. Schmitt, Chengqi Song, Robin Siebler,
-Andrey Skvortsov, Espartaco Smith, Jörg Sonnenberger, Jonathan Steel,
-Martin Steigerwald, Joshua Tasker, Tim Terlegård, Edd Thompson,
-Sergey Tkachenko, E.R. Uber, Walter van den Broek, Jesper Vestergaard,
-Xin Wang, Alejandro Weil, Yellowprotoss, Hai Zaar and many others…
+bugs and code over these years: Antoni Aloy, Sebastien Bacher, Grigory
+Bakunov, Greg Bell, Jean-François Bercher, Luigi M. Bianchi, Hunter
+Blanks, Josef Boehm, Witold Bołt, Fabian Braennstroem, Jason Buberel,
+Ondrej Certik, Kevin Coyner, Tim Daneliuk, Mike Dean, Arnå DG,
+Maximilian Dietrich, Christian Eichert, Steve Emms, Murat Erten,
+Daniel Echeverry, Luca Falavigna, Stephen R. Figgins, f1ufx, Roy
+Fullmer, Francisco Gama, Vlad Glagolev, Ana Beatriz Guerrero Lopez,
+Kelly Hopkins, Laurent Humblet, Ibu, Tjabo Kloppenburg, Zoran Kolic,
+Shantanu Kulkarni, Kurka, Max Kutny, Karol M. Langner, Yu-Jie Lin,
+Martin Lüethi, Thomas Marsaleix, Mateusz Matejuk, Maurício, James
+Mills, Oliver Mueller, Bartosz Oler, Piotr Ozarowski, Mikhail
+A. Pokidko, Jerome Prudent, Mikhail Ramendik, Rod, Daniel T. Schmitt,
+Chengqi Song, Robin Siebler, Andrey Skvortsov, Espartaco Smith, Jörg
+Sonnenberger, Jonathan Steel, Martin Steigerwald, Wayne Tan, Joshua
+Tasker, Tim Terlegård, Jean Terrier, Edd Thompson, Sergey Tkachenko,
+E.R. Uber, Viktor Vad, Walter van den Broek, Jesper Vestergaard, Xin
+Wang, Alejandro Weil, Yellowprotoss, Hai Zaar and many others…
 
 You have made posible to run *lfm* in all those platforms!
 
