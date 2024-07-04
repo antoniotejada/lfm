@@ -15,7 +15,6 @@ import select
 import cPickle
 import curses
 
-import files
 import compress
 import messages
 from __init__ import sysprogs, g_encoding
@@ -34,10 +33,7 @@ import encodings.aliases
 cds = {}
 for c in encodings.aliases.aliases.values():
     cds[c] = 1
-# codecs_list += sorted(cds.keys()) # python v2.4+
-cds = cds.keys()
-cds.sort()
-codecs_list += cds
+codecs_list += sorted(cds.keys())
 
 
 ######################################################################
@@ -178,17 +174,20 @@ class ProcessLoopBase(object):
             return -1
         elif ans == 'internal_error':
             self.show_parent()
-            messages.error(self.action, 'Parent: Internal Error: ' + result)
+            messages.error('Cannot %s\n' % self.action.lower() +
+                           'Parent: Internal Error: ' + result)
             return 0
         elif ans == 'error':
             self.show_parent()
-            messages.error(self.action, 'Parent: Error: ' + result)
+            messages.error('Cannot %s\n' % self.action.lower() +
+                           'Parent: Error: ' + result)
             return 0
         elif ans == 'result':
             return self.process_response(result)
         else:
             self.show_parent()
-            messages.error(self.action, 'Parent: Bad response from child')
+            messages.error('Cannot %s\n' % self.action.lower() +
+                           'Parent: Bad response from child')
             return 0
 
     def return_data(self):
@@ -199,7 +198,8 @@ class ProcessLoopBase(object):
         self.c2p = IPC()
         self.pid_child = os.fork()
         if self.pid_child < 0: # error
-            messages.error(self.action, 'Can\'t run function')
+            messages.error('Cannot %s\n' % self.action.lower() +
+                           'Can\'t run function')
             return -1
         elif self.pid_child == 0: # child
             self.child_process()
@@ -217,7 +217,7 @@ class ProcessLoopBase(object):
         except OSError:
             pass
         self.end_gui()
-        
+
     def child_process(self):
         while True:
             # wait for command to execute
@@ -245,8 +245,8 @@ class ProcessLoopBase(object):
         # end
         # time.sleep(.25) # time to let parent get return value
         os._exit(0)
-    
-    
+
+
 ######################################################################
 ##### Process Loop Base Class, 1 progressbar
 class ProcessLoopBase_1(ProcessLoopBase):
@@ -255,7 +255,7 @@ class ProcessLoopBase_1(ProcessLoopBase):
         super(ProcessLoopBase_1, self).__init__(action, func, *args)
         self.lst = lst
         self.length = len(lst)
-        
+
     def show_win(self):
         filename = self.filename
         percent = 100 * self.file_i / self.length
@@ -310,7 +310,7 @@ class ProcessLoopUnCompress(ProcessLoopBase_1):
             st, msg = result
             if st == -1:
                 self.show_parent()
-                messages.error(self.action, msg)
+                messages.error('Cannot %s\n' % self.action.lower() + msg)
         return 0
 
 
@@ -321,7 +321,7 @@ class ProcessLoopRename(ProcessLoopBase_1):
         buf = 'Rename \'%s\' to' % self.filename
         tabpath = app.act_pane.act_tab.path
         self.show_parent()
-        newname = doEntry(tabpath, 'Rename', buf, self.filename)
+        newname = doEntry(tabpath, 'Rename', buf, self.filename, with_history='file')
         if newname:
             self.newname = newname
             return 1
@@ -346,8 +346,8 @@ class ProcessLoopRename(ProcessLoopBase_1):
                 return self.exec_file(args)
         elif isinstance(result, tuple): # error from child
             self.show_parent()
-            messages.error('%s \'%s\'' % (self.action, self.filename),
-                           '%s (%s)' % result)
+            messages.error('Cannot %s\n' % self.action.lower() +
+                           self.filename + ': %s (%s)' % result)
             return 0
         else:
             return 0
@@ -376,8 +376,8 @@ class ProcessLoopBackup(ProcessLoopBase_1):
                 return self.exec_file(args)
         elif isinstance(result, tuple): # error from child
             self.show_parent()
-            messages.error('%s \'%s\'' % (self.action, self.filename),
-                           '%s (%s)' % result)
+            messages.error('Cannot %s\n' % self.action.lower() +
+                           self.filename + ': %s (%s)' % result)
             return 0
         else:
             return 0
@@ -405,8 +405,8 @@ class ProcessLoopBase_2(ProcessLoopBase):
     def run(self):
         for filename, err in self.pc.errors:
             self.show_parent()
-            messages.error('%s \'%s\'' % (self.action, filename),
-                           '%s (%s)' % err)
+            messages.error('Cannot %s\n' % self.action.lower() +
+                           filename + ': %s (%s)' % err)
         if ProcessLoopBase.run_pre(self) == -1:
             return
         for self.filename, filesize in self.pc.iter_walk(reverse=self.rev):
@@ -424,7 +424,7 @@ class ProcessLoopBase_2(ProcessLoopBase):
                 break
         ProcessLoopBase.run_post(self)
         return self.return_data()
-       
+
 
 ##### Process Loop Copy
 class ProcessLoopCopy(ProcessLoopBase_2):
@@ -438,7 +438,10 @@ class ProcessLoopCopy(ProcessLoopBase_2):
         return 1
 
     def prepare_args(self):
-        filename = self.filename.replace(self.pc.basepath+os.sep, '')
+        if self.pc.basepath == os.sep:
+            filename = self.filename.replace(self.pc.basepath, '')
+        else:
+            filename = self.filename.replace(self.pc.basepath+os.sep, '')
         if self.overwrite_all:
             return (filename, self.pc.basepath) + self.args + (False, )
         else:
@@ -466,14 +469,17 @@ class ProcessLoopCopy(ProcessLoopBase_2):
                 pass
             elif ans == 2:
                 self.overwrite_all = True
-            filename = self.filename.replace(self.pc.basepath+os.sep, '')
+            if self.pc.basepath == os.sep:
+                filename = self.filename.replace(self.pc.basepath, '')
+            else:
+                filename = self.filename.replace(self.pc.basepath+os.sep, '')
             args = (filename, self.pc.basepath) + self.args + (False, )
             return self.exec_file(args)
         elif isinstance(result, tuple): # error from child
             self.ret.append(self.filename)
             self.show_parent()
-            messages.error('%s \'%s\'' % (self.action, self.filename),
-                           '%s (%s)' % result)
+            messages.error('Cannot %s\n' % self.action.lower() +
+                           self.filename + ': %s (%s)' % result)
             return 0
         else:
             return 0
@@ -495,7 +501,7 @@ class ProcessLoopDelete(ProcessLoopBase_2):
             if ans == 2:
                 self.delete_all = True
             return ans
-   
+
     def prepare_args(self):
         return (self.filename, ) + self.args
 
@@ -503,8 +509,8 @@ class ProcessLoopDelete(ProcessLoopBase_2):
         if isinstance(result, tuple): # error from child
             self.dlg.ishidden = True
             self.show_parent()
-            messages.error('%s \'%s\'' % (self.action, self.filename),
-                           '%s (%s)' % result)
+            messages.error('Cannot %s\n' % self.action.lower() +
+                           self.filename + ': %s (%s)' % result)
         return 0
 
 
@@ -575,7 +581,8 @@ class ProcessFunc(object):
             self.ret = buf
         elif code == -1:
             self.show_parent()
-            messages.error(self.action, 'Parent: ' + buf)
+            messages.error('Cannot %s\n' % self.action.lower() +
+                           'Parent: ' + buf)
             self.show_parent()
             self.show_win()
         else:
@@ -602,7 +609,7 @@ class ProcessFunc(object):
         self.c2p = IPC()
         self.pid_child = os.fork()
         if self.pid_child < 0: # error
-            messages.error('Run func', 'Can\'t run function')
+            messages.error('Cannot run function')
             return
         elif self.pid_child == 0: # child
             self.child_process(self.func, *self.args)
@@ -645,7 +652,7 @@ class ProcessFunc(object):
 def run_shell_popen(cmd, path, return_output=False):
     if not cmd:
         return 0, ''
-    cmd = 'cd "%s"; %s' % (path, cmd)
+    cmd = 'cd "%s" && %s' % (path, cmd)
     p = popen2.Popen3(cmd, capturestderr=True)
     p.tochild.close()
     outfd, errfd = p.fromchild, p.childerr
@@ -697,6 +704,29 @@ def run_shell_popen(cmd, path, return_output=False):
     else:
         return 0, ''
 
+# run in background, system version
+def run_in_background_system(cmd, path):
+    pid = os.fork()
+    if pid == 0:
+        try:
+            maxfd = os.sysconf("SC_OPEN_MAX")
+        except (AttributeError, ValueError):
+            maxfd = 256       # default maximum
+        # os.closerange(0, maxfd) # python v2.6+
+        for fd in xrange(0, maxfd):
+            try:
+                os.close(fd)
+            except OSError:   # ERROR (ignore)
+                pass
+        # Redirect the standard file descriptors to /dev/null.
+        os.open("/dev/null", os.O_RDONLY)     # standard input (0)
+        os.open("/dev/null", os.O_RDWR)       # standard output (1)
+        os.open("/dev/null", os.O_RDWR)       # standard error (2)
+        os.system('cd "%s" && %s' % (path, cmd))
+        os._exit(0)
+    else:
+        pass # don't wait
+
 # get output from a command run in shell, popen version
 def get_shell_output_popen(cmd):
     i, a = os.popen4(cmd)
@@ -714,6 +744,15 @@ def get_shell_output2_popen(cmd):
     else:
         return ''
 
+# get error from a command run in shell, popen version
+def get_shell_output3_popen(cmd):
+    i, o, e = os.popen3(cmd)
+    buf = e.read()
+    i.close(), o.close(), e.close()
+    if buf:
+        return buf.strip()
+    else:
+        return ''
 
 # run command via shell and optionally return output, subprocess version
 def run_shell_subprocess(cmd, path, return_output=False):
@@ -734,6 +773,16 @@ def run_shell_subprocess(cmd, path, return_output=False):
         return 0, output
     else:
         return 0, ''
+
+# run in background, subprocess version
+def run_in_background_subprocess(cmd, path):
+    pid = os.fork()
+    if pid == 0:
+        p = Popen(cmd, cwd=path, shell=True, close_fds=True,
+                  stdin=None, stdout=open('/dev/null', 'w'), stderr=STDOUT)
+        os._exit(0)
+    else:
+        pass # don't wait
 
 # get output from a command run in shell, subprocess version
 def get_shell_output_subprocess(cmd):
@@ -756,6 +805,16 @@ def get_shell_output2_subprocess(cmd):
     p.stdout.close()
     return buf.strip() if buf else None
 
+# get error from a command run in shell, subprocess version
+def get_shell_output3_subprocess(cmd):
+    p = Popen(cmd, shell=True,
+              stdin=None, stdout=None, stderr=PIPE, close_fds=True)
+    while p.wait() is None:
+        time.sleep(0.1)
+    buf = p.stderr.read()
+    p.stderr.close()
+    return buf.strip() if buf else None
+
 
 ######################################################################
 ##### run_dettached
@@ -768,6 +827,7 @@ def run_dettached(prog, *args):
             maxfd = os.sysconf("SC_OPEN_MAX")
         except (AttributeError, ValueError):
             maxfd = 256       # default maximum
+        # os.closerange(0, maxfd) # python v2.6+
         for fd in xrange(0, maxfd):
             try:
                 os.close(fd)
@@ -797,9 +857,9 @@ def do_compress_uncompress_file(filename, path, typ):
     else:
         fullfile = os.path.join(path, filename)
     if not os.path.isfile(fullfile):
-        return -1, '%s: can\'t un/compress' % filename
+        return -1, '%s: is not a file' % filename
     c = compress.check_compressed_file(fullfile)
-    if c is None:
+    if c is None or isinstance(c, compress.PackagerTAR):
         packager = compress.packagers_by_type[typ]
         c = packager(fullfile)
         cmd = c.build_compress_cmd()
@@ -807,7 +867,7 @@ def do_compress_uncompress_file(filename, path, typ):
         cmd = c.build_uncompress_cmd()
     else:
         return -1, '%s: can\'t un/compress with %s' % \
-            (filename, compress.packagers_by_type[typ].compress_prog)
+               (filename, compress.packagers_by_type[typ].compress_prog)
     st, msg = run_shell(encode(cmd), encode(path), return_output=True)
     return st, msg
 
@@ -816,7 +876,7 @@ def compress_uncompress_file(tab, typ):
         fs = tab.selections[:]
     else:
         fs = [tab.sorted[tab.file_i]]
-    ProcessLoopUnCompress('Un/Compressing file', do_compress_uncompress_file,
+    ProcessLoopUnCompress('Un/Compress file', do_compress_uncompress_file,
                           fs, tab.path, typ).run()
     tab.selections = []
     app.regenerate()
@@ -851,7 +911,7 @@ def uncompress_dir(tab, dest=None, is_tmp=False):
         fs = tab.selections[:]
     else:
         fs = [tab.sorted[tab.file_i]]
-    ProcessLoopUnCompress('Uncompressing file', do_uncompress_dir,
+    ProcessLoopUnCompress('Uncompress file', do_uncompress_dir,
                           fs, tab.path, dest, is_tmp).run()
     tab.selections = []
 
@@ -885,7 +945,7 @@ def compress_dir(tab, typ, dest=None, is_tmp=False):
         fs = tab.selections[:]
     else:
         fs = [tab.sorted[tab.file_i]]
-    ProcessLoopUnCompress('Compressing file', do_compress_dir,
+    ProcessLoopUnCompress('Compress file', do_compress_dir,
                           fs, tab.path, typ, dest, is_tmp).run()
     tab.selections = []
 
@@ -893,23 +953,25 @@ def compress_dir(tab, typ, dest=None, is_tmp=False):
 ######################################################################
 ##### find / grep
 # find/grep
-def do_findgrep(path, files, pattern, ignorecase=0):
+def do_findgrep(path, files, pattern):
     # escape special chars
-    pat_re = pattern.replace('\\', '\\\\\\\\')
-    pat_re = pat_re.replace('-', '\\-')
+    pat_re = pattern.replace('\\', '\\\\\\\\').replace('-', '\\-')
     pat_re = pat_re.replace('(', '\\(').replace(')', '\\)')
     pat_re = pat_re.replace('[', '\\[').replace(']', '\\]')
-    if ignorecase:
-        ign = 'i'
-    else:
-        ign = ''
-    # 1st. version: find . -name "*.py" -print0 | xargs --null grep -Eni PATTERN
-#     cmd = '%s %s -name \"%s\" -print0 | %s --null %s -En%s %s' % \
-#           (sysprogs['find'], path, files, sysprogs['xargs'],
-#            sysprogs['grep'], ign, pattern)
-    # 2nd. version: find . -name "*.py" -exec grep -EHni PATTERN
-    cmd = '%s %s -name \"%s\" -exec %s -EHn%s \"%s\" {} \\;' % \
-          (sysprogs['find'], path, files, sysprogs['grep'], ign, pat_re)
+    ign = app.prefs.options['grep_ignorecase'] and 'i' or ''
+    rex = app.prefs.options['grep_regex'] and 'E' or ''
+    # 1. find . -type f -iname "*.py" -exec grep -EHni PATTERN {} \;
+    # the slowest, 10x
+    # 2. find . -type f -iname "*py" -print0 | xargs --null grep -EHni PATTERN
+    # maybe the best choice
+    cmd = '%s "%s" -type f -iname "%s" -print0 | %s --null %s -%sHn%s \"%s\"' % \
+          (sysprogs['find'], path, files, sysprogs['xargs'], sysprogs['grep'], rex, ign, pat_re)
+    # 3. grep -EHni PATTERN `find . -type f -iname "*.py"`
+    # don't like `
+    # 4. grep -REHni PATTERN --include "*.py" .
+    # the fastest, but non-POSIX, because of: -R, --include
+    # cmd = '%s -R%sHn%s \"%s\" --include "%s" "%s"' % \
+    #       (sysprogs['grep'], rex, ign, pat_re, files, path)
     st, ret = ProcessFunc('Searching',
                           'Searching for \"%s\" in \"%s\" files' % (pattern, files),
                           run_shell, encode(cmd), path, True).run()
@@ -918,7 +980,7 @@ def do_findgrep(path, files, pattern, ignorecase=0):
     if st < 0: # (-100, -1) => error
         return st, ret
     elif st == 0:
-        ret = ret.split('\n')
+        ret = [f.strip() for f in ret.split('\n') if f.strip() != '']
     matches = []
     if len(ret) > 0:
         # filename:linenumber:matching
@@ -928,8 +990,8 @@ def do_findgrep(path, files, pattern, ignorecase=0):
                 continue
             lst = l.split(':')
             if len(lst) == 1: # binary file
-                linenumber = '0'
-                filename = lst[0].split(' ')[-1]
+                linenumber = 0
+                filename = lst[0].split(' ')[-2] # FIXME: filename can contain SPC
             else:
                 i = len(lst) - 2
                 while True:
@@ -938,11 +1000,15 @@ def do_findgrep(path, files, pattern, ignorecase=0):
                         break
                     else:
                         i -= 1
-                linenumber = lst[i]
+                try:
+                    linenumber = int(lst[i])
+                except ValueError:
+                    linenumber = 0
             filename = filename.replace(path, '')
             if filename[0] == os.sep and path != os.sep:
                 filename = filename[1:]
-            matches.append('%s:%s' % (linenumber, filename))
+            matches.append((filename, linenumber))
+    matches = ['%s:%d' % (f, l) for f, l in sorted(matches)]
     return 0, matches
 
 
@@ -957,17 +1023,16 @@ def do_find(path, files):
     if st < 0: # (-100, -1) => error
         return st, ret
     elif st == 0:
-        ret = ret.split()
+        ret = [f.strip() for f in ret.split('\n') if f.strip() != '']
     matches = []
     if len(ret) > 0:
-        matches = []
         for filename in ret:
             filename = decode(filename).strip().replace(path, '')
             if filename is not None and filename != '':
                 if filename[0] == os.sep and path != os.sep:
                     filename = filename[1:]
                 matches.append(filename)
-    return 0, matches
+    return 0, sorted(matches)
 
 
 ######################################################################
@@ -1037,13 +1102,17 @@ def run_on_current_file(program, filename):
 if sys.version_info[:2] < (2, 4):
     import popen2
     run_shell = run_shell_popen
+    run_in_background = run_in_background_system
     get_shell_output = get_shell_output_popen
     get_shell_output2 = get_shell_output2_popen
+    get_shell_output3 = get_shell_output3_popen
 else:
     from subprocess import Popen, PIPE, STDOUT
+    run_in_background = run_in_background_subprocess
     run_shell = run_shell_subprocess
     get_shell_output = get_shell_output_subprocess
     get_shell_output2 = get_shell_output2_subprocess
+    get_shell_output3 = get_shell_output3_subprocess
 
 
 ######################################################################

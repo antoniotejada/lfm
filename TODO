@@ -1,107 +1,76 @@
 ============================================================================
-Last update:	Time-stamp: <2010-05-22 11:26:41 inigo>
+Last update:	Time-stamp: <2011-05-21 11:44:54 inigo>
 ============================================================================
+
 
 General:
 ========
-
-Bugs:
+High Priority:
+  + enhancements:
+    - don't like much how recursive chmod/chown/chgrp currently works
+      . split in 2 different features chmod and chown/chgrp ?
+    - support for languages with wide chars
+      . look at Xin Wang's patch
+      . check the real length on screen of the utf8-encoded strings.
+        http://bugs.python.org/issue6755
+        http://stackoverflow.com/questions/2476953/python-utf-8-howto-align-printout
+  + documentation:
+    - be sure version and release date is correct in all files
 
 Medium Priority:
-  + improvements
-1   - don't like much recursive chmod/chown/chgrp as currently works
-      . split in 2 different features chmod and chown/chgrp ?
-  + ui
-1   - support for languages with wide chars
-      . check the real length on screen of the utf8-encoded strings
-1   - rewrite messages.error
-      . make size fixed, bigger
-      . add file to body, not in header
-      . support msgs like 'line1\nline2\lines3...'
-2   - rewrite EntryLine
+  + enhancements:
+    - substitute curses.color_pair(X) for COL_XXX
+  + ui:
     - tab views:
       . 2 columns mode
       . customized: permissions instead of date
       . quick view
       . info view
-    - speed up cursor movement => curses.panel
   + new features:
-2   - command line
-      . loop over selected files
-      . tab: complete
-      . pattern substitution: $x$ or %x
-          %f: file including extension
-          %X: file without extension
-          %e: extension
-          %X: path/file.ext
-          %d: directory
-          %od: other panel directory
-          %bmk#: path in bookmark #
-          %l: all selected files, space-separated
-          %idx: index
-          %datetime
-        and key shortcuts to insert some of the variables
-      . flag: show output & errors or only errors
-      . options: flag save historic between sessions, number of items to save
-    - crypt files
-3   - sync dirs, use filecmp.dircmp
-3   - diff between xxx.orig and xxx => Plugins in F11?
-    - pyinotify
+    - pyview:
+      . use mmap
+      . tail mode: option -f, document
+    - powercli: |: run as tail -f, substitute run sync by default, document
+    - diff and sync dirs: use filecmp.dircmp or rsync
 
 Low Priority (maybe some day):
-  + advanced file rename tool
-  + remote vfs: ssh, ftp, smb, webdav
-  + new vfs: .rpm, .cpio, .deb, .jar, .xpi, .egg
-  + filter files (f.e. "*py" to only view python files)
-  + i18n
-  + pyview: tab 4/8 chars
-  + global copy/cut/paste between tabs or panes
-  + show directory under cursor in the other panel: mc: Alt+O
-  + exclude files (f.e. *.o) in grep 
-    - ".#filename" are temporary emacs files/links
-    - grep --exclude=XXX
-  + sessions
-  + keybindings customization
-  + background processes: copy/move
-  + use mimetypes module
-  + plugin system
-  + support setuptools
+  + enhancements:
+    - more than 10 bookmarks => use letters
+    - find/grep
+      . exclude files (f.e. *.o) in findgrep
+        grep --exclude=XXX => NON-POSIX, GNU extension
+      . checkboxes for ignorecase and regex flags
+  + new features:
+    - filter files (f.e. "*py" to only view python files)
+    - crypt files => gnupg ?
+    - new vfs: .rpm, .cpio, .deb, .jar, .xpi, .egg
+    - show directory under cursor in the other panel: mc: Alt+O
+    - keybindings customization
+    - global copy/cut/paste between tabs or panes
+    - background processes: copy/move/delete
+  + other:
+    - use mimetypes module
+    - use pyinotify module
+    - plugin system
 
 Very Low Priority (never):
+  + remote vfs: ssh, ftp, smb, webdav => read FAQ entry about fuse integration
+  + advanced file rename tool => use PowerCLI
+  + i18n => curses ui programming is very hard when dealing with different languages
+            because strings have different lengths so it's imposible to design a nice
+            and working interface for every language
   + mouse support
-  + an UI to configure preferences
-  + "save delete" option => move to ~/.Trash
-
-
-Upgrading python version, interesting features in new versions
-  + python 2.4
-    - sorted
-    - sort, sorted: cmp -> key
-    - subprocess
-    - property
-    - unicodetata.east_asian_width
-  + python 2.5
-    - ternary operator
-    - ctypes
-  + python 2.6
-    - collections.namedtuple
-    - with
-    - multiprocessing
-  + python 3
-    - has_key => in
-    - no module cPickle
-    - print()
+  + UI to configure preferences
+  + "save delete" / delete moving to ~/.Trash
 
 
 Known Bugs:
 ===========
 + general:
-  - "lfm path" fails if path contains spaces, caused by shell 'lfm' function
   - after renaming a file, cursor should be placed over the new file name,
     but this is not always posible because we don't know new file name
   - if an error happens while copying/moving/uncompressing/... =>
     => some rubbish remain in destination
-  - symlinks navigation. symlink has to return to a parent dir.
 
 + compress.py:
   - rar with password halts lfm, because process is waiting for a password =>
@@ -114,6 +83,37 @@ Known Bugs:
     a file, instead of vfs dir (this is just a minor estetic issue)
   - in case of 'panelize' vfs type (after find/grep), deleted / moved
     files are not deleted / moved in real path
+
+
+Python versions:
+================
+Upgrading python version, interesting new features by version
++ python 2.4
+  - sorted
+  - sort, sorted: cmp -> key
+  - subprocess
+  - property
+  - unicodetata.east_asian_width
++ python 2.5
+  - ternary operator
+  - any, all
+  - ctypes
++ python 2.6
+  - with
+  - multiprocessing
+  - subprocess.Popen.{send_signal,kill,terminate}
+  - format
+  - collections.namedtuple
+  - os.closerange()
+  - try: except Exception as
++ python 2.7
+  - subprocess.check_output
+  - collections.OrderedDict
++ python 3.x
+  - print()
+  - has_key => in
+  - collections.OrderedDict
+  - no module cPickle
 
 
 ============================================================================

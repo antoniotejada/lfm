@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2001-10  Iñigo Serna
-# Time-stamp: <2010-01-23 21:12:20 inigo>
+# Copyright (C) 2001-11  Iñigo Serna
+# Time-stamp: <2011-05-21 11:58:14 inigo>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,10 +18,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-u"""lfm v2.2 - (C) 2001-10, by Iñigo Serna <inigoserna@gmail.com>
+u"""lfm v2.3 - (C) 2001-11, by Iñigo Serna <inigoserna@gmail.com>
 
-'Last File Manager' is a file manager for UNIX console which born with
-midnight commander as model. Released under GNU Public License, read
+'Last File Manager' is a file manager for UNIX console.
+It has a curses interface and it's written in Python.
+Released under GNU Public License, read
 COPYING file for more details.
 
 Usage:\tlfm <options> [path1 [path2]]
@@ -39,15 +40,18 @@ Options:
 
 
 __author__ = u'Iñigo Serna'
-__revision__ = '2.2'
+__revision__ = '2.3'
 
 
 import os, os.path
 import sys
 import time
+import datetime
 import getopt
 import logging
 import curses
+import curses.panel
+import cPickle as pickle
 
 from __init__ import *
 from config import Config, colors
@@ -62,7 +66,7 @@ import pyview
 ######################################################################
 ##### Global variables
 LOG_FILE = os.path.join(os.getcwd(), 'lfm.log')
-MAX_HISTORIC_ENTRIES = 15
+MAX_TAB_HISTORY = 15
 
 
 ######################################################################
@@ -75,8 +79,9 @@ class Lfm(object):
         self.prefs = prefs          # preferences
         self.init_ui()
         self.statusbar = StatusBar(self.maxh, self)   # statusbar
-        self.lpane = Pane(PANE_MODE_LEFT, self)  # left pane
-        self.rpane = Pane(PANE_MODE_RIGHT, self) # right pane
+        self.cli = PowerCLI(self.maxh, self)          # powercli
+        self.lpane = Pane(PANE_MODE_LEFT, self)       # left pane
+        self.rpane = Pane(PANE_MODE_RIGHT, self)      # right pane
         self.act_pane, self.noact_pane = self.lpane, self.rpane
         if self.prefs.options['num_panes'] == 1:
             self.lpane.mode = PANE_MODE_FULL
@@ -120,7 +125,7 @@ class Lfm(object):
                            'archive_files', 'source_files', 'graphics_files',
                            'data_files', 'current_file_otherpane',
                            'current_selected_file_otherpane',
-                           'directories', 'exe_files']
+                           'directories', 'exe_files', 'cli_prompt', 'cli_text']
             # Initialize every color pair with user colors or with the defaults
             prefs_colors = self.prefs.colors
             for i, item_name in enumerate(color_items):
@@ -143,16 +148,20 @@ class Lfm(object):
         self.lpane.do_resize(h, w)
         self.rpane.do_resize(h, w)
         self.statusbar.do_resize(h, w)
+        self.cli.do_resize(h, w)
         self.regenerate()
         self.display()
 
 
     def display(self):
-        """display/update both panes and status bar"""
+        """display/update both panes and status bar or powercli"""
 
         self.lpane.display()
         self.rpane.display()
-        self.statusbar.display()
+        if self.cli.visible:
+            self.cli.display()
+        else:
+            self.statusbar.display()
 
 
     def half_display(self):
@@ -184,6 +193,8 @@ class Lfm(object):
                 vfs.exit(tab)
         if self.prefs.options['save_conf_at_exit']:
             self.prefs.save()
+        if self.prefs.options['save_history_at_exit']:
+            pickle.dump(messages.history, file(messages.HISTORY_FILE, 'w'), -1)
         if icode == -1: # change directory
             return self.act_pane.act_tab.path
         else:           # exit, but don't change directory
@@ -205,11 +216,7 @@ class Lfm(object):
                     self.act_pane, self.noact_pane = self.lpane, self.rpane
             elif ret == RET_TAB_NEW:
                 tab = self.act_pane.act_tab
-#                 path = os.path.dirname(tab.vbase) if tab.vfs else tab.path
-                if tab.vfs:
-                    path = os.path.dirname(tab.vbase)
-                else:
-                    path = tab.path
+                path = tab.path if tab.vfs=='' else os.path.dirname(tab.vbase)
                 idx = self.act_pane.tabs.index(tab)
                 newtab = TabVfs(self.act_pane)
                 newtab.init(path)
@@ -231,7 +238,7 @@ class StatusBar(object):
     def __init__(self, maxh, app):
         self.app = app
         try:
-            self.win = curses.newwin(1, 0, maxh-1, 0)
+            self.win = curses.newwin(1, app.maxw, maxh-1, 0)
         except curses.error:
             print 'Can\'t create StatusBar window'
             sys.exit(-1)
@@ -277,6 +284,233 @@ class StatusBar(object):
             except:
                 pass
         self.win.refresh()
+
+
+######################################################################
+##### PowerCLI class
+class PowerCLI(object):
+    """The PowerCLI class is an advanced 1-line cli"""
+
+    RUN_NORMAL, RUN_BACKGROUND, RUN_NEEDCURSESWIN = xrange(3)
+
+    def __init__(self, maxh, app):
+        self.app = app
+        self.visible = False
+        self.text = ''
+        self.pos = 0
+        try:
+            self.win = curses.newwin(1, app.maxw, maxh-1, 0)
+            self.pwin = curses.panel.new_panel(self.win)
+            self.pwin.top()
+        except curses.error:
+            print 'Can\'t create StatusBar window'
+            sys.exit(-1)
+        if curses.has_colors():
+            self.win.bkgd(curses.color_pair(25))
+        self.entry = None
+
+
+    def do_resize(self, h, w):
+        self.win.resize(1, w)
+        self.win.mvwin(h-1, 0)
+        if self.visible:
+            self.display()
+
+
+    def hide(self):
+        self.visible = False
+        self.pwin.bottom()
+        messages.cursor_hide()
+        self.app.statusbar.display()
+
+
+    def display(self):
+        self.visible = True
+        tab = self.app.act_pane.act_tab
+        path = vfs.join(tab) if tab.vfs else tab.path
+        l = self.app.maxw/6 - 4
+        if len(path) > l:
+            path = '~'+ path[-l-1:]
+        useridchar = '#' if os.getuid()==0 else '$'
+        self.win.erase()
+        self.win.addstr('[%s]%s ' % (utils.encode(path), useridchar),
+                        curses.color_pair(24) | curses.A_BOLD)
+        self.win.refresh()
+        le = len(path) + 4
+        self.entry = messages.EntryLine(self.app.maxw-le+4, 1, self.app.maxh-1, le,
+                                        self.text, 'cli', True, tab.path, cli=True)
+        self.entry.pos = self.pos
+        messages.cursor_show2()
+        self.pwin.top()
+        while True:
+            ans = self.entry.manage_keys()
+            if ans == -1:           # Ctrl-C
+                self.text, self.pos = self.entry.text, self.entry.pos
+                cmd = ''
+                break
+            elif ans == 10:         # return
+                self.text, self.pos = '', 0
+                cmd = self.entry.text.strip()
+                break
+        self.hide()
+        if cmd != '':
+            self.execute(cmd, tab)
+            if len(messages.history['cli']) >= messages.MAX_HISTORY:
+                messages.history['cli'].remove(messages.history['cli'][0])
+            if messages.history['cli'].count(cmd) >= 1:
+                messages.history['cli'].remove(cmd)
+            messages.history['cli'].append(cmd)
+
+
+    def __check_loop(self, cmd, selected):
+        if not selected:
+            return False
+        return any((var in cmd) for var in \
+                       ('$f', '$v', '$F', '$E', '$i', '$tm', '$ta', '$tc'))
+
+
+    def __replace_python(self, cmd, lcls):
+        lcls = dict([('__lfm_%s' % k, v) for k,v in lcls.items()])
+        # get chunks
+        chunks, st = {}, 0
+        while True:
+            i = cmd.find('{', st)
+            if i == -1:
+                break
+            j = cmd.find('}', i+1)
+            if j == -1:
+                raise SyntaxError('{ at %d position has not ending }' % i)
+            else:
+                chunks[(i+1, j)] = cmd[i+1:j].replace('$', '__lfm_')
+                st = j + 1
+        # evaluate
+        if chunks == {}:
+            return cmd
+        buf, st = '', 0
+        for i, j in sorted(chunks.keys()):
+            buf += cmd[st:i-1]
+            try:
+                translated = eval(chunks[(i, j)], {}, lcls)
+            except Exception, msg:
+                raise SyntaxError(str(msg).replace('__lfm_', '$'))
+            buf += unicode(translated)
+            st = j+1
+        buf += cmd[st:]
+        return buf
+
+
+    def __replace_variables(self, cmd, lcls):
+        for k, v in lcls.items():
+            if k in ('i', 'tm', 'ta', 'tc', 'tn'):
+                cmd = cmd.replace('$%s' % k, unicode(v))
+            elif k in ('s', 'a'):
+                cmd = cmd.replace('$%s' % k,  ' '.join(['"%s"' % f for f in v]))
+            else:
+                cmd = cmd.replace('$%s' % k, v)
+        return cmd
+
+
+    def __replace_cli(self, cmd, tab, selected, filename=None):
+        # prepare vars
+        if not filename:
+            filename = tab.sorted[tab.file_i]
+        cur_directory = tab.path
+        other_directory = self.app.noact_pane.act_tab.path
+        fullpath = os.path.join(tab.path, filename)
+        filename_noext, ext = os.path.splitext(filename)
+        if filename_noext.endswith('.tar'):
+            filename_noext = filename_noext.replace('.tar', '')
+            ext = '.tar' + ext
+        all_selected = selected
+        all_files = [f for f in tab.sorted if f is not os.pardir]
+        try:
+            selection_idx = selected.index(filename)+1
+        except ValueError:
+            selection_idx = 0
+        tm = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
+        ta = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
+        tc = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
+        tnow = datetime.datetime.now()
+        # and replace, first python code, and then variables
+        lcls =  {'f': filename, 'v': filename, 'F': fullpath,
+                 'E': filename_noext, 'e': ext,
+                 'd': cur_directory, 'o': other_directory,
+                 's': all_selected, 'a': all_files, 'i': selection_idx,
+                 'tm': tm, 'ta': ta, 'tc': tc, 'tn': tnow }
+        for i, bmk in enumerate(self.app.prefs.bookmarks):
+            lcls['b%d' % i] = bmk
+        cmd = self.__replace_python(cmd, lcls)
+        cmd = self.__replace_variables(cmd, lcls)
+        return cmd
+
+
+    def __run(self, cmd, path, mode):
+        if mode == PowerCLI.RUN_NEEDCURSESWIN:
+            curses.endwin()
+            try:
+                msg = utils.get_shell_output3('cd "%s" && %s' % (path, cmd))
+            except KeyboardInterrupt:
+                os.system('reset')
+                msg = 'Stopped by user'
+            st = -1 if msg else 0
+        elif mode == PowerCLI.RUN_BACKGROUND:
+            utils.run_in_background(cmd, path)
+            st, msg = 0, ''
+        else: # PowerCLI.RUN_NORMAL
+            st, msg = utils.ProcessFunc('Executing PowerCLI', cmd,
+                                        utils.run_shell, cmd, path, True).run()
+        if st == -1:
+            messages.error('Cannot execute PowerCLI command:\n  %s\n\n%s' % \
+                               (cmd, str(msg)))
+        elif st != -100 and msg is not None and msg != '':
+            if self.app.prefs.options['show_output_after_exec']:
+                curses.curs_set(0)
+                if messages.confirm('Executing PowerCLI', 'Show output', 1):
+                    lst = [(l, 2) for l in msg.split('\n')]
+                    pyview.InternalView('Output of "%s"' % utils.encode(cmd),
+                                        lst, center=0).run()
+        return st
+
+
+    def execute(self, cmd, tab):
+        selected = [f for f in tab.sorted if f in tab.selections]
+        loop = self.__check_loop(cmd, selected)
+        if cmd[-1] == '&':
+            mode = PowerCLI.RUN_BACKGROUND
+            cmd_orig = cmd[:-1].strip()
+        elif cmd[-1] == '%':
+            mode = PowerCLI.RUN_NEEDCURSESWIN
+            cmd_orig = cmd[:-1].strip()
+        else:
+            mode = PowerCLI.RUN_NORMAL
+            cmd_orig = cmd
+        if loop:
+            for f in selected:
+                try:
+                    cmd = self.__replace_cli(cmd_orig, tab, selected, f)
+                # except Exception as msg: # python v2.6+
+                except Exception, msg:
+                    messages.error('Cannot execute PowerCLI command:\n  %s\n\n%s' % \
+                                       (cmd_orig, str(msg)))
+                    st = -1
+                else:
+                    st = self.__run(cmd, tab.path, mode)
+                if st == -1:
+                    self.app.lpane.display()
+                    self.app.rpane.display()
+                    if messages.confirm('Error running PowerCLI',
+                                        'Do you want to stop now?') == 1:
+                        break
+            tab.selections = []
+        else:
+            try:
+                cmd = self.__replace_cli(cmd_orig, tab, selected)
+            # except Exception as msg: # python v2.6+
+            except Exception, msg:
+                messages.error('Cannot execute PowerCLI command:\n  %s\n\n%s' % \
+                                   (cmd_orig, str(msg)))
+            else:
+                st = self.__run(cmd, tab.path, mode)
 
 
 ######################################################################
@@ -327,8 +561,7 @@ class Pane(object):
         elif self.mode == PANE_MODE_FULL:
             return (self.maxh-2, self.maxw, 1, 0)     # h, w, y0, x0
         else:              # error
-            messages.error('Initialize Panes Error',
-                           'Incorrect pane number.\nLook for bugs if you can see this.')
+            messages.error('Cannot initialize panes\nReport bug if you can see this.')
             return (self.maxh-2, int(self.maxw/2), 1, int(self.maxw/2))
 
 
@@ -597,16 +830,12 @@ class Vfs(object):
         self.vfs = ''          # vfs? if not -> blank string
         self.base = ''         # tempdir basename
         self.vbase = self.path # virtual directory basename
-        # historic
-        self.historic = []
+        # history
+        self.history = []
 
 
     def init_dir(self, path):
-#         old_path = self.path if self.path and not self.vfs else None # python v2.5+
-        if self.path and not self.vfs:
-            old_path = self.path
-        else:
-            old_path = ''
+        old_path = self.path if self.path and not self.vfs else ''
         try:
             app = self.pane.app
             self.nfiles, self.files = files.get_dir(path, app.prefs.options['show_dotfiles'])
@@ -619,19 +848,19 @@ class Vfs(object):
             self.path = os.path.abspath(path)
             self.selections = []
         except (IOError, OSError), (errno, strerror):
-            if len(self.historic) > 0:
-                self.historic.pop()
+            if len(self.history) > 0:
+                self.history.pop()
             return (strerror, errno)
         # vfs variables
         self.vfs = ''
         self.base = ''
         self.vbase = self.path
-        # historic
+        # history
         if old_path:
-            if old_path in self.historic:
-                self.historic.remove(old_path)
-            self.historic.append(old_path)
-            self.historic = self.historic[-MAX_HISTORIC_ENTRIES:]
+            if old_path in self.history:
+                self.history.remove(old_path)
+            self.history.append(old_path)
+            self.history = self.history[-MAX_TAB_HISTORY:]
 
 
     def init(self, path, old_file = ''):
@@ -748,14 +977,14 @@ class Vfs(object):
         res['fname'] = fname
         if res['dev']:
             res['devs'] = '%3d,%d' % (res['maj_rdev'], res['min_rdev'])
-            buf = '%(type_chr)c%(fname)s %(devs)7s %(mtime2)12s' % res
+            buf = u'%(type_chr)c%(fname)s %(devs)7s %(mtime2)12s' % res
         else:
-            buf = '%(type_chr)c%(fname)s %(size)7s %(mtime2)12s' % res
+            buf = u'%(type_chr)c%(fname)s %(size)7s %(mtime2)12s' % res
         return buf
 
 
     def get_fileinfo_str_long(self, res, maxw):
-        filewidth = maxw - 57
+        filewidth = maxw - 62
         fname = res['filename']
         if len(fname) > filewidth:
             half = int(filewidth/2)
@@ -765,9 +994,9 @@ class Vfs(object):
         res['group'] = res['group'][:10]
         if res['dev']:
             res['devs'] = '%3d,%d' % (res['maj_rdev'], res['min_rdev'])
-            buf = '%(type_chr)c%(perms)9s %(owner)-10s %(group)-10s %(devs)7s  %(mtime)16s  %(fname)s' % res
+            buf = u'%(type_chr)c%(perms)9s %(owner)-10s %(group)-10s %(devs)7s  %(mtime)16s  %(fname)s' % res
         else:
-            buf = '%(type_chr)c%(perms)9s %(owner)-10s %(group)-10s %(size)7s  %(mtime)16s  %(fname)s' % res
+            buf = u'%(type_chr)c%(perms)9s %(owner)-10s %(group)-10s %(size)7s  %(mtime)16s  %(fname)s' % res
         return buf
 
 
@@ -794,7 +1023,7 @@ class TabVfs(Vfs):
     def init(self, path, old_file='', check_oldfile=True):
         err = self.init_dir(path)
         if err:
-            messages.error('Enter In Directory', '%s (%d)' % err, path)
+            messages.error('Cannot change directory\n%s: %s (%d)' % (path, err[0], err[1]))
         if (check_oldfile and old_file) or (old_file and err):
             try:
                 self.file_i = self.sorted.index(old_file)
@@ -827,7 +1056,7 @@ def num2str(num):
 
 ######################################################################
 ##### Main
-def usage(msg = ''):
+def usage(msg=''):
     if msg != "":
         print 'lfm:\tERROR: %s\n' % msg
     print __doc__
@@ -873,13 +1102,6 @@ def lfm_start(sysargs):
         time.sleep(1)
 
     # parse args
-    # hack, 'lfm' shell function returns a string, not a list,
-    # so we have to build a list
-    if len(sysargs) <= 2:
-        lst = sysargs[:]
-        sysargs = [lst[0]]
-        if len(lst) > 1:
-            sysargs.extend(lst[1].split())
     try:
         opts, args = getopt.getopt(sysargs[1:], '12dh', ['debug', 'help'])
     except getopt.GetoptError:
@@ -908,6 +1130,15 @@ def lfm_start(sysargs):
     else:
         usage('Incorrect number of arguments')
         lfm_exit(-1)
+
+    # history
+    if prefs.options['save_history_at_exit']:
+        try:
+            messages.history = pickle.load(file(messages.HISTORY_FILE, 'r'))
+        except:
+            messages.history = messages.DEFAULT_HISTORY.copy()
+    else:
+        messages.history = messages.DEFAULT_HISTORY.copy()
 
     # logging
     if DEBUG:

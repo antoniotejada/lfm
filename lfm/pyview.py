@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2001-10  Iñigo Serna
-# Time-stamp: <2010-01-23 21:12:54 inigo>
+# Copyright (C) 2001-11  Iñigo Serna
+# Time-stamp: <2011-05-14 12:12:24 inigo>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 
 
 """
-Copyright (C) 2001-10, Iñigo Serna <inigoserna@gmail.com>.
+Copyright (C) 2001-11, Iñigo Serna <inigoserna@gmail.com>.
 All rights reserved.
 
 This software has been released under the GPL License, see the COPYING
@@ -112,7 +112,7 @@ class InternalView(object):
         buf = [(l[0][:app.maxw-2], l[1] ) for l in buf]
         buf2 = [l[0] for l in buf]
         self.nlines = len(buf2)
-        if self.nlines > app.maxh - 2:
+        if self.nlines >= app.maxh - 2:
             self.large = True
             self.y0 = self.y = 0
         else:
@@ -123,11 +123,7 @@ class InternalView(object):
             self.x0 = int((app.maxw-col_max)/2)
         else:
             self.x0 = 1
-            # self.y0 = 0 if self.large else 1 # python v2.5+
-            if self.large:
-                self.y0 = 0
-            else:
-                self.y0 = 1
+            self.y0 = 0 if self.large else 1
         self.buf = buf
 
     def init_curses(self):
@@ -135,9 +131,9 @@ class InternalView(object):
         curses.raw()
         curses.curs_set(0)
         try:
-            self.win_title = curses.newwin(1, 0, 0, 0)
-            self.win_body = curses.newwin(app.maxh-2, 0, 1, 0)     # h, w, y, x
-            self.win_status = curses.newwin(1, 0, app.maxh-1, 0)
+            self.win_title = curses.newwin(1, app.maxw, 0, 0)
+            self.win_body = curses.newwin(app.maxh-2, app.maxw, 1, 0)     # h, w, y, x
+            self.win_status = curses.newwin(1, app.maxw, app.maxh-1, 0)
         except curses.error:
             print 'Can\'t create windows'
             sys.exit(-1)
@@ -157,7 +153,7 @@ class InternalView(object):
         if self.large:
             status = ''
         else:
-            status = 'Press a key to continue'
+            status = 'Press any key to continue'
             self.win_status.addstr(0, int((app.maxw-len(status))/2), status)
         self.win_title.refresh()
         self.win_status.refresh()
@@ -246,7 +242,7 @@ class FileCache(object):
                 self.lines_pos.append(pos)
                 # prepolulate first 50 lines
                 if nline <= 50:
-                    buf = line.replace('\t', ' '*4)[:-1]
+                    buf = line.replace('\t', ' '*4)
                     self.lines[nline] = buf
                     self.lines_age[nline] = time()
                     self.size += len(buf)
@@ -259,14 +255,14 @@ class FileCache(object):
 
     def __len__(self):
         return len(self.lines)
-    
+
     def __repr__(self):
         return u'FileCache [%s, %d of %d lines in cache]' % \
             (self.filename, len(self), self.nlines)
 
     def isempty(self):
         return self.nbytes == 0
-    
+
     def __getitem__(self, lineno):
         """return line# contents"""
         if lineno < 1 or lineno > self.nlines:
@@ -297,7 +293,7 @@ class FileCache(object):
         """return length of line#"""
         if lineno < 1 or lineno > self.nlines:
             return None
-        return len(self[lineno])   
+        return len(self[lineno])
 
     def linecol2pos(self, lineno, col):
         """return absolute position for line# and col# in file"""
@@ -319,8 +315,8 @@ class FileCache(object):
     def get_bytes(self, n, pos):
         """return a string with n bytes starting at pos"""
         self.fd.seek(pos)
-        return self.fd.read(n)       
-    
+        return self.fd.read(n)
+
 
 ######################################################################
 ##### PyView
@@ -342,11 +338,10 @@ class FileView(object):
         try:
             self.fc = FileCache(filename)
         except (IOError, os.error), (errno, strerror):
-            messages.error('%s' % PYVIEW_NAME,
-                           '%s (%s)' % (strerror, errno), filename)
+            messages.error('Cannot view file\n%s: %s (%s)' % (filename, strerror, errno))
             sys.exit(-1)
         if self.fc.isempty():
-            messages.error('View \'%s\'' % filename, 'File is empty')
+            messages.error('Cannot view file\n%s: File is empty' % filename)
             sys.exit(-1)
         if line != 0:
             if mode == MODE_TEXT:
@@ -360,9 +355,9 @@ class FileView(object):
         curses.raw()
         curses.curs_set(0)
         try:
-            self.win_title = curses.newwin(1, 0, 0, 0)
-            self.win_file = curses.newwin(self.maxh-2, 0, 1, 0)
-            self.win_status = curses.newwin(1, 0, self.maxh-1, 0)
+            self.win_title = curses.newwin(1, self.maxw, 0, 0)
+            self.win_file = curses.newwin(self.maxh-2, self.maxw, 1, 0)
+            self.win_status = curses.newwin(1, self.maxw, self.maxh-1, 0)
         except curses.error:
             print 'Can\'t create windows'
             sys.exit(-1)
@@ -405,7 +400,7 @@ class FileView(object):
             return c # curses.ascii.ascii(c) = c
         else:
             return '.'
-        
+
     def show_str(self, w, line):
         buf = ''.join(map(self.__sanitize_char, line))
         w.addstr(buf)
@@ -421,7 +416,7 @@ class FileView(object):
                 return chars_per_line
         else:
             return -1
-    
+
     def __move_hex(self, n):
         self.pos += self.__calc_hex_charsperline() * n
         self.pos = min(self.fc.nbytes & 0xFFFFFFF0L, max(0, self.pos))
@@ -557,11 +552,11 @@ class FileView(object):
             st, buf = run_shell(encode(cmd), path=u'.', return_output=True)
         except OSError:
             self.show()
-            messages.error('Find Error', 'Can\'t open file')
+            messages.error('Find error: Can\'t open file')
             return -1
         if st == -1:
             self.show()
-            messages.error('Find Error', buf)
+            messages.error('Find error\n' + buf)
             self.matches = []
             return -1
         else:
@@ -579,7 +574,7 @@ class FileView(object):
                 break
         else:
             self.show()
-            messages.error('Find', 'No more matches <%s>' % self.pattern)
+            messages.error('Cannot find "%s"\nNo more matches' % self.pattern)
             return
         if self.mode == MODE_TEXT:
             self.line, self.col = next, 0
@@ -589,15 +584,12 @@ class FileView(object):
     def __find_prev(self):
         pos = (self.mode==MODE_TEXT) and self.line-1 or \
             self.pos - self.__calc_hex_charsperline() # start in prev line
-        # for prev in sorted(self.matches, reverse=True): # python v2.4+
-        rev_matches = self.matches[:]
-        rev_matches.reverse()
-        for prev in rev_matches:
+        for prev in sorted(self.matches, reverse=True):
             if prev <= pos:
                 break
         else:
             self.show()
-            messages.error('Find', 'No more matches <%s>' % self.pattern)
+            messages.error('Cannot find "%s"\nNo more matches' % self.pattern)
             return
         if self.mode == MODE_TEXT:
             self.line, self.col = prev, 0
@@ -627,6 +619,8 @@ class FileView(object):
         if self.mode == MODE_TEXT:
             if self.wrap:
                 if self.col + self.maxw >= self.fc.line_len(self.line):
+                    if self.line == self.fc.nlines:
+                        return
                     self.line = min(self.fc.nlines, self.line+1)
                     self.col = 0
                 else:
@@ -664,7 +658,7 @@ class FileView(object):
         if self.mode == MODE_TEXT:
             if self.wrap:
                 i = y = 0
-                dx = self.col
+                dx = old_col = self.col
                 while y < self.maxh - 2:
                     l = self.fc[self.line+i]
                     if l is None:
@@ -676,17 +670,20 @@ class FileView(object):
                 if f != 0:
                     i -= 1
                     self.col = dx + ((f+1)-(y-self.maxh+2)) * self.maxw
-                    if self.col >= len(l[dx:]):
+                    if l is None or self.col >= len(l[dx:]):
                         self.col = 0
                         i += 1
                 else:
                     self.col = dx
+                if self.line == self.fc.nlines:
+                    self.col = old_col
+                    return
                 self.line = min(self.fc.nlines, self.line+i)
             else:
                 self.line = min(self.fc.nlines, self.line+self.maxh-2)
         else:
             self.__move_hex(self.maxh-2)
-        
+
     def move_home(self):
         if self.mode == MODE_TEXT:
             self.line, self.col = 1, 0
@@ -698,7 +695,7 @@ class FileView(object):
             self.line, self.col = self.fc.nlines, 0
         else:
             self.pos = self.fc.nbytes & 0xFFFFFFF0L
-    
+
     def move_left(self):
         if self.mode == MODE_TEXT and not self.wrap:
             if self.col > 9:
@@ -713,7 +710,7 @@ class FileView(object):
     def goto(self):
         rel = 0
         title = (self.mode==MODE_TEXT) and 'Goto line' or 'Type line number'
-        help = (self.mode==MODE_TEXT) and 'Goto byte' or 'Type byte offset'
+        help = (self.mode==MODE_TEXT) and 'Goto line' or 'Type byte offset'
         n = messages.Entry(title, help, '', True, False).run()
         if not n:
             return
@@ -729,8 +726,8 @@ class FileView(object):
                 n = long(n)
         except ValueError:
             self.show()
-            messages.error('Goto %s' % (self.mode==MODE_TEXT) and 'line' or 'byte',
-                           'Invalid number <%s>' % n)
+            msg = 'Goto %s' % (self.mode==MODE_TEXT and 'line' or 'byte')
+            messages.error(msg + '\nInvalid number: %s' % n)
             return
         if n == 0:
             return
@@ -793,7 +790,7 @@ class FileView(object):
             self.mode = MODE_TEXT
             self.line, self.col = self.fc.pos2linecol(self.pos)[0], 0
             self.pos = 0
-        
+
     # other
     def open_shell(self):
         curses.endwin()
@@ -811,7 +808,7 @@ class FileView(object):
         for l in text:
             buf.append((l, 6))
         InternalView('Help for %s' % PYVIEW_NAME, buf).run()
-   
+
 
     def run(self):
         while True:
@@ -913,7 +910,7 @@ def PyView(sysargs):
     line = 0
     stdin_flag = False
     mode = MODE_TEXT
-    
+
     # args
     try:
         opts, args = getopt.getopt(sysargs[1:], 'dhsm:',

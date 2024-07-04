@@ -31,7 +31,7 @@ def init(tab, filename, vfstype):
                                 tab.path, tempdir, True).run()
     if st == -1: # error
         app.display()
-        messages.error('Creating vfs', msg)
+        messages.error('Cannot create vfs (opening compressed file)\n' + msg)
         app.display()
         return # temppdir deleted by previous call, so we just return
     elif st == -100: # stopped by user
@@ -63,8 +63,7 @@ def copy(tab_org, tab_new):
             files.copy_bulk(os.path.join(dir_src, f), os.path.join(tempdir, f))
         except (IOError, os.error), (errno, strerror):
             app.display()
-            messages.error('Error regenerating vfs file',
-                           '%s (%s)' % (strerror, errno))
+            messages.error('Cannot copy vfs (compressed file)\n%s (%s)' % (strerror, errno))
     # init vars
     tab_new.base = tempdir
     tab_new.vfs = tab_org.vfs
@@ -104,6 +103,9 @@ def regenerate_file(tab):
     if st == -1: # error
         app.display()
         messages.error('Creating vfs', buf)
+
+        messages.error('Cannot regenerate vfs (closing compressed file)\n' + buf)
+
         app.display()
         try:
             files.delete_bulk(tmpfile)
@@ -157,7 +159,7 @@ def pan_init(tab, fs):
             elif os.path.isdir(f_orig):
                 os.mkdir(f_dest)
         except (IOError, os.error), (errno, strerror):
-            messages.error('Can\'t create vfs', '%s (%s)' % (strerror, errno))
+            messages.error('Cannot create vfs (starting panelize)\n%s (%s)' % (strerror, errno))
     # update vfs vars
     vpath = tab.path
     tab.init(tempdir)
@@ -179,8 +181,7 @@ def pan_copy(tab_org, tab_new):
             files.copy_bulk(os.path.join(dir_src, f), os.path.join(tempdir, f))
         except (IOError, os.error), (errno, strerror):
             app.display()
-            messages.error('Error regenerating vfs file',
-                           '%s (%s)' % (strerror, errno))
+            messages.error('Cannot copy vfs (panelize subsystem)\n%s (%s)' % (strerror, errno))
     # init vars
     tab_new.base = tempdir
     tab_new.vfs = tab_org.vfs
@@ -204,9 +205,7 @@ def pan_regenerate(tab):
             files.copy_bulk(os.path.join(dir_src, f), os.path.join(dir_dest, f))
         except (IOError, os.error), (errno, strerror):
             app.display()
-            messages.error('Error regenerating vfs file',
-                           '%s (%s)' % (strerror, errno))
+            messages.error('Cannot regenerating vfs (closing panelize)\n%s (%s)' % (strerror, errno))
 
 
 ######################################################################
-

@@ -1,3 +1,71 @@
+Version 2.3 ("Wow, less than a year!") - 2011/05/21:
+
+  + About the code
+    - lfm needs python version 2.5 or upper now
+
+  + New features
+    - PowerCLI, an advanced command line interface with completion, persistent
+      history, variable substitution and many other useful features.
+      As this is a very powerful tool, read the documentation for examples
+    - history
+      . use different types of history lists: path, file, glob, grep, exec, cli
+        for the different forms and actions
+      . persistent history between sessions => ~/.lfm_history
+        . controlled by a flag in configuration
+    - find/grep
+      . configuration options for ignorecase and regex
+      . sort results
+      . show results as FILE:lineno
+      . much faster
+    - show diff between xxx.orig and xxx files
+    - tar files compress/uncompress
+    - messages.EntryLine has been rewritten, with many new key shorcuts. This is
+      the core behind most of the forms lfm shows when asking for anything.
+      Consult the documentation
+
+  + Minor changes
+    - reorganize "un/compress file" and "compress directory xxx" in file_menu
+    - config: sort entries when saving
+    - improve load/save handling of new options not present in ~/.lfmrc
+    - added new extensions
+    - messages.error rewritten to offer better messages
+    - added some new key shortcuts messages.SelectItem
+
+  + Documentation
+    - added a note about python v2.5+ is needed from now on
+    - 'lfm' shell function: change "$*" to "$@" to properly handle paths
+      containg spaces
+    - FAQ: added information about fuse to mount ssh, ftp, smb and webdav
+    - reorganized and fixed key bindings section
+    - documented .lfmrc contents
+    - added link to public BitBucket repository
+
+  + lots of bugs fixed:
+    - pyview:
+      . last char is not shown if file size is small
+      . last line and wrap: cursor_down or page_next
+      . when number of lines == window height
+    - ncurses v5.8 doesn't accept 0 as width or height
+    - UI crashes:
+      . time string could contain non-ascii characters (reported by Martin Steigerwald)
+      . when filenane length is large in full pane mode
+      . MenuWin, SelectItem: ellipsize entries if bigger than screen width
+    - find or find&grep:
+      . pass "-type f" to find  as ".#filename" are temporary emacs files/links
+        that break search
+      . show wrong matches if results contain directories or files with spaces
+      . file->goto_file: move to correct page
+    - copy/move "/file" to "/anydir/anyplace" fails, trying to copy/move to "/"
+    - executing non-ascii programname or args
+    - convoluted issue with link to directory in corner cases (reported by Xin Wang)
+    - rename/backup ".." crashes
+    - we should not compress ".."
+    - create_link, edit_link: don't show error if canceled
+    - only store one copy of the same entry in history
+    - tree: "disable" colors of active panel, "enable" at end
+    - Config.save: work with unicode, only convert to encoding when saving
+
+
 Version 2.2 ("Approaching perfection") - 2010/05/22:
 
   + New features
@@ -30,7 +98,7 @@ Version 2.2 ("Approaching perfection") - 2010/05/22:
       . new command line flag -s/--stdin to force reading from stdin.
         Now pyview doesn't wait for stdin input by default, so it starts much
         faster. eg. $ ps efax | pyview -s
-    
+
   + Minor changes
     - add color entries for directories and exe_files
     - expand ~ to user home
@@ -40,7 +108,7 @@ Version 2.2 ("Approaching perfection") - 2010/05/22:
     - show file info rewritten, now it shows correctly information
       from fuse-mounted volumes
     - added new "ebook" category, filetypes and formats
-  
+
   + About the code
     - since python v2.6+, popen* is deprecated, so make lfm check python
       version and use popen* or subprocess accordingly
@@ -75,7 +143,7 @@ Version 2.2 ("Approaching perfection") - 2010/05/22:
 Version 2.1 ("What do you want for Christimas?") - 2008/12/21:
 
   + Ctrl-H now show/hide dot files
-  + Ctrl-Y display directories history 
+  + Ctrl-Y display directories history
   + It's now posible to move the cursor in the non-active pane
     Consult the documentation for available keys and actions
     This behaviour is de/activated with Ctrl-W
@@ -117,11 +185,11 @@ Version 2.0 ("Nine 1/2 weeks... ok, ok, and 3 years") - 2007/09/03:
       . delete garbage if user stops action
       . run 'do_special_view_file' as dettached from lfm window
       . path expand in bookmarks ("~/") [Andrey Skvortsov]
-      . an ugly traceback crash appears when user starts "lfm path" and has 
-        no permissions to enter. Show error message and default to current 
+      . an ugly traceback crash appears when user starts "lfm path" and has
+        no permissions to enter. Show error message and default to current
         directory
-      . lfm crashes when filename is not encoded with same codec than 
-        g_encoding utils.{decode|encode}. Needs curses module linked against 
+      . lfm crashes when filename is not encoded with same codec than
+        g_encoding utils.{decode|encode}. Needs curses module linked against
         ncursesw to work properly
       . sort_mix_cases = 1 performance degrades on larger dirs.
         Reported by Andrey Skvortsov
@@ -131,17 +199,17 @@ Version 2.0 ("Nine 1/2 weeks... ok, ok, and 3 years") - 2007/09/03:
       . dialogs appear at bad position after terminal is resized
       . handle window resize in Tree mode
       . refresh display after canceling completion dialog
-      . "the size of the right pane does not fill the last column in 
+      . "the size of the right pane does not fill the last column in
         terminal if their number is odd" [Andrey Skvortsov]
-      . fix crash when "df" shows entries in two different lines (device 
+      . fix crash when "df" shows entries in two different lines (device
         name is too large, f.e. in linux lvm2 volumes)
-      . if you try to enter a directory with insufficient permissions, after 
+      . if you try to enter a directory with insufficient permissions, after
         the error message is closed the cursorline refreshes to the first line
     - compress:
       . added -i flag (--ignore-zeros) flag to tar [Andrey Skvortsov]
       . standard tar needs - for flags
     - vfs:
-      . vfs.py: regenerate_file, if user stops process, tempfile can't be 
+      . vfs.py: regenerate_file, if user stops process, tempfile can't be
         deleted
     - find/grep:
       . escape special chars (- \ ( ) [ ]) in patterns
@@ -163,7 +231,7 @@ Version 0.91 ("It rocks... yeah!") - 2004/06/30:
   + quite stable and robust, doesn't crash
   + faster
   + new option: show_dotfiles flag
-  + new option: detach_terminal_at_exec flag: useful f.e. if you 
+  + new option: detach_terminal_at_exec flag: useful f.e. if you
     want to run elinks as web browser attached to lfm terminal
   + file associations and applications can be configured in preferences
   + now each application has only 1 associated program, *breaking old .lfmrc*
@@ -247,10 +315,10 @@ Version 0.8 ("Close to Paradise") - 2002/03/04:
           * "messages.SelectItem, messages.FindfilesWin, messages.MenuWin,
             messages.ChangePerms: upperleft corner disappears"
           * findgrep: fix bug: if selected file has a ':' in name
-      - pyview: 
+      - pyview:
           * changing 'addch' by 'addstr' shows individual chars >= 0xA0 (meta
             chars) correctly, neither in reversed video or as 2 chars
-          * "if wrap mode => fix prev/next page & up/down cursor". Now 
+          * "if wrap mode => fix prev/next page & up/down cursor". Now
             they move to screen lines, not to physical lines
 
 
@@ -258,10 +326,10 @@ Version 0.7 ("Hello Darling, I'm here") - 2001/11/30:
 
   + 'pyview', a new pager/viewer for use with lfm or standalone,
     internally or externally. It is used as default pager too.
-    Some features: Text / Hex view, backwards & forwards search, 
+    Some features: Text / Hex view, backwards & forwards search,
                    goto line/byte, un/wrap mode, documentation, ...
   + Rewrite 'show filesystems info' to use internal viewer
-  + New 'run_thread' function in which almost every proccess is executed, 
+  + New 'run_thread' function in which almost every proccess is executed,
     so they can be stopped and there is a working signal too.
     'do_something_on_file' does not use it
   + Implemented 'show file info'

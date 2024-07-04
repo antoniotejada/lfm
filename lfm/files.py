@@ -41,6 +41,8 @@ FILETYPES = { FTYPE_DIR: (os.sep, 'Directory'),
 (SORTTYPE_None, SORTTYPE_byName, SORTTYPE_byName_rev, SORTTYPE_bySize,
  SORTTYPE_bySize_rev, SORTTYPE_byDate, SORTTYPE_byDate_rev) = xrange(7)
 
+SYSTEM_PROGRAMS = []
+
 
 ########################################################################
 ##### general functions
@@ -70,7 +72,7 @@ else:
 
 def __get_size(f):
     """return the size of the directory or file via 'du -sk' command"""
-    
+
     buf = get_shell_output2('du -sk \"%s\"' % encode(f))
     return (buf==None) and 0 or int(buf.split()[0])*1024
 
@@ -111,10 +113,7 @@ def __get_filetype(lmode, f):
         except OSError:
             return FTYPE_NLNK
         else:
-            if stat.S_ISDIR(mode):
-                return FTYPE_LNK2DIR
-            else:
-                return FTYPE_LNK
+            return FTYPE_LNK2DIR if stat.S_ISDIR(mode) else FTYPE_LNK
     if stat.S_ISCHR(lmode):
         return FTYPE_CDEV
     if stat.S_ISBLK(lmode):
@@ -152,11 +151,11 @@ def get_fileinfo(f, pardir_flag=False, show_dirs_size=False):
     try:
         owner = pwd.getpwuid(st[stat.ST_UID])[0]
     except:
-        owner = str(st[stat.ST_UID])
+        owner = unicode(st[stat.ST_UID])
     try:
         group = grp.getgrgid(st[stat.ST_GID])[0]
     except:
-        group = str(st[stat.ST_GID])
+        group = unicode(st[stat.ST_GID])
     return (typ, stat.S_IMODE(st[stat.ST_MODE]), owner, group,
             size, st[stat.ST_MTIME])
 
@@ -228,8 +227,8 @@ def get_fileinfo_dict(path, filename, filevalues):
     else:
         mtime = time.strftime('%a  %d %b %Y', time.localtime(filevalues[FT_MTIME]))
         mtime2 = time.strftime('%d %b  %Y', time.localtime(filevalues[FT_MTIME]))
-    res['mtime'] = mtime
-    res['mtime2'] = mtime2
+    res['mtime'] = decode(mtime)
+    res['mtime2'] = decode(mtime2)
     return res
 
 
@@ -239,7 +238,7 @@ def get_dir(path, show_dotfiles=1):
 
     # bug in python: os.path.normpath(u'/') returns str instead of unicode,
     #                so convert to unicode anyway
-    path = decode(os.path.normpath(path))   
+    path = decode(os.path.normpath(path))
     files_dict = {}
     if path != os.sep:
         files_dict[os.pardir] = get_fileinfo(os.path.dirname(path), 1)
@@ -338,10 +337,7 @@ def get_mount_points():
     for e in buf.split('\n'):
         es = e.split()
         lst.append((es[2], es[0], es[4]))
-    # lst.sort(reverse=True) # python v2.4+
-    lst.sort()
-    lst.reverse()
-    return lst
+    return sorted(lst, reverse=True)
 
 
 def get_mountpoint_for_file(f):
@@ -361,6 +357,19 @@ def convert_filename_encoding(path, filename, newname):
     os.chdir(curpath)
 
 
+def get_binary_programs():
+    d = {}
+    for p in os.getenv('PATH').split(':'):
+        try:
+            for prog in os.listdir(p):
+                d.setdefault(prog)
+        except OSError:
+            pass
+    return sorted(d.keys())
+
+SYSTEM_PROGRAMS = get_binary_programs()
+
+
 ########################################################################
 ##### temporary file
 def mktemp():
@@ -373,66 +382,40 @@ def mkdtemp():
 ########################################################################
 ##### sort
 def __do_sort(f_dict, sortmode, sort_mix_cases):
-    def __move_pardir_to_top(names):
-        if names.count(os.pardir) != 0:
-            names.remove(os.pardir)
-            names.insert(0, os.pardir)
-        return names
-
     if sortmode == SORTTYPE_None:
-        return __move_pardir_to_top(f_dict.keys())
-
-    if sortmode in (SORTTYPE_byName, SORTTYPE_byName_rev):
-        if sort_mix_cases:
-            mycmp = lambda a, b: cmp(a.lower(), b.lower())
-        else:
-            mycmp = None
         names = f_dict.keys()
-        names.sort(cmp=mycmp)
-        if sortmode == SORTTYPE_byName_rev:
-            names.reverse()
-        return __move_pardir_to_top(names)
-
-    mydict = {}
-    for k in f_dict.keys():
-        if sortmode in (SORTTYPE_bySize, SORTTYPE_bySize_rev):
-            size = f_dict[k][FT_SIZE]
-            while mydict.has_key(size):    # can't be 2 entries with same key
-                size += 0.1
-            mydict[size] = k
-        elif sortmode in (SORTTYPE_byDate, SORTTYPE_byDate_rev):
-            tim = f_dict[k][FT_MTIME]
-            while mydict.has_key(tim):    # can't be 2 entries with same key
-                tim += 0.1
-            mydict[tim] = k
-        else:
-            raise ValueError
-    values = mydict.keys()
-    values.sort()
-    names = [mydict[v] for v in values]
-    if sortmode in (SORTTYPE_bySize_rev, SORTTYPE_byDate_rev):
-        names.reverse()
-    return __move_pardir_to_top(names)
+    elif sortmode in (SORTTYPE_byName, SORTTYPE_byName_rev):
+        names = sorted(f_dict.keys(),
+                       key=lambda f: f.lower() if sort_mix_cases else f,
+                       reverse=sortmode==SORTTYPE_byName_rev)
+    elif sortmode in (SORTTYPE_bySize, SORTTYPE_bySize_rev):
+        names = sorted(f_dict.keys(),
+                       key=lambda f: f_dict[f][FT_SIZE],
+                       reverse=sortmode==SORTTYPE_bySize_rev)
+    elif sortmode in (SORTTYPE_byDate, SORTTYPE_byDate_rev):
+        names = sorted(f_dict.keys(),
+                       key=lambda f: f_dict[f][FT_MTIME],
+                       reverse=sortmode==SORTTYPE_byDate_rev)
+    if names.count(os.pardir) != 0: # move pardir to top
+        names.remove(os.pardir)
+        names.insert(0, os.pardir)
+    return names
 
 
 def sort_dir(files_dict, sortmode, sort_mix_dirs, sort_mix_cases):
     """return an array of files which are sorted by mode"""
 
-    # separate directories and files
     d, f = {}, {}
     if sort_mix_dirs:
         f = files_dict
+        d1 = []
     else:
         for k, v in files_dict.items():
             if v[FT_TYPE] in (FTYPE_DIR, FTYPE_LNK2DIR):
                 d[k] = v
             else:
                 f[k] = v
-    # sort
-    if d:
         d1 = __do_sort(d, sortmode, sort_mix_cases)
-    else:
-        d1 = []
     d2 = __do_sort(f, sortmode, sort_mix_cases)
     d1.extend(d2)
     return d1
@@ -478,6 +461,10 @@ def complete(entrypath, panelpath):
     return base, d1
 
 
+def complete_programs(text):
+    return [prog for prog in SYSTEM_PROGRAMS if prog.startswith(text)]
+
+
 ########################################################################
 ##### actions
 def do_create_link(pointto, link):
@@ -520,7 +507,7 @@ def delete_bulk(path, ignore_errors=False):
 
 
 def do_copy(filename, basepath, dest, rename_dir=False, check_fileexists=True):
-    src = os.path.join(basepath, filename)   
+    src = os.path.join(basepath, filename)
     if os.path.exists(dest) and os.path.isdir(dest):
         if rename_dir:
             filename = os.sep.join(filename.split(os.sep)[1:])
@@ -621,7 +608,7 @@ class PathContents(object):
         if not os.path.isdir(self.basepath):
             raise TypeError, "basepath must be a valid directory or None"
         self.__entries = []
-        self.__errors = []        
+        self.__errors = []
         for f in fs:
             f = os.path.join(self.basepath, f)
             try:
@@ -674,7 +661,7 @@ class PathContents(object):
     @property
     def entries(self, reverse=False):
         return sorted(self.__entries, reverse=reverse)
-        
+
     @property
     def errors(self):
         return sorted(self.__errors)
@@ -695,6 +682,6 @@ class PathContents(object):
         self.length = (length > 0) and length or 0
         self.tlength = len(self.__entries)
         self.tsize = sum([f[1] for f in self.__entries]) or 1
-        
-    
+
+
 ########################################################################

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright (C) 2001-10, Iñigo Serna <inigoserna@gmail.com>.
+Copyright (C) 2001-11, Iñigo Serna <inigoserna@gmail.com>.
 All rights reserved.
 
 This software has been realised under the GPL License, see the COPYING
@@ -29,12 +29,12 @@ if g_encoding is None or g_encoding == '':
     print 'lfm can\'t find a valid encoding for your terminal.'
     print 'Please configure before running lfm. Eg. $ export LANG=en_GB.UTF-8'
     exit(-1)
-    
+
 
 ######################################################################
-AUTHOR = 'Iñigo Serna'
-VERSION = '2.2'
-DATE = '2001-10'
+AUTHOR = u'Iñigo Serna'
+VERSION = '2.3'
+DATE = '2001-11'
 
 LFM_NAME = 'lfm - Last File Manager'
 

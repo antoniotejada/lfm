@@ -1,8 +1,8 @@
 Metadata-Version: 1.0
 Name: lfm
-Version: 2.2
-Summary: Last File Manager is a simple but powerful file manager for the UNIX console
-Home-page: http://www.terra.es/personal7/inigoserna/lfm
+Version: 2.3
+Summary: Last File Manager is a powerful file manager for the UNIX console.
+Home-page: https://inigo.katxi.org/devel/lfm
 Author: Inigo Serna
 Author-email: inigoserna@gmail.com
 License: GPL

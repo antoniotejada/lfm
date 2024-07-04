@@ -9,6 +9,9 @@ This module contains the actions to execute when keys are pressed.
 import os, os.path
 import sys
 from glob import glob
+from time import tzname, ctime
+import datetime
+import difflib
 import curses
 
 from __init__ import *
@@ -46,9 +49,9 @@ keytable = {
     0x0C: 'cursor_center',          # Ctrl-L
     0x10: 'cursor_quarter_up',      # Ctrl-P
     0x231: 'cursor_quarter_up',     # Ctrl-Cursor_up
-    0x0e: 'cursor_quarter_down',    # Ctrl-N
+    0x0E: 'cursor_quarter_down',    # Ctrl-N
     0x208: 'cursor_quarter_down',   # Ctrl-Cursor_down
-        
+
     # movement other pane
     curses.KEY_SR: 'cursor_up_otherpane',        # Shift-up
     0x22f: 'cursor_up_otherpane',                # Alt-up, kUP3
@@ -91,8 +94,8 @@ keytable = {
     0x04: 'select_bookmark',   # Ctrl-D
     0x1C: 'select_bookmark',   # Ctrl-\
     ord('b'): 'set_bookmark',
-    0x19: 'select_historic',   # Ctrl-Y
-    
+    0x19: 'select_history',    # Ctrl-Y
+
     # panels
     ord('\t'): 'toggle_active_pane',  # tab
     ord('.'): 'toggle_panes',
@@ -126,6 +129,7 @@ keytable = {
     ord('l'): 'create_link',
     ord('L'): 'edit_link',
     0x0F: 'open_shell',         # Ctrl-O
+    0x18: 'show_cli',           # Ctrl-X
 
     # main functions
     curses.KEY_F2: 'rename',
@@ -146,13 +150,13 @@ keytable = {
 
     # terminal resize:
     curses.KEY_RESIZE: 'resize_window',
-    0x12: 'refresh_screen',          # Ctrl-R
+    0x12: 'refresh_screen',     # Ctrl-R
 
     # quit & exit
     ord('q'): 'quit',
     ord('Q'): 'quit',
     curses.KEY_F10: 'quit',
-    0x11: 'exit'                     # Ctrl-Q
+    0x11: 'exit'                # Ctrl-Q
 }
 
 
@@ -221,7 +225,7 @@ def cursor_quarter_down(tab):
     delta = int(tab.pane.dims[0]/4)
     tab.file_i += delta
     tab.fix_limits()
-    return RET_HALF_UPDATE  
+    return RET_HALF_UPDATE
 
 # movement other pane
 def cursor_up_otherpane(tab):
@@ -284,7 +288,7 @@ def end_otherpane(tab):
     else:
         return RET_NO_UPDATE
 
-def cursor_left_otherpane(tab): 
+def cursor_left_otherpane(tab):
     if app.prefs.options['manage_otherpane'] and \
             tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
         othertab = app.noact_pane.act_tab
@@ -293,7 +297,7 @@ def cursor_left_otherpane(tab):
     else:
         return RET_NO_UPDATE
 
-def cursor_right_otherpane(tab): 
+def cursor_right_otherpane(tab):
     if app.prefs.options['manage_otherpane'] and \
             tab.pane.mode in (PANE_MODE_LEFT, PANE_MODE_RIGHT):
         othertab = app.noact_pane.act_tab
@@ -321,7 +325,7 @@ def cursor_quarter_down_otherpane(tab):
         return RET_HALF_UPDATE_OTHER
     else:
         return RET_NO_UPDATE
-    
+
 # change dir
 def cursor_left(tab):
     tab.exit_dir()
@@ -334,12 +338,15 @@ def enter(tab, allowexec=True):
     filename = tab.get_file()
     vfstype = compress.check_compressed_file_type(filename)
     typ = tab.files[filename][files.FT_TYPE]
-    if vfstype in ('bz2', 'gz'):
+    if vfstype in ('bz2', 'gz', 'xz'):
         vfstype = None
     if typ == files.FTYPE_DIR:
         tab.enter_dir(filename)
     elif typ == files.FTYPE_LNK2DIR:
-        tab.init(files.get_linkpath(tab.path, filename))
+        if filename == os.pardir:
+            tab.enter_dir(os.path.normpath(os.path.join(tab.path, filename)))
+        else:
+            tab.init(files.get_linkpath(tab.path, filename))
     elif typ in (files.FTYPE_REG, files.FTYPE_LNK) and vfstype is not None:
         vfs.init(tab, filename, vfstype)
     elif typ == files.FTYPE_EXE and allowexec:
@@ -350,7 +357,7 @@ def enter(tab, allowexec=True):
         return
 
 def goto_dir(tab):
-    todir = doEntry(tab.path, 'Go to directory', 'Type directory name')
+    todir = doEntry(tab.path, 'Go to directory', 'Type directory name', with_history='path')
     if todir:
         app.display()
         todir = os.path.join(tab.path, todir)
@@ -359,7 +366,7 @@ def goto_dir(tab):
         tab.init(todir)
 
 def goto_file(tab):
-    tofile = doEntry(tab.path, 'Go to file', 'Type how file name begins')
+    tofile = doEntry(tab.path, 'Go to file', 'Type how file name begins', with_history='file')
     if tofile:
         thefiles = tab.sorted[tab.file_i:]
         for f in thefiles:
@@ -373,12 +380,10 @@ def goto_file(tab):
 def tree(tab):
     if tab.vfs:
         return
-    app.act_pane, app.noact_pane = app.act_pane, app.noact_pane
+    app.act_pane, app.noact_pane = app.noact_pane, app.act_pane
     tab.pane.display()
-    t = Tree(tab.path, tab.pane.mode)
-    ans = t.run()
-    del t
-    app.act_pane, app.noact_pane = app.act_pane, app.noact_pane
+    ans = Tree(tab.path, tab.pane.mode).run()
+    app.act_pane, app.noact_pane = app.noact_pane, app.act_pane
     if ans != -1:
         tab.init(ans)
 
@@ -421,7 +426,7 @@ def select_bookmark(tab):
 
 def set_bookmark(tab):
     if tab.vfs:
-        messages.error('Set bookmark', 'Can\'t bookmark inside vfs')
+        messages.error('Cannot set bookmark inside vfs')
         return
     while True:
         ch = messages.get_a_key('Set bookmark',
@@ -433,10 +438,10 @@ def set_bookmark(tab):
             break
 
 
-def select_historic(tab):
-    items = tab.historic[::-1]
+def select_history(tab):
+    items = tab.history[::-1]
     if not items:
-        messages.error('Select from history', 'No previous directories')
+        messages.error('Cannot select directory from history\nNo entries yet')
         return
     ret = messages.MenuWin('Return to', items).run()
     if ret != -1:
@@ -485,13 +490,13 @@ def same_tabs(tab):
 
 def new_tab(tab):
     if len(tab.pane.tabs) >= 4:
-        messages.error('New tab', 'Can\'t create more tabs')
+        messages.error('Cannot create more tabs')
     else:
         return RET_TAB_NEW
 
 def close_tab(tab):
     if len(tab.pane.tabs) == 1:
-        messages.error('Close tab', 'Can\'t close last tab')
+        messages.error('Cannot close last tab')
     else:
         if tab.vfs:
             vfs.exit(tab)
@@ -524,7 +529,7 @@ def select_item(tab):
     tab.fix_limits()
 
 def select_group(tab):
-    pattern = doEntry(tab.path, 'Select group', 'Type pattern', '*')
+    pattern = doEntry(tab.path, 'Select group', 'Type pattern', '*', with_history='glob')
     if pattern:
         fullpath = os.path.join(tab.path, pattern)
         for f in [os.path.basename(f) for f in glob(fullpath)]:
@@ -532,7 +537,7 @@ def select_group(tab):
                 tab.selections.append(f)
 
 def deselect_group(tab):
-    pattern = doEntry(tab.path, 'Deselect group', 'Type pattern', '*')
+    pattern = doEntry(tab.path, 'Deselect group', 'Type pattern', '*', with_history='glob')
     if pattern:
         fullpath = os.path.join(tab.path, pattern)
         for f in [os.path.basename(f) for f in glob(fullpath)]:
@@ -544,21 +549,14 @@ def invert_select(tab):
     tab.selections = [f for f in tab.sorted if f not in selections_old and \
                           f != os.pardir]
 
+
 # misc
 def toggle_dotfiles(tab):
-#     app.prefs.options['show_dotfiles'] = 1 if app.prefs.options['show_dotfiles'] == 0 else 0
-    if app.prefs.options['show_dotfiles'] == 0:
-        app.prefs.options['show_dotfiles'] = 1
-    else:
-        app.prefs.options['show_dotfiles'] = 0
+    app.prefs.options['show_dotfiles'] = 1 if app.prefs.options['show_dotfiles']==0 else 0
     app.regenerate()
 
 def toggle_manage_otherpane(tab):
-#     app.prefs.options['manage_otherpane'] = 1 if app.prefs.options['manage_otherpane'] == 0 else 0
-    if app.prefs.options['manage_otherpane'] == 0:
-        app.prefs.options['manage_otherpane'] = 1
-    else:
-        app.prefs.options['manage_otherpane'] = 0
+    app.prefs.options['manage_otherpane'] = 1 if app.prefs.options['manage_otherpane'] == 0 else 0
     return RET_HALF_UPDATE_OTHER
 
 def show_size(tab):
@@ -581,7 +579,7 @@ def find_grep(tab):
     findgrep(tab)
 
 def touch_file(tab):
-    newfile = doEntry(tab.path, 'Touch file', 'Type file name')
+    newfile = doEntry(tab.path, 'Touch file', 'Type file name', with_history='file')
     if not newfile:
         return
     fullfilename = os.path.join(tab.path, newfile)
@@ -590,7 +588,7 @@ def touch_file(tab):
     if err:
         err = err.split(':')[-1:][0].strip()
         app.display()
-        messages.error('Touch file', '%s: %s' % (newfile, err))
+        messages.error('Cannot touch file\n%s: %s' % (newfile, err))
     else:
         curses.curs_set(0)
         app.regenerate()
@@ -602,18 +600,21 @@ def create_link(tab):
     else:
         otherfile = othertab.get_file()
     newlink, pointto = doDoubleEntry(tab.path, 'Create link', 'Link name', '',
-                                     'Pointing to', otherfile)
+                                     'Pointing to', otherfile,
+                                     with_history1='file', with_history2='path')
     app.display()
-    if not newlink:
-        messages.error('Create link', 'You must type new link name')
+    if newlink is None or pointto is None:
         return
-    if not pointto:
-        messages.error('Create link', 'You must type pointed file')
+    if newlink == '':
+        messages.error('Cannot create link\nYou must specify the name for the new link')
+        return
+    if pointto == '':
+        messages.error('Cannot create link\nYou must specify the file to link')
         return
     fullfilename = os.path.join(tab.path, newlink)
     ans = files.create_link(pointto, fullfilename)
     if ans:
-        messages.error('Create link', '%s (%s)' % (ans, tab.get_file()))
+        messages.error('Cannot create link\n%s (%s)' % (ans, tab.get_file()))
     else:
         app.regenerate()
 
@@ -622,23 +623,31 @@ def edit_link(tab):
     if not os.path.islink(fullfilename):
         return
     pointto = doEntry(tab.path, 'Edit link', 'Link \'%s\' points to' % \
-                      tab.get_file(), os.readlink(fullfilename))
+                      tab.get_file(), os.readlink(fullfilename), with_history='path')
     app.display()
-    if not pointto:
-        messages.error('Create link', 'You must type pointed file')
+    if pointto is None:
+        return
+    elif pointto == '':
+        messages.error('Cannot edit link\nYou must specify the file to link')
         return
     if pointto != os.readlink(fullfilename):
         ans = files.modify_link(pointto, fullfilename)
         if ans:
-            messages.error('Edit link', '%s (%s)' % (ans, tab.getfile()))
+            messages.error('Cannot edit link\n%s (%s)' % (ans, tab.getfile()))
     app.regenerate()
 
 def open_shell(tab):
     curses.endwin()
-    os.system('cd "%s"; %s' % (get_escaped_filename(tab.path),
-                               app.prefs.progs['shell']))
+    os.system('cd "%s" && %s' % (get_escaped_filename(tab.path),
+                                 app.prefs.progs['shell']))
     curses.curs_set(0)
     tab.refresh()
+
+def show_cli(tab):
+    app.cli.display()
+    curses.curs_set(0)
+    tab.refresh()
+    app.regenerate()
 
 
 # main functions
@@ -654,6 +663,8 @@ def __rename_backup_helper(tab):
 
 def rename(tab):
     fs = __rename_backup_helper(tab)
+    if fs is None:
+        return
     res = ProcessLoopRename('Rename files', files.do_rename, fs, tab.path).run()
     tab.selections = []
     tab.refresh()
@@ -661,17 +672,64 @@ def rename(tab):
 
 def backup_file(tab):
     fs = __rename_backup_helper(tab)
+    if fs is None:
+        return
     try:
         # pc is not used, just to check files have valid encoding
         pc = files.PathContents(fs, tab.path)
     except UnicodeError:
-        messages.error('Backup files', 'Files with invalid encoding, convert first')
+        messages.error('Cannot backup files\nFiles with invalid encoding, convert first')
         return
     res = ProcessLoopBackup('Backup files', files.do_backup, fs, tab.path,
                             app.prefs.misc['backup_extension']).run()
     tab.selections = []
     tab.refresh()
     app.regenerate()
+
+def diff_file(tab):
+    orig_ext = app.prefs.misc['backup_extension']
+    diff_type = app.prefs.misc['diff_type']
+    filename = tab.get_file()
+    if filename.endswith(orig_ext):
+        file_old = os.path.join(tab.path, filename)
+        file_new = os.path.join(tab.path, filename[:-len(orig_ext)])
+    else:
+        file_old = os.path.join(tab.path, filename + orig_ext)
+        file_new = os.path.join(tab.path, filename)
+    if not os.path.exists(file_old):
+        messages.error('Cannot diff file\nBackup file does not exist')
+        return
+    if not os.path.exists(file_new):
+        messages.error('Cannot diff file\nOnly backup file exists')
+        return
+    if not os.path.isfile(file_old) or not os.path.isfile(file_new):
+        messages.error('Cannot diff file\nWe can only diff regular files')
+        return
+    buf0 = open(file_old).readlines()
+    buf1 = open(file_new).readlines()
+    d0 = datetime.datetime.fromtimestamp(os.stat(file_old).st_mtime)
+    date_old = d0.strftime('    %Y-%m-%d %H:%M:%S.%f ') + tzname[0]
+    d1 = datetime.datetime.fromtimestamp(os.stat(file_new).st_mtime)
+    date_new = d1.strftime('    %Y-%m-%d %H:%M:%S.%f ') + tzname[0]
+    if diff_type == 'context':
+        diff = difflib.context_diff(buf0, buf1, file_old, file_new, date_old, date_new, n=3)
+    elif diff_type == 'unified':
+        diff = difflib.unified_diff(buf0, buf1, file_old, file_new, date_old, date_new, n=3)
+    elif diff_type == 'ndiff':
+        diff = difflib.ndiff(buf0, buf1)
+    diff = list(diff)
+    if diff == []:
+        messages.error('Files are identical')
+        return
+    tmpfile = os.path.join(files.mkdtemp(), os.path.basename(file_old) + \
+                           ' DIFF ' + os.path.basename(file_new))
+    f = open(tmpfile, 'w')
+    f.writelines(diff)
+    f.close()
+    curses.endwin()
+    os.system('%s \"%s\"' % (app.prefs.progs['pager'], tmpfile))
+    curses.curs_set(0)
+    files.delete_bulk(os.path.dirname(tmpfile), True)
 
 def view_file(tab):
     do_view_file(tab)
@@ -686,14 +744,14 @@ def __copymove_helper(destdir, path, fs):
     dest_exists = os.path.exists(destdir)
     # special case: no copy/move multiple files or dir over an existing file
     if len(fs) > 1 and (dest_is_file or not dest_exists):
-        messages.error('Copying files \'%s\'' % destdir,
-                       'Not a directory (20)')
-        return -1, None, None 
+        messages.error('Cannot copy files\n' +
+                       '%s: Not a directory (20)' % destdir)
+        return -1, None, None
     for f in fs:
         if os.path.isdir(os.path.join(path, f)) and dest_is_file:
-            messages.error('Copying files \'%s\'' % destdir,
-                           'Not a directory (20)')
-            return -1, None, None 
+            messages.error('Cannot copy files\n' +
+                           '%s: Not a directory (20)' % destdir)
+            return -1, None, None
     # special case: copy/move a dir to same path with different name
     rename_dir = False
     for f in fs:
@@ -708,14 +766,12 @@ def __copymove_helper(destdir, path, fs):
     #         not (os.path.isdir(os.path.dirname(destdir)) and not dest_exists):
     if dir_destdir != path and (not os.path.isdir(dir_destdir) or dest_exists):
         for f in fs:
-            src = os.path.join(path, f)
             dest = os.path.join(destdir, f)
             if not os.path.exists(dest) and not dest_exists:
-                messages.error(dest, destdir)
-                messages.error('Copying files \'%s\'' % destdir,
-                               'No such file or directory (2)')
-                return -1, None, None 
-    return 0, destdir, rename_dir 
+                messages.error('Cannot copy files\n' +
+                               '%s: No such file or directory (2)' % destdir)
+                return -1, None, None
+    return 0, destdir, rename_dir
 
 def copy(tab):
     destdir = app.noact_pane.act_tab.path + os.sep
@@ -728,7 +784,7 @@ def copy(tab):
             return
         buf = 'Copy \'%s\' to' % filename
         fs = [filename]
-    destdir = doEntry(tab.path, 'Copy', buf, destdir)
+    destdir = doEntry(tab.path, 'Copy', buf, destdir, with_history='path')
     if destdir:
         st, destdir, rename_dir = __copymove_helper(destdir, tab.path, fs)
         if st == -1:
@@ -737,13 +793,13 @@ def copy(tab):
             pc = files.PathContents(fs, tab.path)
         except UnicodeError:
             app.display()
-            messages.error('Copy files', 'Files with invalid encoding, convert first')
+            messages.error('Cannot copy files\nFiles with invalid encoding, convert first')
             return
         res = ProcessLoopCopy('Copy files', files.do_copy, pc,
                               destdir, rename_dir).run()
         tab.selections = []
         app.regenerate()
-        
+
 def move(tab):
     destdir = app.noact_pane.act_tab.path + os.sep
     if tab.selections:
@@ -755,7 +811,7 @@ def move(tab):
             return
         buf = 'Move \'%s\' to' % filename
         fs = [filename]
-    destdir = doEntry(tab.path, 'Move', buf, destdir)
+    destdir = doEntry(tab.path, 'Move', buf, destdir, with_history='path')
     if destdir:
         st, destdir, rename_dir = __copymove_helper(destdir, tab.path, fs)
         if st == -1:
@@ -764,7 +820,7 @@ def move(tab):
             pc = files.PathContents(fs, tab.path)
         except UnicodeError:
             app.display()
-            messages.error('Move files', 'Files with invalid encoding, convert first')
+            messages.error('Cannot move files\nFiles with invalid encoding, convert first')
             return
         res = ProcessLoopCopy('Move files', files.do_copy, pc,
                               destdir, rename_dir).run()
@@ -779,13 +835,13 @@ def move(tab):
         tab.refresh()
 
 def make_dir(tab):
-    newdir = doEntry(tab.path, 'Make directory', 'Type directory name')
+    newdir = doEntry(tab.path, 'Make directory', 'Type directory name', with_history='file')
     if newdir:
         ans = files.mkdir(tab.path, newdir)
         if ans:
             app.display()
-            messages.error('Make directory',
-                           '%s (%s)' % ans)
+            messages.error('Cannot make directory\n' +
+                           newdir + ': %s (%s)' % ans)
         else:
             app.regenerate()
 
@@ -800,7 +856,7 @@ def delete(tab):
     try:
         pc = files.PathContents(fs, tab.path)
     except UnicodeError:
-        messages.error('Delete files', 'Files with invalid encoding, convert first')
+        messages.error('Cannot delete files\nFiles with invalid encoding, convert first')
         return
     res = ProcessLoopDelete('Delete files', files.do_delete, pc).run()
     tab.selections = []
@@ -832,17 +888,11 @@ def file_menu(tab):
              'i    File info',
              'p    Change file permissions, owner, group',
              'a    Backup file',
-             'g    Gzip/gunzip file(s)',
-             'b    Bzip2/bunzip2 file(s)',
-             'h    Xz/unxz file(s)',
-             'x    Uncompress .tar.gz, .tar.bz2, .tar.xz, .zip, .rar, .7z',
+             'd    Diff file with backup',
+             'z    Compress/uncompress file(s)...', # u'\u2026'
+             'x    Uncompress .tar.gz, .tar.bz2, .tar.xz, .tar, .zip, .rar, .7z',
              'u    Uncompress .tar.gz, etc in other panel',
-             'c    Compress directory to .tar.gz',
-             'd    Compress directory to .tar.bz2',
-             'e    Compress directory to .tar.xz',
-             'z    Compress directory to .zip',
-             'r    Compress directory to .rar',
-             '7    Compress directory to .7z' ]
+             'c    Compress directory to format...' ] # u'\u2026'
     cmd = messages.MenuWin('File Menu', menu).run()
     if cmd == -1:
         return
@@ -856,28 +906,37 @@ def file_menu(tab):
         do_change_perms(tab)
     elif cmd == 'a':
         backup_file(tab)
-    elif cmd == 'g':
-        compress_uncompress_file(tab, 'gz')
-    elif cmd == 'b':
-        compress_uncompress_file(tab, 'bz2')
-    elif cmd == 'h':
-        compress_uncompress_file(tab, 'xz')
+    elif cmd == 'd':
+        diff_file(tab)
+    elif cmd == 'z':
+        compress_fmts = {'g': 'gz', 'b': 'bz2', 'x': 'xz'}
+        while True:
+            ch = messages.get_a_key('Un/Compress file(s)',
+                                    '(g)zip, (b)zip2, (x)z\n\n'
+                                    '   Ctrl-C to quit')
+            if ch == -1: # Ctrl-C
+                break
+            elif chr(ch) in compress_fmts.keys():
+                compress_uncompress_file(tab, compress_fmts[chr(ch)])
+                break
     elif cmd == 'x':
         uncompress_dir(tab, tab.path)
     elif cmd == 'u':
         uncompress_dir(tab, app.noact_pane.act_tab.path)
     elif cmd == 'c':
-        compress_dir(tab, 'tgz')
-    elif cmd == 'd':
-        compress_dir(tab, 'tbz2')
-    elif cmd == 'e':
-        compress_dir(tab, 'txz')
-    elif cmd == 'z':
-        compress_dir(tab, 'zip')
-    elif cmd == 'r':
-        compress_dir(tab, 'rar')
-    elif cmd == '7':
-        compress_dir(tab, '7z')
+        if not tab.selections and os.path.basename(tab.sorted[tab.file_i])==os.pardir:
+            return
+        compress_fmts = {'g': 'tgz', 'b': 'tbz2', 'x': 'txz', 't': 'tar',
+                         'z': 'zip', 'r': 'rar', '7': '7z'}
+        while True:
+            ch = messages.get_a_key('Compress directory to...',
+                                    '.tar.(g)z, .tar.(b)z2, .tar.(x)z, .(t)ar, .(z)ip, .(r)ar, .(7)z\n\n'
+                                    '                    Ctrl-C to quit')
+            if ch == -1: # Ctrl-C
+                break
+            elif chr(ch) in compress_fmts.keys():
+                compress_dir(tab, compress_fmts[chr(ch)])
+                break
     app.regenerate()
 
 
@@ -889,7 +948,8 @@ def general_menu(tab):
              'f    Show filesystems info',
              'o    Open shell',
              'c    Edit configuration',
-             'r    Regenerate programs' ]
+             'r    Regenerate programs',
+             'h    Delete history' ]
     cmd = messages.MenuWin('General Menu', menu).run()
     if cmd == -1:
         return
@@ -916,7 +976,10 @@ def general_menu(tab):
         app.prefs.check_progs()
         app.prefs.save()
         app.prefs.load()
-        messages.win('Regenerate programs', '          OK')
+        messages.win('Configuration', 'Regenerating programs... OK')
+    elif cmd == 'h':
+        files.delete_bulk(messages.HISTORY_FILE)
+        messages.history = messages.DEFAULT_HISTORY.copy()
 
 
 # window resize
@@ -1011,7 +1074,7 @@ def do_special_view_file(tab):
         if ext in exts:
             prog = app.prefs.progs[typ]
             if prog == '':
-                messages.error('Can\'t run program',
+                messages.error('Cannot run program\n' +
                                'Can\'t start %s files, defaulting to view' % typ)
                 do_view_file(tab)
                 break
@@ -1037,6 +1100,7 @@ def do_special_view_file(tab):
 # do view file
 def do_view_file(tab):
     run_on_current_file('pager', tab.get_fullpathfile())
+    app.regenerate()
 
 
 # do edit file
@@ -1048,24 +1112,24 @@ def do_edit_file(tab):
 # do execute file
 def do_execute_file(tab):
     filename = tab.get_file()
-    parms = doEntry(tab.path, 'Execute file', 'Enter arguments')
+    parms = doEntry(tab.path, 'Execute file', 'Enter arguments', with_history='exec')
     if parms is None:
         return
     elif parms == '':
         cmd = get_escaped_filename(filename)
     else:
-        cmd = '%s %s' % (get_escaped_filename(filename), parms)
+        cmd = '%s %s' % (get_escaped_filename(filename), encode(parms))
     curses.endwin()
     st, msg = ProcessFunc('Executing file', encode(filename),
                           run_shell, cmd, encode(tab.path), True).run()
     if st == -1:
-        messages.error('Executing file', msg)
+        messages.error('Cannot execute file\n' + decode(msg))
     if st != -100 and msg is not None:
         if app.prefs.options['show_output_after_exec']:
             curses.curs_set(0)
             if messages.confirm('Executing file', 'Show output'):
                 lst = [(l, 2) for l in msg.split('\n')]
-                pyview.InternalView('Output of "%s"' % encode(cmd),
+                pyview.InternalView('Output of "%s"' % cmd,
                                     lst, center=0).run()
     curses.curs_set(0)
     tab.refresh()
@@ -1073,7 +1137,7 @@ def do_execute_file(tab):
 
 # do something on file
 def do_something_on_file(tab):
-    cmd = doEntry(tab.path, 'Do something on file(s)', 'Enter command')
+    cmd = doEntry(tab.path, 'Do something on file(s)', 'Enter command', with_history='exec')
     if cmd:
         curses.endwin()
         if len(tab.selections):
@@ -1091,9 +1155,6 @@ def do_something_on_file(tab):
 # show file info
 def do_show_file_info(tab):
     def show_info(tab, file):
-        import stat
-        from time import ctime
-
         fullfilename = os.path.join(tab.path, file)
         fd = tab.files[file]
         fde = files.get_fileinfo_extended(fullfilename)
@@ -1147,13 +1208,13 @@ def __do_change_perms(filename, perms, owner, group, recursive):
     try:
         ans = files.set_perms(filename, perms, recursive)
         if ans:
-            messages.error('Chmod "%s"' % filename, '%s (%s)' % ans)
+            messages.error('Cannot chmod\n' + filename +  ': %s (%s)' % ans)
         ans = files.set_owner_group(filename, owner, group, recursive)
         if ans:
-            messages.error('Chown "%s"' % filename, '%s (%s)' % ans)
+            messages.error('Cannot chown\n' + filename + ': %s (%s)' % ans)
     except UnicodeError:
         app.display()
-        messages.error('Change permissions',
+        messages.error('Cannot change permissions\n' +
                        'Files with invalid encoding, convert first')
 
 
@@ -1188,27 +1249,27 @@ def do_change_perms(tab):
 # do show filesystems info
 def do_show_fs_info():
     try:
-        fs = get_shell_output('df -h')
+        buf = get_shell_output('df -h')
     except (IOError, os.error), (errno, strerror):
-        messages.error('Show filesystems info', (strerror, errno))
+        messages.error('Cannot show filesystems info\n%s (%s)' % (strerror, errno))
         return
-    if fs is None or fs == '':
-        messages.error('Show filesystems info', ('Can\'t run "df" command', 0))
+    if buf is None or buf == '':
+        messages.error('Cannot show filesystems info\n%s (%s)' % ('Can\'t run "df" command', 0))
         return
-    fs = fs.split('\n')
-    buf = []
-    buf.append((fs[0].strip(), 6))
-    buf.append(('-'*len(fs[0]), 6))
-    for l in fs[1:]:
-        buf.append((l.strip(), 2))
-    pyview.InternalView('Show filesystems info', buf).run()
+    hdr = buf.split('\n')[0].strip()
+    fs = [l.strip() for l in buf.strip().split('\n')[1:]]
+    lst = [(hdr, 6), ('-'*len(hdr), 6)]
+    for l in fs:
+        lst.append((l, 2))
+    pyview.InternalView('Show filesystems info', lst).run()
 
 
 # find and grep
 def findgrep(tab):
     # ask data
-    fs, pat = doDoubleEntry(tab.path, 'Find files', 'Filename', '*', 
-                            'Content', '', with_complete2=False)
+    fs, pat = doDoubleEntry(tab.path, 'Find files', 'Filename', '*',
+                            'Content', '', with_complete2=False,
+                            with_history1='glob', with_history2='grep')
     if fs is None or fs == '':
         return
     path = os.path.dirname(fs)
@@ -1229,11 +1290,11 @@ def findgrep(tab):
             return
         else: # some other error
             app.display()
-            messages.error(search_type, m)
+            messages.error('Cannot %s\n' % search_type.lower() + m)
             return
     if not m or m == []:
         app.display()
-        messages.error(search_type, 'No files found')
+        messages.error('Cannot %s\n' % search_type.lower() + 'No files found')
         return
     # show matches
     find_quit = 0
@@ -1243,12 +1304,12 @@ def findgrep(tab):
         if par:
             if pat:
                 try:
-                    line = int(par.split(':')[0])
+                    line = int(par.split(':')[-1])
                 except ValueError:
                     line = 0
                     f = os.path.join(path, par)
                 else:
-                    f = os.path.join(path, par[par.find(':')+1:])
+                    f = os.path.join(path, par[:par.rfind(':')])
             else:
                 line = 0
                 f = os.path.join(path, par)
@@ -1264,6 +1325,7 @@ def findgrep(tab):
             tab.vfs, tab.base, tab.vbase = pvfs, base, vbase
             if tofile:
                 tab.file_i = tab.sorted.index(tofile)
+                tab.fix_limits()
             find_quit = 1
         elif cmd == 1:           # panelize
             if pat:
@@ -1280,8 +1342,7 @@ def findgrep(tab):
                                               line, get_escaped_filename(f)))
                 curses.curs_set(0)
             else:
-                messages.error('View', 'it\'s a directory',
-                               todir)
+                messages.error('Cannot view file\n' + todir + ': Is a directory')
         elif cmd == 3:           # edit
             if tofile:
                 curses.endwin()
@@ -1294,9 +1355,9 @@ def findgrep(tab):
                 curses.curs_set(0)
                 app.regenerate()
             else:
-                messages.error('Edit', 'it\'s a directory', todir)
+                messages.error('Cannot edit file\n' + todir + ': Is a directory')
         elif cmd == 4:           # do something on file
-            cmd2 = doEntry(tab.path, 'Do something on file', 'Enter command')
+            cmd2 = doEntry(tab.path, 'Do something on file', 'Enter command', with_history='exec')
             if cmd2:
                 curses.endwin()
                 os.system(get_escaped_command(cmd2, f))
@@ -1307,10 +1368,9 @@ def findgrep(tab):
 
 
 # entries
-def doEntry(tabpath, title, help, path = '',
-            with_historic = True, with_complete = True):
+def doEntry(tabpath, title, help, path='', with_history='', with_complete=True):
     while True:
-        path = messages.Entry(title, help, path, with_historic, with_complete,
+        path = messages.Entry(title, help, path, with_history, with_complete,
                               tabpath).run()
         if isinstance(path, list):
             path = path.pop()
@@ -1319,14 +1379,14 @@ def doEntry(tabpath, title, help, path = '',
 
 
 def doDoubleEntry(tabpath, title, help1, path1, help2, path2,
-                  with_historic1 = True, with_complete1 = True,
-                  with_historic2 = True, with_complete2 = True):
+                  with_history1='', with_complete1=True,
+                  with_history2='', with_complete2=True):
     tabpath1 = tabpath2 = tabpath
     while True:
         path = messages.DoubleEntry(title, help1, path1,
-                                    with_historic1, with_complete1, tabpath1,
+                                    with_history1, with_complete1, tabpath1,
                                     help2, path2,
-                                    with_historic2, with_complete2, tabpath2,
+                                    with_history2, with_complete2, tabpath2,
                                     active_entry=0).run()
         if not isinstance(path, list):
             return path
@@ -1673,3 +1733,4 @@ class Tree(object):
 
 
 ######################################################################
+

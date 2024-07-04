@@ -4,19 +4,19 @@ pyview - Last File Manager Viewer
 
 :Author: Iñigo Serna, inigoserna AT gmail DOT com
 
-:Version: 2.2, May 22th. 2010
+:Version: 2.3, May 21th. 2011
 
-:Home page: http://www.terra.es/personal7/inigoserna/lfm/
+:Home page: https://inigo.katxi.org/devel/lfm/  or  http://www.terra.es/personal7/inigoserna/lfm/
 
-:License: \(C\) 2001-10, Iñigo Serna
+:License: \(C\) 2001-11, Iñigo Serna
 
           This software has been realised under the `GPL License`__ version 3
           or later, read the COPYING_ file that comes with this package for
-          more information. 
+          more information.
 
           There is NO WARRANTY.
 
-:Last update: Sat May 22 11:18:35 2010
+:Last update: Sat May 21 11:47:16 2011
 
 .. contents:: Table of Contents
 
@@ -62,7 +62,7 @@ Goto Line / Byte Offset
 =======================
 Enter the line number / byte offset you want to show.
 If number / byte is preceded by `0x` it is interpreted as hexadecimal.
-You can scroll relative lines from the current position using '+' or '-' 
+You can scroll relative lines from the current position using '+' or '-'
 character.
 
 

@@ -45,7 +45,7 @@ class PackagerBase(object):
         if os.path.isfile(self.fullname):
             if self.type in ('bz2', 'gz', 'xz'):
                 return self.compress_cmd % self.filename
-            elif self.type in ('tbz2', 'tgz', 'txz'):
+            elif self.type in ('tbz2', 'tgz', 'txz', 'tar'):
                 return # Don't use tar, it's a file
             else:
                 return self.compress_cmd % (self.filename, newfile)
@@ -146,6 +146,16 @@ class PackagerXZ(PackagerBase):
     compressXXX_cmd = compress_prog + ' %s'
 
 
+class PackagerTAR(PackagerBase):
+    type = 'tar'
+    exts = ('.tar', )
+    need_tar = False
+    uncompress_prog = compress_prog = sysprogs['tar']
+    uncompress_cmd = uncompress_prog + ' xf \"%s\"'
+    compress_cmd = compress_prog + ' cf \"%s\" \"%s\"'
+    compressXXX_cmd = compress_prog + ' cf \"%s\" %s'
+
+
 class PackagerZIP(PackagerBase):
     type = 'zip'
     exts = ('.zip', )
@@ -181,8 +191,8 @@ class Packager7Z(PackagerBase):
 packagers = ( PackagerTBZ2, PackagerBZ2,
               PackagerTGZ, PackagerGZ,
               PackagerTXZ, PackagerXZ,
-              PackagerZIP, PackagerRAR,
-              Packager7Z )
+              PackagerTAR, PackagerZIP,
+              PackagerRAR, Packager7Z )
 
 packagers_by_type = { 'tbz2': PackagerTBZ2,
                       'bz2': PackagerBZ2,
@@ -190,6 +200,7 @@ packagers_by_type = { 'tbz2': PackagerTBZ2,
                       'gz': PackagerGZ,
                       'txz': PackagerTXZ,
                       'xz': PackagerXZ,
+                      'tar': PackagerTAR,
                       'zip': PackagerZIP,
                       'rar': PackagerRAR,
                       '7z': Packager7Z }

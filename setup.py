@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 
-"""Last File Manager is a simple but powerful file manager for the UNIX console
-It has been developed with the ol' good Midnight Commander as model."""
+"""Last File Manager is a powerful file manager for the UNIX console.
+Based in a curses interface, it's written in Python."""
 
 
 from distutils.core import setup
@@ -43,13 +43,13 @@ if sys.version_info < (2, 3):
 
 
 setup(name = 'lfm',
-      version = '2.2',
+      version = '2.3',
       license = 'GPL',
       description = doclines[0],
       long_description = '\n'.join(doclines[2:]),
       author = u'Inigo Serna',
       author_email = 'inigoserna@gmail.com',
-      url = 'http://www.terra.es/personal7/inigoserna/lfm',
+      url = 'https://inigo.katxi.org/devel/lfm',
       platforms = 'POSIX',
       classifiers = filter(None, classifiers.split("\n")),
       py_modules = ['lfm/__init__', 'lfm/lfm', 'lfm/messages', 'lfm/files',
