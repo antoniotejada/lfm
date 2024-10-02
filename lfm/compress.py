@@ -3,11 +3,52 @@
 
 from os.path import dirname, basename, join, isfile, isdir
 
-from utils import delete_bulk
+from utils import delete_bulk, get_file_info
 from common import *
 
 
 ######################################################################
+def probe_compressed_file_engine(filename):
+    # Some files are compressed but without extension or with the wrong one (eg
+    # .exe, .apk, .cbr, .cbz...), use get_file_info which invokes file -brief
+    # command and compare the file information description prefix with some well
+    # known ones. Note the packagers uncompress by invoking the respective
+    # command line rather than using Python libraries, so probing using the
+    # packager code is not any better than probing invoking the file -brief
+    # command.
+    
+    # XXX This is only used when forced to uncompress, but not eg to color
+    #     filetypes in the panel, should it? (could be too expensive to fire
+    #     a type command for each file without extension?) 
+
+    # XXX Also, this won't tell the difference between a gz and a tgz
+    
+    # XXX Another option is to have an action different from dir_enter to
+    #     enter into a compressed file and do get_file there (would also
+    #     need to do it for the existing uncompress_file action)
+    
+    # Convert from prefix of the file command into packager type
+    type_to_info_prefix = {
+        'gz': 'gzip compressed data',
+        'bz2': 'bzip2 compressed data',
+        'xz': 'XZ compressed data',
+        'z': 'Z standard compressed data',
+        'lzma': 'LZMA compressed data',
+        'lz4': 'LZ4 compressed data',
+        'zip': 'Zip archive data',
+        'rar': 'RAR archive data',
+        '7z': '7-zip archive data',
+        'tar': 'POSIX tar archive'
+    }
+    info = get_file_info(filename)
+    for t, prefix in type_to_info_prefix.items():
+        if (info.startswith(prefix)):
+            return packagers_by_type[t](filename)
+    
+    # Fall-back to file extension matching if probing failed
+    return get_compressed_file_engine(filename)
+
+
 def get_compressed_file_engine(filename):
     for p in packagers:       # Note: tbz2 must be before bz2
         for e in p.exts:

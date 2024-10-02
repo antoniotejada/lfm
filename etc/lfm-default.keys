@@ -19,7 +19,6 @@ dir_enter:                     right enter
 goto:                          g
 bookmark_goto:                 b
 bookmark_set:                  B
-bookmark_select_fromlist:      C-d
 history_select_fromlist:       C-y
 
 # pane & tabs

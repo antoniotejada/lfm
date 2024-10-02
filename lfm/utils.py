@@ -1,8 +1,8 @@
 #  -*- coding: utf-8 -*-
 
 
+import locale
 import os
-import sys
 import pwd
 import grp
 import difflib
@@ -28,6 +28,8 @@ from common import *
 ##### Module variables
 use_wide_chars = False
 
+# Enable locale-specific thousands separator to be used by locale.format_string
+locale.setlocale(locale.LC_ALL, '')
 
 ########################################################################
 ###### LFM
@@ -493,12 +495,16 @@ def delete_bulk(path, ignore_errors=False):
 
 ########################################################################
 ##### Un/compress
-from compress import get_compressed_file_engine, packagers_by_type, PackagerTAR
+from compress import probe_compressed_file_engine, get_compressed_file_engine, packagers_by_type, PackagerTAR
 
 def uncompress_dir(filename, destdir):
+    log.info("%r to %r", filename, destdir)
     if not isfile(filename):
         raise Exception('It\'s not a file: {}'.format(basename(filename)))
-    c = get_compressed_file_engine(filename)
+    # Create the destination directory unconditionally since it may not exist
+    # if the archive is uncompressed in its own subdirectory
+    make_dir(destdir)
+    c = probe_compressed_file_engine(filename)
     if c is None:
         raise Exception('Cannot uncompress this file type: {}'.format(basename(filename)))
     res, err = run_in_cli(c.cmd_uncompress, destdir)
@@ -548,6 +554,7 @@ def get_mount_points():
 def get_mountpoint_for_file(filename):
     try:
         for m, d, t in get_mount_points():
+            log.debug("Finding %r in %r", m, filename)
             if filename.find(m) != -1:
                 return (m, d, t)
         else:
@@ -583,19 +590,30 @@ def get_binary_programs():
 ##### String formatting
 def size2str(size):
     """Converts a file size into a string"""
-    if size >= 1000000000:
-        return str(size//1048576) + 'M' # 1024*1024
-    elif size >= 10000000:
-        return str(size//1024) + 'K'
-    else:
-        return str(size)
+    units = [ '', 'K', 'M', 'G', 'T', 'P' ]
+    unit_size = 1024
+    for unit in units:
+        if (size < unit_size*2**6):
+            break
+        size = size // unit_size
+    
+    return locale.format_string("%%d%s" % unit, size, grouping=True)
 
 def num2str(num):
     # Thanks to "Fatal" in #pys60
     num = str(num)
     return (len(num) < 4) and num or (num2str(num[:-3])+","+num[-3:])
 
+def secs2str(seconds):
+    """Convert an amount of seconds into hours, minutes and seconds"""
+    hours, remainder = divmod(int(seconds), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    # Format as HH:MM:SS
+    return '{:02}:{:02}:{:02}'.format(hours, minutes, seconds)
+
 def time2str(t, short=True):
+    # XXX Rename to ftime2str?
     """Converts a file time into a string"""
     if -15552000 < (time() - t) < 15552000:
         # date < 6 months from now, past or future
@@ -799,13 +817,14 @@ class ProcessCommand:
         if self.proc.poll(): # process can finish too fast
             while True:
                 self.animation.next()
-                self.status = self.proc.poll()
+                # Poll with timeout to balance UI responsiveness with CPU
+                # utilization
+                self.status = self.proc.poll(0.25)
                 if self.status is not None:
                     break
                 if self.check_stop():
                     self.status = -100
                     break
-                sleep(0.05)
         self.dialog.hide()
         results, errors = self.proc.communicate()
         return self.status, results, errors
@@ -820,6 +839,7 @@ class ProcessFuncLoop:
         self.i, self.n = 0, len(lst)
         self.proc = None
         self.animation = CursorAnimation()
+        self.ignore_errors = False
 
     def check_stop(self):
         if self.dialog.check_key() == 0x03:
@@ -834,6 +854,14 @@ class ProcessFuncLoop:
         return False
 
     def run_func(self, fn, qin, qout, qerr, conn):
+        """
+        Main function for the worker process
+        - get work from qin
+        - run derived do_run,
+        - output progress to qout/qerr
+        - output termination to conn pipe
+        - equest confirmations from conn pipe
+        """
         while not qin.empty():
             if qin.empty():
                 break
@@ -847,11 +875,17 @@ class ProcessFuncLoop:
             else:
                 qout.put_nowait(ret)
                 qerr.put_nowait(None)
-            # sleep(0.001)
         conn.send((ProcCode.end, ))
-        sleep(0.25)
 
     def run(self):
+        """
+        - Start a worker process that calls run_func, 
+        - put work in qin,
+        - poll the worker process for 
+            - progress/error in qout/qerr, 
+            - termination in pipe, 
+        - refresh and poll UI for cancellation, kill worker process if so
+        """
         self.prepare()
         self.dialog.show()
         qin, qout, qerr = Queue(maxsize=self.n), Queue(maxsize=self.n), Queue(maxsize=self.n)
@@ -861,7 +895,9 @@ class ProcessFuncLoop:
         self.proc = Process(target=self.run_func, args=(self.fn, qin, qout, qerr, conn_child))
         self.proc.start()
         while True:
-            if conn_parent.poll():
+            # Poll with timeout to balance UI responsiveness with CPU
+            # utilization
+            if conn_parent.poll(0.25):
                 buf = conn_parent.recv()
                 if buf[0] == ProcCode.end:
                     conn_parent.send(ProcCodeConfirm.stop)
@@ -873,10 +909,30 @@ class ProcessFuncLoop:
                         errs.append(qerr.get_nowait())
                     break
                 elif buf[0] == ProcCode.error:
-                    self.dialog.hide()
-                    msg = buf[1] if buf[1].startswith('Cannot') else 'Cannot {}!\n{}'.format(self.title.lower(), buf[1])
-                    DialogError(msg)
-                    self.dialog.show()
+                    if (not self.ignore_errors):
+                        self.dialog.hide()
+                        # XXX Fix DialogConfirm so it allows multiline prompts,
+                        #     this spills over borders and buttons
+                        # XXX Do a retry/ignore/ignore all/stop dialog box
+                        msg = buf[1] if buf[1].startswith('Cannot') else 'Cannot {}!\n {}'.format(self.title.lower(), buf[1])
+                        msg = msg.replace("\n", " ")
+                        msg += "\n Ignore further errors?"
+                        # XXX Currently ProcCode.error doesn't expect an answer,
+                        #     this should pass the answer to the worker process
+                        #     so it's not even sent in case of ignore all and
+                        #     retry can be done without having to enqueue ?
+                        # XXX Since the worker process is not stopped for the
+                        #     answer, is the worker process just stopped on the
+                        #     next progress report? What if there are more errors?
+                        ans = DialogConfirm(self.title, msg, default=1)
+                        if ans == 1:
+                            self.ignore_errors = True
+                        self.dialog.show()
+                        
+                elif buf[0] == ProcCode.current:
+                    conn_parent.send(ProcCodeConfirm.ok)
+                    size = buf[1]
+                    self.dialog.update(self.cur_elm, self.i, self.n, self.acc_size + size, self.tot_size, size, self.next_size)
                 elif buf[0] == ProcCode.next:
                     self.display_next(*buf[1:])
                     ans = self.confirm_pre()
@@ -894,7 +950,6 @@ class ProcessFuncLoop:
                 status, rets, errs = ProcCode.stopped, None, None
                 break
             self.animation.next()
-            # sleep(0.05)
         self.dialog.hide()
         try:
             os.kill(self.proc.pid, SIGKILL)
@@ -928,14 +983,16 @@ class ProcessFuncDeleteLoop(ProcessFuncLoop):
         super(ProcessFuncDeleteLoop, self).__init__(title, fn, lst)
         self.tot_size = tot_size
         self.confirm = confirm
-
+        
     def prepare(self):
         self.dialog = DialogProgress2Panel(self.title)
         self.acc_size = 0
+        self.next_size = 0
 
     def display_next(self, text, size, *args):
         self.i += 1
-        self.acc_size += size
+        self.acc_size += self.next_size
+        self.next_size = size
         self.cur_elm = text
         self.dialog.update(text, self.i, self.n, self.acc_size, self.tot_size)
 
@@ -981,12 +1038,14 @@ class ProcessFuncCopyLoop(ProcessFuncLoop):
     def prepare(self):
         self.dialog = DialogProgress2Panel(self.title)
         self.acc_size = 0
+        self.next_size = 0
 
     def display_next(self, text, size, *args):
         self.i += 1
-        self.acc_size += size
+        self.acc_size += self.next_size
+        self.next_size = size
         self.cur_elm = text
-        self.dialog.update(text, self.i, self.n, self.acc_size, self.tot_size)
+        self.dialog.update(text, self.i, self.n, self.acc_size, self.tot_size, 0, self.next_size)
 
     def confirm_post(self, filename):
         if self.overwrite is None:
@@ -1007,10 +1066,83 @@ class ProcessFuncCopyLoop(ProcessFuncLoop):
         else:
             return self.overwrite
 
+    def copyfileobj(self, conn, fsrc, fdst):
+        """
+        Overload shutil.copyfileobj so progress can be reported and so a buffer
+        bigger than 16K is used to reduce CPU utilization (6% vs. 1%)
+
+        Recent Python versions have larger copy buffer sizes, see
+        https://github.com/python/cpython/commit/4f1903061877776973c1bbfadd3d3f146920856e
+
+        The buffer size can also be set via the shutil.COPY_BUFSIZE global,
+        which defaults to 64KB in Linux, 1MB in Windows See
+        https://github.com/python/cpython/blob/be257c58152e9b960827362b11c9ef2223fd6267/Lib/shutil.py#L47
+
+        for a 4GB file copied via usb to the same usb disk, 
+        - shutil.copyfile took 125.75 seconds 36053.84 kbps buffer size 65536 sendfile False
+        - shutil.copyfile took 136.23 seconds 33279.28 kbps buffer size 65536 sendfile False
+        - shutil.copyfile took 117.08 seconds 38724.30 kbps buffer size 131072 sendfile False
+        - shutil.copyfile took 111.37 seconds 40707.07 kbps buffer size 524288 sendfile False
+        - shutil.copyfile took 114.39 seconds 39634.14 kbps buffer size 524288 sendfile True
+
+        CPU utilization is 22% for 64KB, 16% for the rest
+        """
+        bufer_size = 256*2**10
+        cur_size = 0
+        last_report_time = time()
+        report_interval_secs = 1.0
+        buf = 1
+        while (buf):
+            buf = fsrc.read(bufer_size)
+            fdst.write(buf)
+            cur_size += len(buf)
+            # Report once a second, don't bother reporting final size since
+            # ProcCode.next reports it before the copy begins
+            # XXX This could also measure speed and do dynamic buffer sizing
+            t = time()
+            if (((t - last_report_time) >= report_interval_secs) or (not buf)):
+                # These can be used to flush chunks but the roundtrip on network
+                # files is too big, it's better to disable caching at the SMB
+                # level
+                # fdst.flush()
+                # os.fsync(fdst.fileno())
+                # st = os.stat(fdst.name)
+                conn.send((ProcCode.current, cur_size))
+                ans = conn.recv()
+                last_report_time = time()
+                # XXX The copy errors in strace with 
+                # setxattr("xxx", "user.DOSATTRIB", "0x20\0\0\3\0\3\0\0\0\21\0\0\0 \0\0\0\0\0\0\0\0\0\0\0\0\0\0", 56, 0) = -1 EINVAL (Invalid argument)
+                #     use "store dos attributes = yes" on smb.conf
+                #     Or mount.cifs with nouser_xattr?
+                # XXX lstat64() takes a long time, set "stat cache = yes" 
+                # XXX Also, close() and stat of the target file on samba drives
+                #     takes minutes?
+                # XXX mounting cifs with cache=none fixes the close() issue and 
+                #     the write speed is similar than not using it
+                
+
     def do_run(self, fn, qin, conn):
         filename, size, err, basepath, destdir = qin.get_nowait()
         conn.send((ProcCode.next, filename.replace(basepath, ''), size))
         ans = conn.recv()
+        import shutil
+        import functools
+        if (hasattr(shutil, "_USE_CP_SENDFILE")):
+            # At least in Python 3.9.2 shutil.copyfile is optimized to use
+            # single call to sendfile on linux which skips calling into
+            # copyfileobj. Disable sendfile so progress updates done by the
+            # copyfileobj monkey patched below work. See
+            # https://bugs.python.org/issue25156
+
+            # XXX A possible alternative that doesn't require monkey patching
+            #     shutil and thus benefits from the sendfile performance is to
+            #     snoop the file size while the operation takes place?
+            
+            # XXX Another alternative is to use the already existing copy_file
+            #     implementation above and implement copy2 which is just a call
+            #     copystat and copyfile (which calls copyfileobj)
+            shutil._USE_CP_SENDFILE = False
+        shutil.copyfileobj = functools.partial(ProcessFuncCopyLoop.copyfileobj, self, conn)
         if err:
             raise err
         if ans == ProcCodeConfirm.ok:

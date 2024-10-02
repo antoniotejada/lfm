@@ -19,6 +19,7 @@ from common import *
 class FSConfig:
     def __init__(self):
         self.filters = ''
+        self.goto_text = ''
         self.show_dotfiles = True
         self.sort_type = SortType.byName
         self.sort_reverse = False
@@ -113,15 +114,26 @@ class FSEntry:
 
     def get_type_from_ext(self, files_ext):
         if self.is_dir:
-            return 'dir'
-        elif self.type == FileType.exe:
-            return 'exe'
+            ftype = 'dir'
         else:
+            # Check file extension before executable attribute, since some
+            # partitions mount all files as executable (eg NTFS) which prevents
+            # compressed files in them from being accessed as vfs (or any other
+            # file being launched with the associated app).
+            
+            # Note that lfm doesn't execute executables, only launches them with
+            # the associated app, so hiding that an archive is executable is not
+            # an issue
             for ftype in files_ext.keys():
                 if self.ext[1:] in files_ext[ftype]:
-                    return ftype
+                    break
             else:
-                return 'reg'
+                if self.type == FileType.exe:
+                    ftype = 'exe'
+                else:
+                    ftype = 'reg'
+
+        return ftype
 
     @property
     def is_dir(self):
@@ -239,6 +251,10 @@ class BaseFolder:
 
     def refresh(self):
         """Apply filters and sort entries. Call when config, sorting or filters change"""
+        # XXX This happens on every tab even if not active, blocking the current
+        #     tab. Investigate if refresh is too aggressive or if inactive tabs
+        #     shouldn't be refreshed in the foreground (in general refresh
+        #     should be async / cancellable)
         log.debug('Refresh {} [{}]'.format(self, self.pdir))
         ds, fs = list(), list()
         if self.cfg.filters == '':

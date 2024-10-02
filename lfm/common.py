@@ -67,7 +67,7 @@ SortType = Enum('SortType', 'none byName byExt byPath bySize byMTime')
 KeyModifier = Enum('KeyModifier', 'none control alt')
 RetCode = Enum('RetCode', 'nothing quit_chdir quit_nochdir fix_limits full_redisplay half_redisplay')
 
-ProcCode = Enum('ProcCode', 'end stopped error next confirm')
+ProcCode = Enum('ProcCode', 'end stopped error current next confirm')
 ProcCodeConfirm = Enum('ProcCodeConfirm', 'stop ok skip')
 
 class LFMFileExistsError(Exception):
@@ -79,6 +79,8 @@ class LFMFileSkipped(Exception):
 class LFMTerminalTooNarrow(Exception):
     pass
 
+def cmp(a, b):
+    return (-1 if (a < b) else (1 if (a > b) else 0))
 
 ########################################################################
 ##### Color Theme

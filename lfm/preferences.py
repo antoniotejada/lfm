@@ -18,6 +18,7 @@ CONFIGFILE_HEADER = '{0} {1} Configuration File v3.x {0}'.format('#'*10, LFM_NAM
 
 DEF_OPTIONS = {'save_configuration_at_exit': True,
                'save_history_at_exit': True,
+               'save_panel_state_at_exit' : True,
                'show_output_after_exec': True,
                'use_wide_chars': False,
                'rebuild_vfs': False,
@@ -30,7 +31,8 @@ DEF_OPTIONS = {'save_configuration_at_exit': True,
                'automatic_file_encoding_conversion': False, # ask
                'find_ignorecase': False,
                'grep_ignorecase': True,
-               'grep_regex': True}
+               'grep_regex': True,
+               'panel_state' : {} }
 OPTIONS_TEXT = 'automatic_file_encoding_conversion: {}\nsort_type: {}'.format("never = -1, ask = 0, always = 1", ', '.join([str(s) for s in SortType]))
 
 DEF_CONFIRMATIONS = {'delete': True,
@@ -109,7 +111,7 @@ class SectContainer:
 
     def prepare_to_save(self, comment=''):
         # convert True->1, False->0 except non booleans values
-        NO_BOOL = ('sort_type', 'backup_extension', 'diff_type')
+        NO_BOOL = ('sort_type', 'backup_extension', 'diff_type', 'panel_state')
         d = dict((k, (v if k in NO_BOOL else (1 if v else 0))) for k, v in self.__dict__.items())
         if comment:
             d['#'] = comment
@@ -127,6 +129,7 @@ class Config:
         self.programs = DEF_PROGRAMS
         self.files_ext = FILES_EXT
         self.bookmarks = dict([(b, '/') for b in BOOKMARKS_KEYS])
+        self.panel_state = {}
         self.powercli_favs = POWERCLI_FAVS
 
     def load(self):
@@ -150,7 +153,7 @@ class Config:
             for k, v in cp.items('Options'):
                 if k in DEF_OPTIONS:
                     try:
-                        exec('self.options.{} = {}'.format(k, v if k=='sort_type' else int(v)!=0))
+                        exec('self.options.{} = {}'.format(k, v if k in ['sort_type', 'panel_state'] else int(v)!=0))
                     except:
                         log.warning('CONFIGURATION FILE: Invalid value "{}" for "{}" in Options section'.format(v, k))
                 else:
@@ -213,7 +216,7 @@ class Config:
             for i, (_, v) in enumerate(cp.items('PowerCLI Favs')):
                 self.powercli_favs[i] = v.strip()
         else:
-            log.warning('CONFIGURATION FILE: No "PowerCLI Favs" section, filling with defaults')
+            log.warning('CONFIGURATION FILE: No "PowerCLI Favs" section, filling with defaults')    
 
     def save(self):
         log.debug('Save configuration file "{}"'.format(CONFIG_FILE))
@@ -327,6 +330,9 @@ def load_keys():
                 continue
             else:
                 keys[k] = a
+
+    log.debug('loaded keys %r', keys)
+
     return keys
 
 

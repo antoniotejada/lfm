@@ -5,13 +5,13 @@ import pkg_resources
 from glob import glob
 from tempfile import mkdtemp
 from os import sep, readlink, environ, uname
-from os.path import basename, dirname, exists, getsize, isdir, isfile, islink, join, pardir
+from os.path import realpath, basename, dirname, exists, getsize, isdir, isfile, islink, join, pardir, splitext
 
 import utils
 from utils import public
 from ui_widgets import DialogError, DialogConfirm, DialogGetKey, SelectItem, \
                        DialogEntry, DialogDoubleEntry, DialogFindGrep, TreeView, \
-                       DialogPerms, DialogOwner, InternalView
+                       DialogPerms, DialogOwner, InternalView, DialogConfirmCancel
 from common import *
 
 
@@ -83,15 +83,41 @@ def cursor_end():
 
 @public
 def cursor_goto_file():
-    text = DialogEntry('Go to file', 'Type part of the file name').run()
-    if not text:
+    tab_active = app.pane_active.tab_active
+    text = DialogEntry('Go to file', 'Type part of the file name', tab_active.fs.cfg.goto_text).run()
+    if (text is None):
         return RetCode.nothing, None
-    start = app.pane_active.tab_active.i + 1
-    entries = app.pane_active.tab_active.fs.get_filenames(start=start)
+    
+    tab_active.fs.cfg.goto_text = text
+    
+    return cursor_goto_next_file()
+
+@public
+def cursor_goto_next_file():
+    tab_active = app.pane_active.tab_active
+    start = tab_active.i + 1
+    entries = tab_active.fs.get_filenames(start=start)
+    ltext = tab_active.fs.cfg.goto_text.lower()
     for e in entries:
-        if e.find(text) != -1:
-            app.pane_active.tab_active.i = entries.index(e) + start
+        i = e.lower().find(ltext)
+        if i != -1:
+            tab_active.i = entries.index(e) + start
             return RetCode.fix_limits, None
+
+    return RetCode.fix_limits, None
+
+@public
+def cursor_goto_prev_file():
+    tab_active = app.pane_active.tab_active
+    start = max(tab_active.i, 0)
+    entries = tab_active.fs.get_filenames()
+    ltext = tab_active.fs.cfg.goto_text.lower()
+    for e in reversed(entries[:start]):
+        i = e.lower().find(ltext)
+        if i != -1:
+            tab_active.i = entries.index(e) 
+            return RetCode.fix_limits, None
+
     return RetCode.fix_limits, None
 
 @public
@@ -152,15 +178,12 @@ def goto():
 
 @public
 def bookmark_goto():
-    while True:
-        key = DialogGetKey('Goto bookmark',
-                           'Press 0-9 a-z to select the bookmark, Ctrl-C to quit')
-        if key == -1: # Ctrl-C
-            break
-        elif chr(key) in BOOKMARKS_KEYS:
-            log.debug('Goto bookmark in key "{}" > "{}"'.format(chr(key), app.cfg.bookmarks[chr(key)]))
-            app.pane_active.tab_active.goto_folder(app.cfg.bookmarks[chr(key)], delete_vfs_tree=True)
-            break
+    bmks = sorted(['{}  {}'.format(k, b) for k, b in app.cfg.bookmarks.items()])
+    ret = SelectItem('Goto bookmark', bmks).run()
+    if ((ret != -1) and (ret[0] in BOOKMARKS_KEYS)):
+        ch = ret[0]
+        log.debug('Goto bookmark in key "{}" > "{}"'.format(ch, app.cfg.bookmarks[ch]))
+        app.pane_active.tab_active.goto_folder(app.cfg.bookmarks[ch], delete_vfs_tree=True)
     return RetCode.full_redisplay, None
 
 @public
@@ -169,23 +192,14 @@ def bookmark_set():
     if fs.vfs:
         DialogError('Cannot save a bookmark to a VFS')
         return RetCode.full_redisplay, None
-    while True:
-        key = DialogGetKey('Set bookmark',
-                           'Press 0-9 a-z to save bookmark, Ctrl-C to quit')
-        if key == -1: # Ctrl-C
-            break
-        elif chr(key) in BOOKMARKS_KEYS:
-            log.debug('Save bookmark "{}" to key "{}"'.format(fs.path_str, chr(key)))
-            app.cfg.bookmarks[chr(key)] = fs.path_str
-            break
-    return RetCode.full_redisplay, None
 
-@public
-def bookmark_select_fromlist():
     bmks = sorted(['{}  {}'.format(k, b) for k, b in app.cfg.bookmarks.items()])
-    ret = SelectItem('Select Bookmark', bmks).run()
-    if ret != -1:
-        app.pane_active.tab_active.goto_folder(ret[3:], delete_vfs_tree=True)
+    ret = SelectItem('Set bookmark', bmks).run()
+    
+    if ((ret != -1) and (ret[0] in BOOKMARKS_KEYS)):
+        ch = ret[0]
+        log.debug('Save bookmark "{}" to key "{}"'.format(fs.path_str, ch))
+        app.cfg.bookmarks[ch] = fs.path_str
     return RetCode.full_redisplay, None
 
 @public
@@ -276,7 +290,7 @@ def sort_files():
             break
         elif chr(key) in sorttypes.keys():
             app.cfg.options.sort_type = sorttypes[chr(key)]
-            app.cfg.options.sort_reverse = key<ord('Z')
+            app.cfg.options.sort_reverse = (key < ord('Z'))
             app.pane1.refresh()
             app.pane2.refresh()
             break
@@ -389,6 +403,43 @@ def select_invert():
     tab.selected = [f for f in tab.fs if f not in selected_old and f.name != '..']
     return RetCode.half_redisplay, None
 
+@public 
+def select_newer():
+    tab1, tab2 = app.pane1.tab_active, app.pane2.tab_active
+    fs1 = sorted(tab1.fs, key=lambda f: f.name)
+    fs2 = sorted(tab2.fs, key=lambda f: f.name)
+    i1, i2 = 0, 0
+    # Iterate over the sorted lists, when a file is not on both, select it,
+    # when it's on both, select the newest only
+    while ((i1 < len(fs1)) or (i2 < len(fs2))):
+        # c < 0 pick f1, c > 0 pick f2
+        c = -1 if (i2 == len(fs2)) else (1 if (i1 == len(fs1)) else cmp(fs1[i1].name, fs2[i2].name))
+        if (c < 0):
+            # select f1 in tab1 and advance
+            tab1.selected.append(fs1[i1])
+            i1 += 1
+
+        elif (c > 0):
+            # select f2 in tab2 and advance
+            tab2.selected.append(fs2[i2])
+            i2 += 1
+
+        else:
+            # Same filename, pick newest or none if same date
+            f1 = fs1[i1]
+            f2 = fs2[i2]
+            if (f1.name != ".."):
+                c = f1.mtime - f2.mtime
+                if (c > 0):
+                    tab1.selected.append(f1)
+                elif (c < 0):
+                    tab2.selected.append(f2)
+
+            i1 += 1
+            i2 += 1
+    
+    return RetCode.full_redisplay, None
+
 
 ########################################################################
 ##### Files
@@ -450,6 +501,8 @@ def copy_file():
     destdir, basepath, files = __copymove_helper('Copy')
     if not destdir:
         return RetCode.full_redisplay, None
+    # XXX PathContents can take a very long time, defer to ProcessFunc and make
+    #     it interruptible. See eg actions.show_dirs_size
     es = utils.PathContents(files, basepath)
     args = [(f, s, e, basepath, destdir) for f, s, e in es.entries]
     st, rets, errs = utils.ProcessFuncCopyLoop('Copy file(s)', utils.copy_file, args,
@@ -470,6 +523,8 @@ def move_file():
     destdir, basepath, files = __copymove_helper('Move')
     if not destdir:
         return RetCode.full_redisplay, None
+    # XXX PathContents can take a very long time, defer to ProcessFunc and make
+    #     it interruptible. See eg actions.show_dirs_size
     es = utils.PathContents(files, basepath)
     args = [(f, s, e, basepath, destdir) for f, s, e in es.entries]
     st, rets, errs = utils.ProcessFuncCopyLoop('Move file(s)', utils.copy_file, args,
@@ -527,6 +582,8 @@ def delete_file():
     if len(files) == 0:
         return RetCode.nothing, None
     log.debug('Delete file(s)')
+    # XXX PathContents can take a very long time, defer to ProcessFunc and make
+    #     it interruptible. See eg actions.show_dirs_size
     es = utils.PathContents(files, tab.dirname+sep)
     args = [(f, s, e, tab.dirname+sep) for f, s, e in es.entries_rev] # reverse!
     st, rets, errs = utils.ProcessFuncDeleteLoop('Delete file(s)', utils.delete_file, args,
@@ -582,7 +639,9 @@ def make_dir():
         return RetCode.full_redisplay, None
     else:
         app.history.append('file', newdir)
-        return refresh()
+        ret = refresh()
+        app.pane_active.tab_active.focus_file(newdir)
+        return ret
 
 @public
 def touch_file():
@@ -780,7 +839,7 @@ def show_file_info():
     lst.append(('Location: {}, {} / Inode: #{:X} ({:X}h:{:X}h)'.format(
         (dev>>8) & 0x00FF, dev & 0x00FF, f.stat.st_ino, dev, f.stat.st_ino), color))
     filename = tab.fs.path_str if tab.fs.vfs else f.pfile
-    mountpoint, device, fstype = utils.get_mountpoint_for_file(filename)
+    mountpoint, device, fstype = utils.get_mountpoint_for_file(realpath(filename))
     lst.append(('File system: {} on {} ({})'.format(device, mountpoint, fstype), color))
     InternalView('Information about \'{}\''.format(f.name), lst).run()
     return refresh()
@@ -805,7 +864,19 @@ def show_filesystems_info():
 ########################################################################
 ##### Un/compress
 def do_uncompress_dir(destdir):
-    args = [(f.pfile, destdir) for f in app.pane_active.tab_active.selected_or_current]
+    # XXX Have a setting/dialog box for this yeas/no/all dialog box, needs a 
+    #     specific uncompress ProcessFuncLoop since by default it will show a
+    #     dialog box with only ctrl+c available
+    ch = DialogConfirmCancel('Uncompress File', 'Uncompress in its own subdirectory?', 1)
+    if (ch == 0):
+        args = [(f.pfile, destdir) for f in app.pane_active.tab_active.selected_or_current]
+    elif (ch == 1):
+        # Join the filename to destdir, uncompress_dir will create if doesn't
+        # exist already
+        args = [(f.pfile, join(destdir, splitext(basename(f.pfile))[0])) for f in app.pane_active.tab_active.selected_or_current]
+    else:
+        return RetCode.full_redisplay, None
+        
     if len(args) == 0:
         return RetCode.nothing, None
     log.debug('Uncompress file(s) to \'{}\''.format(destdir))

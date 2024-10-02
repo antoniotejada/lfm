@@ -99,23 +99,28 @@ def lfm_start():
         print('lfm - ERROR: cannot initialize path\n{}'.format(err))
         sys.exit(-1)
 
-    logging.info('Start lfm')
+    log.info('Start lfm')
     try:
         path = run_app(args.path1, args.path2, args.use_wide_chars)
     except FileNotFoundError as err:
         print('ERROR: Cannot copy default theme or keys file to user configuration folder {}\n{}\nQuitting'.format(CONFIG_DIR, err))
-        sys.exit(-1)
+        # XXX Fix, this doesn't always come from failure to copy theme or keys,
+        #     for the time being raise so it doesn't hide the error report
+        if (log.getEffectiveLevel() <= logging.DEBUG):
+            raise
+        else:
+            sys.exit(-1)
     except BaseException as err:
         import traceback
         tb_str = traceback.format_exc()
-        logging.critical('ERROR: ' + str(err))
-        logging.critical(tb_str)
+        log.critical('ERROR: ' + str(err))
+        log.critical(tb_str)
         print('ERROR:', str(err))
         print(tb_str)
         path = None
         raise
 
-    logging.info('End lfm, returns: "{}"'.format(path))
+    log.info('End lfm, returns: "{}"'.format(path))
     if path is not None:
         lfm_exit(0, path)
     else:

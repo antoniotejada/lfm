@@ -5,8 +5,9 @@ import curses
 import curses.panel
 from os import sep, listdir
 from os.path import basename, dirname, exists, expanduser, isdir, isabs, join
+from time import time
 
-from utils import length, max_length, text2wrap, prev_step, next_step, perms2str, get_binary_programs, DirsTree
+from utils import length, max_length, text2wrap, prev_step, next_step, secs2str, size2str, perms2str, get_binary_programs, DirsTree
 from common import *
 
 
@@ -162,6 +163,86 @@ def DialogConfirm(title, question, default=0):
             break
         elif ch in (0x03, 0x1B):    # Ctrl-C, ESC
             answer = 0
+            break
+        elif ch in (10, 13):        # enter
+            break
+        else:
+            curses.beep()
+    pwin.hide()
+    curses.panel.update_panels()
+    return answer
+
+
+def DialogConfirmCancel(title, question, default=0):
+    """Show a yes/no/cancel question, returning 1/0/-1"""
+    BTN_SELECTED, BTN_NO_SELECTED = app.CLR['button_active'], app.CLR['button_inactive']
+    h, w = 5, min(max(34, len(question)+5), app.w-2)
+    try:
+        win = curses.newwin(h, w, (app.h-h)//2, (app.w-w)//2)
+        pwin = curses.panel.new_panel(win)
+        pwin.top()
+    except curses.error:
+        raise
+    win.keypad(1)
+    win.bkgd(app.CLR['dialog'])
+    win.erase()
+    win.box()
+    win.addstr(0, (w-len(title)-2)//2, ' %s ' % title, app.CLR['dialog_title'])
+    win.addstr(1, 2, question)
+    win.refresh()
+    row, col = (app.h-h)//2 + 3, (app.w-w)//2
+    # XXX Use this code to create a generic DialogConfirm instead of replicating
+    #     and hand-tuning values everywhere
+    btn_infos = [
+        # text, answer, column
+        ['[ Yes ]', 1, 0],
+        ['[ No ]', 0, 0],
+        ['[ Cancel ]', -1, 0],
+    ]
+    margin = 2
+    btns_width = sum([len(btn_text) for btn_text, _, _ in btn_infos])
+    avail_padding = (w - margin * 2 - btns_width)
+    # Padding at the beginning, end, and in between each button
+    btn_padding = avail_padding // (len(btn_infos) + 1)
+    # if btn_padding is not evenly divisible, the remainder will distributed 
+    # between the margins, with the remainder of the remainder in the right margin
+    btn_col = col + margin + btn_padding + (avail_padding - btn_padding * (len(btn_infos) + 1)) // 2
+    for i in range(len(btn_infos)):
+        btn_infos[i][-1] = btn_col
+        btn_col += btn_padding + len(btn_infos[i][0])
+
+    win.keypad(1)
+    answer = default
+    order = [1, 0, -1]
+    while True:
+        for btn_text, btn_answer, btn_col in btn_infos:
+            btn_attr = BTN_SELECTED if (answer == btn_answer) else BTN_NO_SELECTED
+            btn = curses.newpad(1, len(btn_text) + 1)
+            btn.addstr(0, 0, btn_text, btn_attr)
+            btn.refresh(0, 0, row, btn_col, row + 1, btn_col + len(btn_text) - 1)
+            
+        ch = win.getch()
+        if ch in (curses.KEY_UP, curses.KEY_LEFT, curses.KEY_BTAB):
+            try:
+                answer = order[order.index(answer) - 1]
+            except IndexError:
+                answer = order[len(order)]
+        elif ch in (curses.KEY_DOWN, curses.KEY_RIGHT, 9):
+            try:
+                answer = order[order.index(answer) + 1]
+            except IndexError:
+                answer = order[0]
+        elif ch in (ord('Y'), ord('y')):
+            answer = 1
+            break
+        elif ch in (ord('N'), ord('n')):
+            answer = 0
+            break
+        elif ch in (ord('C'), ord('c')):
+            answer = -1
+            break
+        elif ch in (0x03, 0x1B):    # Ctrl-C, ESC
+            answer = -1
             break
         elif ch in (10, 13):        # enter
             break
@@ -356,7 +437,12 @@ class CursorAnimation:
     def next(self):
         self.win.erase()
         self.win.addch(CursorAnimation.anim_chars[self.step%4])
-        self.win.refresh(0, 0, 0, app.w-3, 1, app.w-2)
+        try:
+            self.win.refresh(0, 0, 0, app.w-3, 1, app.w-2)
+        except curses.error as e:
+            # XXX This can return error when in a progress dialog box and
+            #     the window is resized, ignore for now, but investigate
+            log.error("Ignoring win.refresh error %r", e)
         self.step = 0 if self.step>3 else self.step+1
 
 
@@ -448,6 +534,10 @@ class DialogProgress2Panel(DialogProgress1Panel):
     def __init__(self, title):
         title = title[:app.w-14]
         h, self.w = 8, min(max(len(title), 60)+6, app.w-2)
+        self.start_time = None
+        self.last_update_sp = 0
+        self.last_update_sp_time = time()
+        self.bps = 0
         try:
             self.win = curses.newwin(h, self.w, (app.h-h)//2, (app.w-self.w)//2)
             self.pwin = curses.panel.new_panel(self.win)
@@ -461,23 +551,58 @@ class DialogProgress2Panel(DialogProgress1Panel):
         self.win.box()
         self.win.addstr(0, (self.w-len(title)-2)//2, ' %s ' % title, app.CLR['dialog_title'])
         self.win.addstr(2, 2, 'File:')
-        self.win.addstr(4, 2, 'Bytes')
-        self.win.addstr(4, 9, ' '*(self.w-4-14), app.CLR['progressbar_bg'])
+        self.win.addstr(4, 2, ' '*(self.w-2-9), app.CLR['progressbar_bg'])
         self.win.addstr(4, self.w-8, '[  0%]')
-        self.win.addstr(5, 2, 'Count')
-        self.win.addstr(5, 9, ' '*(self.w-4-14), app.CLR['progressbar_bg'])
+        self.win.addstr(5, 2, ' '*(self.w-2-9), app.CLR['progressbar_bg'])
         self.win.addstr(5, self.w-8, '[  0%]')
         self.win.addstr(h-1, (self.w-22)//2, ' Press Ctrl-C to stop ')
         self.win.refresh()
 
-    def update(self, text, i, n, sp, st):
-        buf = '{}/{}'.format(i, n)
-        self.win.addstr(2, 9, text2wrap(text, self.w-11-11, fill=True), app.CLR['dialog_title'])
-        self.win.addstr(2, self.w-2-len(buf), buf)
-        self.win.addstr(4, 9, ' '*int((self.w-4-14)*sp/st), app.CLR['progressbar_fg'])
-        self.win.addstr(4, self.w-8, '[{:3}%]'.format(100*sp//st))
-        self.win.addstr(5, 9, ' '*int((self.w-4-14)*i/n), app.CLR['progressbar_fg'])
-        self.win.addstr(5, self.w-8, '[{:3}%]'.format(100*i//n))
+    def update(self, text, i, n, sp, st, ssp=None, sst=None):
+        self.win.addstr(2, 9, text2wrap(text, self.w-11, fill=True), app.CLR['dialog_title'])
+        # XXX The caller should avoid calling this wasting CPU, it cannot be
+        #     done here because it doesn't know when the last update is or which
+        #     updates are important?
+
+        # Calculate the bps by looking at the amount transferred since the last
+        # non-zero update. Don't use the total times since the copy may be
+        # blocked by a confirmation dialog box which will cause initial speed to
+        # be low and, on the other side, file caches may cause initial speed to
+        # be high, both of which will show very inaccurate times until the
+        # total counters catch up with the real speed.
+        
+        # XXX If the file cache is larger than the file, the transfer will
+        #     happen immediately and the stat update will block, seemingly
+        #     looking like the program hung. Not clear anything can be done
+        #     other than disabling caching externally to lfm?
+        t = time()
+        if (((t - self.last_update_sp_time) > 2.0) or (self.bps == 0)):
+            self.bps = (sp-self.last_update_sp) / (t - self.last_update_sp_time + 0.1)
+            self.last_update_sp_time = t
+            self.last_update_sp = sp
+        bps = self.bps
+
+        if (ssp is None):
+            # This operation doesn't have a current file percentage (eg Delete
+            # operation)
+            # XXX Remove the current file progress bar below?
+            # XXX Also override bps above so it's calculated over the number of
+            #     files, not over the total file size
+            pct_ddone = 100
+        else:
+            pct_ddone = int(round(ssp/(sst+0.1)*100))
+        pct_done = int(round(sp/(st+0.1)*100))
+        self.win.addstr(3, 9, text2wrap('%ss %sB left - %sBps' % (secs2str((st-sp)/(bps+0.1)), size2str(st-sp), size2str(bps)), self.w-4-14,fill=True))
+        self.win.addstr(4, 2, ' '*(self.w-2-9), app.CLR['progressbar_bg'])
+        self.win.addstr(4, 2, ' '*int((self.w-2-9)*pct_ddone/100), app.CLR['progressbar_fg'])
+        self.win.addstr(4, self.w-8, '[{:3}%]'.format(pct_ddone))
+        self.win.addstr(5, 2, ' '*int((self.w-2-9)*pct_done/100), app.CLR['progressbar_fg'])
+        self.win.addstr(5, self.w-8, '[{:3}%]'.format(pct_done))
+        
+        self.win.addstr(6, 2, ' '*(self.w-4))
+        self.win.addstr(6, 2, '{} / {}'.format(i, n))
+        buf = ' {} / {}'.format(size2str(sp), size2str(st))
+        self.win.addstr(6, self.w-len(buf)-2, buf)
 
 
 ########################################################################
