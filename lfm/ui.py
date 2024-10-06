@@ -4,7 +4,7 @@
 import errno
 import curses
 from os import getuid, pardir, statvfs
-from os.path import basename, dirname, exists, join
+from os.path import basename, dirname, exists, join, split
 from datetime import datetime
 
 from preferences import Config, load_colortheme, load_keys, History
@@ -135,6 +135,7 @@ class UI:
                     try:
                         tab.goto_folder(path)
                     except:
+                        # XXX Needs to skip initialization below
                         log.warning("Cannot restore path %r, using . instead", path)
                 
                 # Make the proper tab active
@@ -158,6 +159,15 @@ class UI:
                         if f:
                             log.debug("Restoring selection %r", filename)
                             tab.selected.append(f)
+
+                    # History is on the second revision of the config, ignore
+                    # if not present
+                    if ("history_mru" in tab_config):
+                        log.debug("Restoring history %r", tab_config["history"])
+                        tab.history = tab_config["history"]
+                        tab.next_history_index = tab_config["next_history_index"]
+                        log.debug("Restoring history_mru %r", tab_config["history_mru"])
+                        tab.history_mru = tab_config["history_mru"]
                         
                 panes.append(pane)
 
@@ -444,6 +454,8 @@ class Tab:
     def __init__(self, path):
         self.fs = None
         self.history = []
+        self.history_mru = []
+        self.next_history_index = 0
         self.goto_folder(path)
 
     def __check_rebuild(self):
@@ -458,9 +470,20 @@ class Tab:
     def close(self):
         self.fs.exit(all_levels=True, rebuild=self.__check_rebuild())
 
+    def goto_history(self, entry_i):
+        if (0 <= entry_i < len(self.history)):
+            self.next_history_index = entry_i
+            self.goto_folder(self.history[self.next_history_index], delete_vfs_tree=True)
+            
+            # If the next history entry is a file in this directory, focus on
+            # that file.
+            if (self.next_history_index < len(self.history)):
+                d, b = split(self.history[self.next_history_index])
+                if (self.fs.path_str == d):
+                    self.focus_file(b)
+
     def goto_folder(self, path, delete_vfs_tree=False, files=None):
         """Called when chdir to a new path"""
-        oldpath = self.fs.path_str if self.fs else None
         oldfs = self.fs
         try:
             if files: # search vfs
@@ -489,11 +512,30 @@ class Tab:
         self.a = self.i = 0
         self.selected = []
         self.refresh(first=True)
-        if oldpath and VFS_STRING not in oldpath:
-            if oldpath in self.history:
-                self.history.remove(oldpath)
-            self.history.append(oldpath)
+        newpath = self.fs.path_str
+        if newpath and VFS_STRING not in newpath:
+            # Append to MRU
+            try:
+                self.history_mru.remove(newpath)
+            except ValueError: 
+                pass
+            self.history_mru.append(newpath)
+            # The history index points to the next entry to be filled in, if the
+            # entry is the same this means it's navigating the history,
+            # otherwise it's creating new history
+            if (self.next_history_index < len(self.history)):
+                if (self.history[self.next_history_index] != newpath):
+                    # Trim the history
+                    self.history = self.history[:self.next_history_index]
+                    self.history.append(newpath)
+            else:
+                self.history.append(newpath)
+            self.next_history_index += 1
+            
+            # Only keep the HISTORY_MAX last entries
+            self.next_history_index -= max(0, (len(self.history) - HISTORY_MAX))
             self.history = self.history[-HISTORY_MAX:]
+            self.history_mru = self.history_mru[-HISTORY_MAX:]
 
     def reload(self):
         """Called when contents have changed"""
@@ -846,7 +888,10 @@ def launch_ui(win, path1, path2, use_wide_chars):
                         tab_state = {
                             'path' : dirname(tab.fs.base_filename) if tab.fs.vfs else tab.fs.path_str,
                             'focused_file' : basename(tab.fs.base_filename) if tab.fs.vfs else tab.fs[tab.i].name,
-                            'selected_files' : [] if tab.fs.vfs else [fs.name for fs in tab.selected]
+                            'selected_files' : [] if tab.fs.vfs else [fs.name for fs in tab.selected],
+                            'history' : tab.history,
+                            'history_mru' : tab.history_mru,
+                            'next_history_index' : tab.next_history_index,
                         }
                         panel_state["tabs"].append(tab_state)
                     state["panels"].append(panel_state)

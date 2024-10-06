@@ -180,8 +180,8 @@ def goto():
 def bookmark_goto():
     bmks = sorted(['{}  {}'.format(k, b) for k, b in app.cfg.bookmarks.items()])
     ret = SelectItem('Goto bookmark', bmks).run()
-    if ((ret != -1) and (ret[0] in BOOKMARKS_KEYS)):
-        ch = ret[0]
+    if ((ret != -1) and (bmks[ret][0] in BOOKMARKS_KEYS)):
+        ch = bmks[ret][0]
         log.debug('Goto bookmark in key "{}" > "{}"'.format(ch, app.cfg.bookmarks[ch]))
         app.pane_active.tab_active.goto_folder(app.cfg.bookmarks[ch], delete_vfs_tree=True)
     return RetCode.full_redisplay, None
@@ -196,21 +196,51 @@ def bookmark_set():
     bmks = sorted(['{}  {}'.format(k, b) for k, b in app.cfg.bookmarks.items()])
     ret = SelectItem('Set bookmark', bmks).run()
     
-    if ((ret != -1) and (ret[0] in BOOKMARKS_KEYS)):
-        ch = ret[0]
+    if ((ret != -1) and (bmks[ret][0] in BOOKMARKS_KEYS)):
+        ch = bmks[ret][0]
         log.debug('Save bookmark "{}" to key "{}"'.format(fs.path_str, ch))
         app.cfg.bookmarks[ch] = fs.path_str
     return RetCode.full_redisplay, None
+    
+@public
+def history_select_frommru():
+    return history_select_fromlist(True)
 
 @public
-def history_select_fromlist():
+def history_select_fromlist(mru = False):
     tab = app.pane_active.tab_active
-    if len(tab.history) == 0:
+    if ((len(tab.history_mru) if mru else len(tab.history)) == 0):
         DialogError('No entries in history')
         return RetCode.full_redisplay, None
-    ret = SelectItem('Return to', list(reversed(tab.history)), quick_key=False).run()
+    if (mru):
+        entries = tab.history_mru
+        entry_i = tab.history_mru.index(tab.history[tab.next_history_index - 1])
+
+    else:
+        entries = tab.history
+        entry_i = tab.next_history_index - 1
+
+    ret = SelectItem('Navigate ' + ('MRU' if mru else 'History'), entries, entry_i=entry_i, quick_key=False).run()
     if ret != -1:
-        app.pane_active.tab_active.goto_folder(ret, delete_vfs_tree=True)
+        if (mru):
+            tab.goto_folder(entries[ret])
+        else:
+            tab.goto_history(ret)
+        
+    return RetCode.full_redisplay, None
+
+@public
+def history_next():
+    tab = app.pane_active.tab_active
+    tab.goto_history(tab.next_history_index)
+    
+    return RetCode.full_redisplay, None
+
+@public
+def history_prev():
+    tab = app.pane_active.tab_active
+    tab.goto_history(tab.next_history_index - 2)
+
     return RetCode.full_redisplay, None
 
 
@@ -226,6 +256,18 @@ def pane_change_focus():
 def pane_other_tab_equal():
     path = app.pane_active.tab_active.fs.path_str
     app.pane_inactive.tab_active.goto_folder(path, delete_vfs_tree=True)
+    return RetCode.full_redisplay, None
+
+@public
+def pane_right_equal():
+    path = app.pane1.tab_active.fs.path_str
+    app.pane2.tab_active.goto_folder(path, delete_vfs_tree=True)
+    return RetCode.full_redisplay, None
+
+@public
+def pane_left_equal():
+    path = app.pane2.tab_active.fs.path_str
+    app.pane1.tab_active.goto_folder(path, delete_vfs_tree=True)
     return RetCode.full_redisplay, None
 
 @public
@@ -535,10 +577,10 @@ def move_file():
     for a, res, err in zip(args, rets, errs):
         if err:
             if isinstance(err, LFMFileSkipped):
-                log.warning('Move file(s). Not overwritten: {}'.format(str(err)))
-                not_overwritten.append(str(err))
+                log.warning('Not moving {} due to skipping'.format(a[0]))
             else:
-                log.warning('ERROR: {}'.format(str(err).replace('\n', ' ')))
+                log.warning('Not moving {} due to error {}'.format(a[0], str(err).replace('\n', ' ')))
+            not_overwritten.append(a[0])
     es.remove_files(not_overwritten)
     args = [(f, s, e, basepath) for f, s, e in es.entries_rev] # reverse!
     st, rets, errs = utils.ProcessFuncDeleteLoop('Move file(s)', utils.delete_file, args,
@@ -1084,7 +1126,7 @@ def main_menu():
             'h    Delete history']
     ret = SelectItem('Main Menu', menu, min_height=True).run()
     if ret != -1:
-        ch = ret[0]
+        ch = menu[ret][0]
         if ch == '/':
             return find_grep()
         elif ch == '#':
@@ -1136,7 +1178,7 @@ def file_menu():
             'c    Compress directory to format…']
     ret = SelectItem('File Menu', menu, min_height=True).run()
     if ret != -1:
-        ch = ret[0]
+        ch = menu[ret][0]
         if ch == '@':
             return exec_on_file()
         elif ch == 'i':
@@ -1174,7 +1216,7 @@ def help_menu():
             'k    Key bindings']
     ret = SelectItem('Help Menu', menu, min_height=True).run()
     if ret != -1:
-        if ret[0] == 'k':
+        if menu[ret][0] == 'k':
             from preferences import dump_keys_to_file
             dump_keys_to_file(app.keys)
             filename = DUMP_KEYS_FILE

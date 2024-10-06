@@ -610,7 +610,7 @@ class DialogProgress2Panel(DialogProgress1Panel):
 class SelectItem:
     """A dialog to select an item in a list"""
 
-    def __init__(self, title, entries, y0=-1, x0=-1, entry_i='', quick_key=True, min_height=False):
+    def __init__(self, title, entries, y0=-1, x0=-1, entry_i=None, quick_key=True, min_height=False):
         self.quick_key = quick_key
         if y0==-1 and x0==-1: # (y0,x0) is the position, if == -1 => center
             self.h = min(app.h-4, len(entries) if min_height else 10) + 2
@@ -629,10 +629,7 @@ class SelectItem:
         self.win.bkgd(app.CLR['selectitem'])
         self.entries = entries
         self.nels = len(entries)
-        try:
-            self.entry_i = self.entries.index(entry_i)
-        except:
-            self.entry_i = 0
+        self.entry_i = 0 if entry_i is None else entry_i
         self.title = title
 
     def show(self):
@@ -662,7 +659,7 @@ class SelectItem:
                 if ch in initials:
                     for e in self.entries:
                         if ch == ord(e[0]):
-                            return self.entries[self.entries.index(e)]
+                            return self.entries.index(e)
             if ch in (0x03, 0x1B, ord('q'), ord('Q')):     # Ctrl-C, ESC
                 return -1
             elif ch in (curses.KEY_UP, ord('k'), ord('K')):
@@ -687,7 +684,7 @@ class SelectItem:
                         self.entry_i = self.entries.index(e)
                         break
             elif ch in (0x0A, 0x0D):   # enter
-                return self.entries[self.entry_i]
+                return self.entry_i
             else:
                 curses.beep()
 
@@ -907,6 +904,7 @@ class EntryLine:
                 y = self.y0
             curses.curs_set(0)
             selected = SelectItem(title, entries, y+1, x-2, quick_key=False).run()
+            selected = entries[selected] if selected != -1 else selected 
             app.display()
             if not self.cli:
                 self.par_widget.show()
@@ -1460,13 +1458,13 @@ class DialogOwner:
                 if self.entry_i == 3:
                     self.recursive = not self.recursive
                 elif self.entry_i == 0:
-                    ret = SelectItem('Select new owner', self.owners, y+6, x+7, self.owner).run()
+                    ret = SelectItem('Select new owner', self.owners, y+6, x+7, self.owners.index(self.owner)).run()
                     if ret != -1:
-                        self.owner = ret
+                        self.owner = self.owners[ret]
                 elif self.entry_i == 1:
-                    ret = SelectItem('Select new group', self.groups, y+6, x+21, self.group).run()
+                    ret = SelectItem('Select new group', self.groups, y+6, x+21, self.groups.index(self.group)).run()
                     if ret != -1:
-                        self.group = ret
+                        self.group = self.groups[ret]
                 elif self.entry_i == 12:
                     return -1, -1, False, False
                 elif self.n>1 and self.entry_i==13:
